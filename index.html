@@ -4,132 +4,368 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PhysiTal Simulations — Ceres Orbit Determination</title>
-<script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600&family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #050510;
+  --surface: rgba(18, 18, 28, 0.88);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e2e8f0;
+  --text-dim: #8b949e;
+  --accent: #60a5fa;
+  --accent2: #a78bfa;
+  --green: #2dce89;
+  --gold: #ffd700;
+}
+
 body {
   min-height: 100vh;
-  background: #050510;
+  background: var(--bg);
   font-family: 'Rubik', 'Assistant', sans-serif;
-  color: #e2e8f0;
+  color: var(--text);
+  overflow-x: hidden;
 }
+
+/* Starfield background */
+.stars { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
+.stars span {
+  position: absolute; border-radius: 50%; background: white;
+  animation: twinkle 3s infinite alternate;
+}
+@keyframes twinkle { 0% { opacity: 0.2; } 100% { opacity: 0.8; } }
+
+/* Hero section */
 .hero {
   text-align: center;
-  padding: 60px 20px 40px;
-  background: linear-gradient(180deg, rgba(96,165,250,0.08) 0%, transparent 100%);
+  padding: 80px 24px 48px;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 800px; height: 500px;
+  background: radial-gradient(ellipse, rgba(96,165,250,0.08) 0%, rgba(167,139,250,0.04) 40%, transparent 70%);
+  pointer-events: none;
+}
+.hero-icon {
+  width: 72px; height: 72px;
+  margin: 0 auto 20px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(96,165,250,0.15), rgba(167,139,250,0.15));
+  border: 1px solid rgba(96,165,250,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2rem;
 }
 .hero h1 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  margin-bottom: 12px;
-  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  font-size: 2.6rem; font-weight: 700; margin-bottom: 14px;
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #60a5fa 100%);
+  background-size: 200% auto;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  animation: shimmer 6s linear infinite;
 }
-.hero p { color: #8b949e; font-size: 1rem; max-width: 600px; margin: 0 auto; line-height: 1.7; }
+@keyframes shimmer { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
+.hero .subtitle {
+  color: var(--text-dim); font-size: 1.05rem;
+  max-width: 640px; margin: 0 auto; line-height: 1.8; font-weight: 300;
+}
+.hero .meta-badge {
+  display: inline-block; margin-top: 20px;
+  padding: 6px 18px; border-radius: 99px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 0.78rem; color: var(--text-dim); letter-spacing: 0.5px;
+}
+.hero .meta-badge span { color: var(--accent); font-weight: 500; }
+
+/* Section headers */
+.section-header {
+  max-width: 1200px; margin: 0 auto; padding: 48px 24px 16px;
+}
+.section-header h2 {
+  font-size: 0.82rem; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 2px;
+  color: var(--accent); padding-bottom: 8px;
+  border-bottom: 1px solid rgba(96,165,250,0.15);
+  display: inline-block;
+}
+
+/* Cards grid */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px; max-width: 1200px; margin: 0 auto; padding: 0 24px 24px;
 }
+
 .card {
-  background: rgba(18, 18, 24, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 16px;
-  padding: 24px;
+  position: relative; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 16px; padding: 28px;
   backdrop-filter: blur(16px);
-  transition: transform 0.2s, box-shadow 0.2s;
-  text-decoration: none;
-  color: inherit;
-  display: block;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  text-decoration: none; color: inherit;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--card-accent, #60a5fa), transparent);
+  opacity: 0; transition: opacity 0.3s;
 }
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(96,165,250,0.15);
-  border-color: rgba(96,165,250,0.3);
+  transform: translateY(-6px);
+  box-shadow: 0 20px 60px rgba(96,165,250,0.12), 0 4px 20px rgba(0,0,0,0.3);
+  border-color: rgba(96,165,250,0.2);
 }
+.card:hover::before { opacity: 1; }
+
+.card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+.card-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; flex-shrink: 0;
+  background: rgba(96,165,250,0.1); border: 1px solid rgba(96,165,250,0.15);
+}
+.card-meta { flex: 1; }
 .card .tag {
-  display: inline-block;
-  background: rgba(96,165,250,0.15);
-  color: #60a5fa;
-  font-size: 0.72rem;
-  padding: 3px 10px;
-  border-radius: 99px;
-  margin-bottom: 12px;
-  font-weight: 500;
+  display: inline-block; font-size: 0.68rem;
+  padding: 2px 10px; border-radius: 99px; font-weight: 500;
+  letter-spacing: 0.3px; margin-bottom: 6px;
 }
-.card .tag.green { background: rgba(45,206,137,0.15); color: #2dce89; }
-.card .tag.gold { background: rgba(255,215,0,0.15); color: #ffd700; }
-.card .tag.red { background: rgba(233,69,96,0.15); color: #e94560; }
-.card h2 { font-size: 1.15rem; font-weight: 500; margin-bottom: 8px; }
-.card p { color: #8b949e; font-size: 0.85rem; line-height: 1.6; }
+.tag-physital { background: rgba(45,206,137,0.12); color: var(--green); }
+.tag-interactive { background: rgba(96,165,250,0.12); color: var(--accent); }
+.tag-docs { background: rgba(255,215,0,0.12); color: var(--gold); }
+
+.card h3 { font-size: 1.15rem; font-weight: 500; line-height: 1.3; }
+.card .desc { color: var(--text-dim); font-size: 0.84rem; line-height: 1.7; flex: 1; }
+.card .features {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;
+  padding-top: 14px; border-top: 1px solid var(--border);
+}
+.feature-chip {
+  font-size: 0.68rem; padding: 3px 10px; border-radius: 6px;
+  background: rgba(255,255,255,0.04); color: var(--text-dim);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Info banner */
+.info-banner { max-width: 1200px; margin: 8px auto 0; padding: 0 24px; }
+.info-banner-inner {
+  background: rgba(96,165,250,0.06);
+  border: 1px solid rgba(96,165,250,0.1); border-radius: 12px;
+  padding: 16px 22px; display: flex; align-items: center; gap: 14px;
+  font-size: 0.84rem; color: var(--text-dim); line-height: 1.6;
+}
+.info-banner-inner .info-icon { font-size: 1.4rem; flex-shrink: 0; }
+.info-banner-inner kbd {
+  display: inline-block; padding: 1px 7px; border-radius: 4px;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+  font-family: monospace; font-size: 0.82rem; color: var(--text);
+}
+
+/* Footer */
 .footer {
-  text-align: center;
-  padding: 40px 20px;
-  color: #484f58;
-  font-size: 0.78rem;
+  text-align: center; padding: 56px 24px 32px;
+  color: #3d4450; font-size: 0.78rem; line-height: 1.8;
 }
-.footer a { color: #60a5fa; text-decoration: none; }
+.footer a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+.footer a:hover { color: #93bbfc; }
+.footer .divider { width: 40px; height: 1px; background: rgba(255,255,255,0.06); margin: 16px auto; }
+
+/* Responsive */
+@media (max-width: 720px) {
+  .hero h1 { font-size: 1.8rem; }
+  .grid { grid-template-columns: 1fr; }
+  .hero { padding: 48px 16px 32px; }
+}
 </style>
 </head>
 <body>
 
+<!-- Starfield -->
+<div class="stars" id="stars"></div>
+
+<!-- Hero -->
 <div class="hero">
+  <div class="hero-icon">&#127756;</div>
   <h1>PhysiTal Simulations</h1>
-  <p>
+  <p class="subtitle">
     Milestone 4 — Ceres Orbit Determination<br>
-    19 observations by Giuseppe Piazzi (Jan–Feb 1801)
+    19 observations by Giuseppe Piazzi (Jan–Feb 1801)<br>
+    Recovering a lost dwarf planet using computational astrophysics
   </p>
+  <div class="meta-badge">
+    <span>6</span> interactive simulations &middot; <span>PhysiTal 2.0</span> standard &middot; Weizmann Institute
+  </div>
 </div>
 
+<!-- Recording info banner -->
+<div class="info-banner">
+  <div class="info-banner-inner">
+    <span class="info-icon">&#127909;</span>
+    <span>
+      All simulations include a built-in <b>recording module</b> — press <kbd>R</kbd> to open the recording frame.
+      Record video (WebM), take screenshots, choose resolution and aspect ratio.
+    </span>
+  </div>
+</div>
+
+<!-- Featured Simulations -->
+<div class="section-header"><h2>Featured — PhysiTal 2.0</h2></div>
 <div class="grid">
-
-  <a class="card" href="convergence_simulation.html">
-    <span class="tag green">PhysiTal 2.0</span>
-    <h2>Convergence Explorer</h2>
-    <p>Multi-start optimization convergence visualization. Morph animation from initial guesses to converged results + detailed step-by-step iteration viewer with loss curves and gradient analysis.</p>
+  <a class="card" href="convergence_simulation.html" style="--card-accent: #2dce89;">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(45,206,137,0.1); border-color:rgba(45,206,137,0.15);">&#127919;</div>
+      <div class="card-meta">
+        <span class="tag tag-physital">PhysiTal 2.0</span>
+        <h3>Convergence Explorer</h3>
+      </div>
+    </div>
+    <p class="desc">
+      Watch multi-start Levenberg-Marquardt optimization converge to Ceres' orbital parameters.
+      <b>Morph mode</b> animates all starts from initial guesses to final solutions.
+      <b>Detail mode</b> provides step-by-step iteration analysis with loss curves, gradient arrows, and parameter evolution.
+    </p>
+    <div class="features">
+      <span class="feature-chip">11 optimization starts</span>
+      <span class="feature-chip">Morph animation</span>
+      <span class="feature-chip">Loss curves</span>
+      <span class="feature-chip">Gradient analysis</span>
+    </div>
   </a>
 
-  <a class="card" href="orbital_explorer_v2.html">
-    <span class="tag green">PhysiTal 2.0</span>
-    <h2>Orbital Explorer v2</h2>
-    <p>Interactive 3D + 2D orbital simulation with real-time parameter sliders, time control, sight lines, orbit tracing, forward projection, and Ceres observation fitting mode.</p>
+  <a class="card" href="orbital_explorer_v2.html" style="--card-accent: #2dce89;">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(45,206,137,0.1); border-color:rgba(45,206,137,0.15);">&#127758;</div>
+      <div class="card-meta">
+        <span class="tag tag-physital">PhysiTal 2.0</span>
+        <h3>Orbital Explorer v2</h3>
+      </div>
+    </div>
+    <p class="desc">
+      Interactive 3D + 2D orbital mechanics simulator. Adjust all 6 Keplerian parameters in real-time
+      and see how they change the orbit geometry, sky-projected positions, and observation fit.
+      Includes Earth-Ceres sight line visualization and time animation.
+    </p>
+    <div class="features">
+      <span class="feature-chip">Three.js 3D</span>
+      <span class="feature-chip">Parameter sliders</span>
+      <span class="feature-chip">Sight lines</span>
+      <span class="feature-chip">Orbit tracing</span>
+    </div>
   </a>
 
-  <a class="card" href="radec_simulation.html">
-    <span class="tag green">PhysiTal 2.0</span>
-    <h2>RA/Dec Simulation</h2>
-    <p>Full RADEC simulation with Three.js 3D view and sky map. Earth-Ceres sight line visualization with time animation and trail accumulation.</p>
+  <a class="card" href="radec_simulation.html" style="--card-accent: #2dce89;">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(45,206,137,0.1); border-color:rgba(45,206,137,0.15);">&#128301;</div>
+      <div class="card-meta">
+        <span class="tag tag-physital">PhysiTal 2.0</span>
+        <h3>RA/Dec Simulation</h3>
+      </div>
+    </div>
+    <p class="desc">
+      Full Right Ascension / Declination simulation with a 3D solar system view and sky projection map.
+      Visualize how Piazzi's observations map onto the celestial sphere,
+      with animated Earth-Ceres sight lines and trail accumulation over the 41-day observation arc.
+    </p>
+    <div class="features">
+      <span class="feature-chip">3D + sky map</span>
+      <span class="feature-chip">Time animation</span>
+      <span class="feature-chip">Trail accumulation</span>
+      <span class="feature-chip">Dual view</span>
+    </div>
   </a>
-
-  <a class="card" href="fitting_visualization.html">
-    <span class="tag">Interactive</span>
-    <h2>Fitting Visualization</h2>
-    <p>Visual comparison of predicted vs observed sky positions. Shows how orbital parameters affect the fit quality with real-time RMS calculation.</p>
-  </a>
-
-  <a class="card" href="kepler_equation.html">
-    <span class="tag">Interactive</span>
-    <h2>Kepler Equation</h2>
-    <p>Interactive visualization of Kepler's equation M = E - e sin(E). Newton-Raphson solver convergence with adjustable eccentricity and mean anomaly.</p>
-  </a>
-
-  <a class="card" href="code_explained.html">
-    <span class="tag gold">Documentation</span>
-    <h2>Code Explained</h2>
-    <p>Step-by-step walkthrough of the computational pipeline — from raw CSV observations through orbit fitting to final parameter estimation.</p>
-  </a>
-
 </div>
 
+<!-- Interactive Simulations -->
+<div class="section-header"><h2>Interactive Tools</h2></div>
+<div class="grid">
+  <a class="card" href="fitting_visualization.html" style="--card-accent: #60a5fa;">
+    <div class="card-header">
+      <div class="card-icon">&#128200;</div>
+      <div class="card-meta">
+        <span class="tag tag-interactive">Interactive</span>
+        <h3>Fitting Visualization</h3>
+      </div>
+    </div>
+    <p class="desc">
+      Explore how orbital parameters affect observation fit quality.
+      Compares predicted vs. observed sky positions across Piazzi's 19 observations,
+      with real-time RMS calculation and multi-start cost function comparison.
+    </p>
+    <div class="features">
+      <span class="feature-chip">Predicted vs. Observed</span>
+      <span class="feature-chip">RMS metric</span>
+      <span class="feature-chip">Residual analysis</span>
+    </div>
+  </a>
+
+  <a class="card" href="kepler_equation.html" style="--card-accent: #60a5fa;">
+    <div class="card-header">
+      <div class="card-icon">&#128208;</div>
+      <div class="card-meta">
+        <span class="tag tag-interactive">Interactive</span>
+        <h3>Kepler Equation</h3>
+      </div>
+    </div>
+    <p class="desc">
+      Deep-dive into Kepler's equation M = E - e sin(E), the heartbeat of orbital mechanics.
+      Watch Newton-Raphson iterations converge geometrically,
+      and explore how eccentricity shapes the relationship between mean and eccentric anomaly.
+    </p>
+    <div class="features">
+      <span class="feature-chip">Newton-Raphson</span>
+      <span class="feature-chip">Adjustable eccentricity</span>
+      <span class="feature-chip">Convergence visualization</span>
+    </div>
+  </a>
+</div>
+
+<!-- Documentation -->
+<div class="section-header"><h2>Documentation</h2></div>
+<div class="grid">
+  <a class="card" href="code_explained.html" style="--card-accent: #ffd700;">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(255,215,0,0.1); border-color:rgba(255,215,0,0.15);">&#128214;</div>
+      <div class="card-meta">
+        <span class="tag tag-docs">Documentation</span>
+        <h3>Code Explained</h3>
+      </div>
+    </div>
+    <p class="desc">
+      Complete walkthrough of the computational pipeline — from parsing Piazzi's raw CSV observations,
+      through coordinate transformations and the forward model,
+      to Levenberg-Marquardt orbit fitting and final parameter estimation.
+      Includes interactive sky plots and residual analysis.
+    </p>
+    <div class="features">
+      <span class="feature-chip">Pipeline walkthrough</span>
+      <span class="feature-chip">Interactive plots</span>
+      <span class="feature-chip">Mathematical derivations</span>
+    </div>
+  </a>
+</div>
+
+<!-- Footer -->
 <div class="footer">
+  <div class="divider"></div>
   <p>Weizmann Institute of Science — Computational Astrophysics</p>
-  <p style="margin-top:4px;">Built with <a href="https://github.com/kingTB">kingTB</a> + Claude</p>
+  <p>Built by <a href="https://github.com/kingTB">kingTB</a> + Claude</p>
+  <p style="margin-top:8px; font-size:0.7rem; color:#2d3340;">PhysiTal 2.0 &middot; Single-file HTML simulations &middot; No server required</p>
 </div>
 
+<!-- Starfield generator -->
+<script>
+(function() {
+  var c = document.getElementById('stars'), n = 80;
+  for (var i = 0; i < n; i++) {
+    var s = document.createElement('span');
+    var sz = Math.random() * 2 + 0.5;
+    s.style.cssText = 'width:'+sz+'px;height:'+sz+'px;left:'+Math.random()*100+'%;top:'+Math.random()*100+'%;animation-delay:'+Math.random()*3+'s;animation-duration:'+(2+Math.random()*4)+'s;';
+    c.appendChild(s);
+  }
+})();
+</script>
 </body>
 </html>
