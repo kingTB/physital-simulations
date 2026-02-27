@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Milestone 4 — הקוד מאחורי מציאת מסלול קרס</title>
+
+<!-- MathJax -->
+<script>
+MathJax = {
+  tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] },
+  options: { skipHtmlTags: ['code','pre'] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+
+<!-- Prism.js for syntax highlighting -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+
+<style>
+  :root {
+    --bg:        #0d1117;
+    --bg2:       #161b22;
+    --bg3:       #1c2333;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --dim:       #8b949e;
+    --blue:      #58a6ff;
+    --green:     #7ee787;
+    --orange:    #ffa657;
+    --red:       #ff7b72;
+    --purple:    #d2a8ff;
+    --yellow:    #e3b341;
+    --cyan:      #79c0ff;
+    --accent-bg: rgba(88,166,255,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    direction: rtl;
+  }
+
+  /* ---------- hero ---------- */
+  .hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b40 50%, #0d1117 100%);
+    padding: 80px 20px 60px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px; left: 50%; width: 600px; height: 600px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(88,166,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero h1 { font-size: 2.6em; margin-bottom: 12px; color: var(--blue); position: relative; }
+  .hero .sub { font-size: 1.15em; color: var(--dim); max-width: 680px; margin: 0 auto; position: relative; }
+
+  /* ---------- nav sidebar ---------- */
+  .layout { display: flex; max-width: 1400px; margin: 0 auto; }
+
+  nav {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: 280px;
+    min-width: 280px;
+    overflow-y: auto;
+    padding: 24px 16px;
+    border-left: 1px solid var(--border);
+    background: var(--bg2);
+    font-size: 0.88em;
+  }
+  nav h3 { color: var(--blue); font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; margin: 18px 0 8px; }
+  nav a {
+    display: block;
+    color: var(--dim);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 6px;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+  nav a:hover, nav a.active { color: var(--text); background: var(--accent-bg); }
+
+  /* ---------- main content ---------- */
+  main {
+    flex: 1;
+    padding: 40px 48px 120px;
+    max-width: 960px;
+    min-width: 0;
+  }
+
+  h2 {
+    color: var(--blue);
+    font-size: 1.7em;
+    margin: 60px 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 { color: var(--orange); font-size: 1.2em; margin: 36px 0 12px; }
+  h4 { color: var(--green); font-size: 1.05em; margin: 24px 0 8px; }
+
+  p { margin: 10px 0; color: var(--text); }
+  ul, ol { margin: 10px 0 10px 24px; }
+  li { margin: 4px 0; }
+  strong { color: var(--orange); }
+
+  a { color: var(--blue); }
+
+  /* ---------- code blocks ---------- */
+  .code-section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .code-section .code-header {
+    background: var(--bg3);
+    padding: 8px 16px;
+    font-size: 0.82em;
+    color: var(--dim);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    direction: ltr;
+    text-align: left;
+  }
+  .code-section .code-header .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block;
+  }
+  .code-section .code-header .dot.r { background: #ff5f56; }
+  .code-section .code-header .dot.y { background: #ffbd2e; }
+  .code-section .code-header .dot.g { background: #27c93f; }
+  .code-section .code-header span.filename { margin-right: auto; margin-left: 8px; }
+
+  .code-section pre {
+    margin: 0 !important;
+    padding: 16px 20px !important;
+    border-radius: 0 !important;
+    font-size: 0.88em !important;
+    direction: ltr !important;
+    text-align: left !important;
+    overflow-x: auto;
+    background: var(--bg2) !important;
+  }
+  .code-section pre code { direction: ltr; text-align: left; }
+
+  /* ---------- explanation boxes ---------- */
+  .explain {
+    background: var(--accent-bg);
+    border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 16px 0;
+  }
+  .explain.math {
+    background: rgba(210,168,255,0.06);
+    border-color: rgba(210,168,255,0.2);
+  }
+  .explain.warn {
+    background: rgba(255,166,87,0.06);
+    border-color: rgba(255,166,87,0.2);
+  }
+  .explain.key {
+    background: rgba(126,231,135,0.06);
+    border-color: rgba(126,231,135,0.2);
+  }
+  .explain-title {
+    font-weight: bold;
+    margin-bottom: 6px;
+    font-size: 0.92em;
+  }
+  .explain-title.blue   { color: var(--blue); }
+  .explain-title.purple { color: var(--purple); }
+  .explain-title.orange { color: var(--orange); }
+  .explain-title.green  { color: var(--green); }
+
+  /* ---------- pipeline diagram ---------- */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 24px 0;
+    flex-wrap: wrap;
+    justify-content: center;
+    direction: ltr;
+  }
+  .pipeline .step {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 0.88em;
+    min-width: 100px;
+  }
+  .pipeline .step .label { color: var(--dim); font-size: 0.8em; }
+  .pipeline .step .val { color: var(--blue); font-weight: bold; }
+  .pipeline .arrow { color: var(--dim); font-size: 1.4em; padding: 0 4px; }
+
+  /* ---------- comparison table ---------- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.92em;
+  }
+  th { background: var(--bg3); color: var(--blue); text-align: right; }
+  th, td { padding: 10px 14px; border: 1px solid var(--border); }
+  td { color: var(--text); }
+
+  /* ---------- mapping rows ---------- */
+  .mapping {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    margin: 16px 0;
+    align-items: center;
+  }
+  .mapping .math-side {
+    background: rgba(210,168,255,0.06);
+    border: 1px solid rgba(210,168,255,0.15);
+    border-radius: 8px;
+    padding: 12px 16px;
+    text-align: center;
+  }
+  .mapping .code-side {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 0.9em;
+    direction: ltr;
+    text-align: left;
+    color: var(--green);
+  }
+  .mapping .arrow-mid { color: var(--dim); font-size: 1.6em; text-align: center; }
+
+  /* ---------- inline code ---------- */
+  code:not([class]) {
+    background: var(--bg3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--cyan);
+    direction: ltr;
+    display: inline;
+    unicode-bidi: embed;
+  }
+
+  /* responsive */
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav { width: 100%; height: auto; position: static; border-left: none; border-bottom: 1px solid var(--border); }
+    main { padding: 24px 16px 80px; }
+    .mapping { grid-template-columns: 1fr; }
+    .mapping .arrow-mid { transform: rotate(90deg); }
+  }
+
+
+/* ═══ PhysiTal Recording Module ═══ */
+#rec-frame { position:fixed; inset:0; z-index:400; display:none; pointer-events:none; }
+#rec-frame.active { display:block; }
+#rec-frame-border { position:absolute; border:2px solid #60a5fa; box-shadow:0 0 0 9999px rgba(0,0,0,0.35); pointer-events:auto; cursor:move; transition:border-color 0.3s; }
+#rec-frame-border.recording { border-color:#dc2626; box-shadow:0 0 0 9999px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(220,38,38,0.3); }
+#rec-frame-border.paused { border-color:#f59e0b; animation:pulse-border-rec 1.2s ease-in-out infinite; }
+.rec-handle { position:absolute; width:12px; height:12px; background:#60a5fa; border-radius:2px; pointer-events:auto; z-index:2; }
+.rec-handle-nw { top:-6px; left:-6px; cursor:nw-resize; }
+.rec-handle-ne { top:-6px; right:-6px; cursor:ne-resize; }
+.rec-handle-sw { bottom:-6px; left:-6px; cursor:sw-resize; }
+.rec-handle-se { bottom:-6px; right:-6px; cursor:se-resize; }
+.rec-handle-n  { top:-6px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rec-handle-s  { bottom:-6px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rec-handle-e  { right:-6px; top:50%; transform:translateY(-50%); cursor:e-resize; }
+.rec-handle-w  { left:-6px; top:50%; transform:translateY(-50%); cursor:w-resize; }
+#rec-frame-dims { position:absolute; top:-28px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); padding:2px 10px; border-radius:4px; font-size:0.75rem; color:#8b949e; white-space:nowrap; font-variant-numeric:tabular-nums; pointer-events:none; }
+#rec-controls { position:fixed; display:flex; align-items:center; gap:8px; background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 14px; pointer-events:auto; white-space:nowrap; z-index:401; }
+#rec-controls select { padding:4px 6px; font-size:0.78rem; border-radius:6px; background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.1); }
+.rc-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; border:none; cursor:pointer; font-size:1rem; transition:all 0.2s; color:white; background:rgba(255,255,255,0.1); }
+.rc-btn:hover { background:rgba(255,255,255,0.2); }
+.rc-btn.rec-active { background:#dc2626; animation:pulse-rec-btn 1.5s ease-in-out infinite; }
+.rc-btn.paused-active { background:#f59e0b; }
+#rc-timer { font-size:0.82rem; font-variant-numeric:tabular-nums; color:#8b949e; min-width:42px; text-align:center; }
+.rc-sep { width:1px; height:20px; background:rgba(255,255,255,0.1); }
+#rc-close { opacity:0.5; transition:opacity 0.2s; background:none; border:none; color:#8b949e; cursor:pointer; font-size:1rem; }
+#rc-close:hover { opacity:1; }
+@keyframes pulse-rec-btn { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+@keyframes pulse-border-rec { 0%,100%{border-color:#f59e0b;} 50%{border-color:rgba(245,158,11,0.4);} }
+#rec-download-overlay { position:fixed; inset:0; z-index:800; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); }
+#rec-download-dialog { background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:24px; min-width:340px; box-shadow:0 20px 50px rgba(0,0,0,0.6); }
+#rec-download-dialog h3 { font-size:1rem; font-weight:500; margin-bottom:14px; color:#e2e8f0; }
+#rec-filename { width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-family:inherit; font-size:0.9rem; direction:ltr; margin-bottom:14px; }
+#rec-filename:focus { outline:none; border-color:#60a5fa; }
+#rec-download-dialog .dl-btns { display:flex; gap:10px; justify-content:flex-end; }
+.dl-btn { padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:white; transition:background 0.2s; }
+.dl-btn-primary { background:#60a5fa; }
+.dl-btn-primary:hover { background:#3b82f6; }
+.dl-btn-secondary { background:rgba(255,255,255,0.1); }
+.dl-btn-secondary:hover { background:rgba(255,255,255,0.2); }
+#rec-hint { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 16px; font-size:0.75rem; color:#8b949e; z-index:50; pointer-events:none; opacity:0; transition:opacity 1s; }
+#rec-hint.show { opacity:1; }
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+<!-- ==================== HERO ==================== -->
+<div class="hero">
+  <h1>הקוד מאחורי מציאת מסלול קרס</h1>
+  <p class="sub">מדריך מלא לכל שורת קוד, כל משוואה, וכל טכניקה — ממחברת Milestone 4</p>
+</div>
+
+<!-- ==================== LAYOUT ==================== -->
+<div class="layout">
+
+<!-- ---------- NAV ---------- -->
+<nav id="toc">
+  <h3>מבוא</h3>
+  <a href="#overview">סקירה כללית</a>
+  <a href="#pipeline">הצנרת (Pipeline)</a>
+  <a href="#params">6 הפרמטרים</a>
+
+  <h3>המודל הפיזיקלי</h3>
+  <a href="#kepler">משוואת קפלר</a>
+  <a href="#helio">מיקום הליוצנטרי</a>
+  <a href="#earth">מיקום כדור הארץ</a>
+  <a href="#forward">המודל המלא</a>
+
+  <h3>פונקציית ההפסד</h3>
+  <a href="#residuals">Residuals</a>
+  <a href="#cos-correction">תיקון cos(δ)</a>
+  <a href="#loss">פונקציית Loss</a>
+  <a href="#soft-l1">Robust Loss (soft_l1)</a>
+
+  <h3>האופטימיזציה</h3>
+  <a href="#bounds">גבולות פיזיקליים</a>
+  <a href="#initial">ניחוש התחלתי</a>
+  <a href="#least-squares">מ-GD ל-Gauss-Newton</a>
+  <a href="#jacobian">היעקוביאן</a>
+  <a href="#trust-region">Trust Region</a>
+  <a href="#multi-start">Multi-Start</a>
+  <a href="#refinement">שלב העידון</a>
+
+  <h3>תוצאות</h3>
+  <a href="#results">הפרמטרים שנמצאו</a>
+  <a href="#diagnostics">דיאגנוסטיקה</a>
+  <a href="#ml-connection">הקשר ל-ML</a>
+</nav>
+
+<!-- ---------- MAIN ---------- -->
+<main>
+
+<!-- ========================================= -->
+<h2 id="overview">סקירה כללית: מה הקוד הזה עושה?</h2>
+
+<p>
+יש לנו <strong>19 תצפיות</strong> של פיאצי מ-1801. כל תצפית מספרת לנו "באיזה כיוון בשמיים ראיתי נקודת אור" — כלומר <strong>RA</strong> (Right Ascension) ו-<strong>Dec</strong> (Declination).
+</p>
+<p>
+המטרה: למצוא <strong>6 מספרים</strong> — פרמטרי מסלול — שמתארים את האליפסה של קרס סביב השמש, כך שהמודל שלנו יחזה כיוונים שמתאימים לתצפיות.
+</p>
+
+<div class="explain key">
+<div class="explain-title green">בקיצור</div>
+אנחנו בונים <strong>פונקציה</strong> שלוקחת 6 פרמטרים ומחזירה RA/Dec חזויים, ואז מחפשים את ערכי הפרמטרים שממזערים את הפער בין החיזוי לתצפיות. זה <strong>Least Squares</strong>.
+</div>
+
+<!-- Interactive Sky Map: Piazzi's observations — pan & zoom -->
+<div style="margin: 32px 0;">
+<div style="text-align:center;color:var(--blue);font-weight:bold;font-size:1.1em;margin-bottom:8px;">19 התצפיות של פיאצי על גלגל השמיים המלא</div>
+<canvas id="skyObs" width="880" height="460" style="width:100%;border-radius:10px;border:1px solid var(--border);cursor:grab;"></canvas>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+  <div id="skyObsTooltip" style="color:var(--dim);font-size:0.85em;direction:ltr;">🖱️ גרור להזיז | גלגלת לזום | דאבל-קליק לאיפוס</div>
+  <button id="skyObsReset" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:0.8em;">Reset</button>
+</div>
+</div>
+<script>
+(function(){
+  const obsRA = [51.7969,51.7244,51.66,51.5965,51.3837,51.3762,51.3822,51.534,51.6428,51.7059,51.7788,52.2273,52.4506,52.5719,52.6967,52.8294,53.2612,53.7437,54.2772];
+  const obsDec = [15.6288,15.6849,15.7421,15.7993,16.1756,16.3804,16.4516,16.8211,16.9766,17.0551,17.1349,17.5484,17.7197,17.806,17.8935,17.9826,18.2503,18.5231,18.7997];
+  const c = document.getElementById('skyObs');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const mg = {top:35, bottom:30, left:50, right:20};
+  const pw = W-mg.left-mg.right, ph = H-mg.top-mg.bottom;
+  let vRA=180, vDec=0, vZoom=1;
+  function vW(){return 360/vZoom;} function vH(){return 180/vZoom;}
+  function raToX(ra){let h=vW()/2;return mg.left+(1-(ra-(vRA-h))/(2*h))*pw;}
+  function decToY(dec){let h=vH()/2;return mg.top+(1-(dec-(vDec-h))/(2*h))*ph;}
+  function xToRA(x){return vRA-vW()/2+(1-(x-mg.left)/pw)*vW();}
+  function yToDec(y){return vDec-vH()/2+(1-(y-mg.top)/ph)*vH();}
+  function draw(){
+    ctx.fillStyle="#0d1117";ctx.fillRect(0,0,W,H);
+    ctx.save();ctx.beginPath();ctx.rect(mg.left,mg.top,pw,ph);ctx.clip();
+    let raStep=vW()>180?30:(vW()>60?15:(vW()>20?5:1));
+    let decStep=vH()>90?15:(vH()>30?5:(vH()>10?2:1));
+    ctx.strokeStyle="#21262d";ctx.lineWidth=0.5;
+    let rs=Math.floor((vRA-vW()/2)/raStep)*raStep,re=Math.ceil((vRA+vW()/2)/raStep)*raStep;
+    for(let ra=rs;ra<=re;ra+=raStep){let x=raToX(ra);if(x>=mg.left&&x<=W-mg.right){ctx.beginPath();ctx.moveTo(x,mg.top);ctx.lineTo(x,H-mg.bottom);ctx.stroke();}}
+    let ds=Math.floor((vDec-vH()/2)/decStep)*decStep,de_=Math.ceil((vDec+vH()/2)/decStep)*decStep;
+    for(let dec=ds;dec<=de_;dec+=decStep){let y=decToY(dec);if(y>=mg.top&&y<=H-mg.bottom){ctx.beginPath();ctx.moveTo(mg.left,y);ctx.lineTo(W-mg.right,y);ctx.stroke();}}
+    let eqY=decToY(0);if(eqY>mg.top&&eqY<H-mg.bottom){ctx.strokeStyle="rgba(88,166,255,0.2)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(mg.left,eqY);ctx.lineTo(W-mg.right,eqY);ctx.stroke();}
+    ctx.strokeStyle="rgba(227,179,65,0.25)";ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();let st=false;
+    for(let ra=0;ra<=360;ra+=1){let l=ra*Math.PI/180,d=Math.asin(Math.sin(23.44*Math.PI/180)*Math.sin(l))*180/Math.PI;let x=raToX(ra),y=decToY(d);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);}
+    ctx.stroke();ctx.setLineDash([]);
+    for(let i=0;i<obsRA.length;i++){let x=raToX(obsRA[i]),y=decToY(obsDec[i]);ctx.beginPath();ctx.arc(x,y,5,0,2*Math.PI);ctx.fillStyle="#ffa657";ctx.fill();ctx.strokeStyle="#ffcf8a";ctx.lineWidth=1;ctx.stroke();}
+    ctx.restore();
+    ctx.fillStyle="#484f58";ctx.font="11px monospace";
+    for(let ra=rs;ra<=re;ra+=raStep){let x=raToX(ra);if(x>=mg.left&&x<=W-mg.right){ctx.textAlign="center";ctx.fillText(ra+"\u00B0",x,mg.top-8);ctx.fillText((ra/15).toFixed(1)+"h",x,H-mg.bottom+14);}}
+    for(let dec=ds;dec<=de_;dec+=decStep){let y=decToY(dec);if(y>=mg.top&&y<=H-mg.bottom){ctx.textAlign="right";ctx.fillText(dec+"\u00B0",mg.left-5,y+4);}}
+    ctx.fillStyle="#8b949e";ctx.font="bold 12px sans-serif";ctx.textAlign="center";
+    ctx.fillText("Right Ascension (RA)",W/2,H-4);
+    ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText("Declination (Dec)",0,0);ctx.restore();
+    if(vZoom>1.05){ctx.fillStyle="rgba(88,166,255,0.8)";ctx.font="bold 10px monospace";ctx.textAlign="right";ctx.fillText("Zoom: "+vZoom.toFixed(1)+"x",W-mg.right-4,mg.top+14);}
+  }
+  draw();
+  let drag=false,lx=0,ly=0;
+  c.addEventListener('mousedown',function(e){drag=true;lx=e.clientX;ly=e.clientY;c.style.cursor='grabbing';});
+  window.addEventListener('mousemove',function(e){if(!drag)return;let r=c.getBoundingClientRect(),s=W/r.width;vRA+=(e.clientX-lx)*s/pw*vW();vDec+=(e.clientY-ly)*s/ph*vH();vDec=Math.max(-90,Math.min(90,vDec));lx=e.clientX;ly=e.clientY;draw();});
+  window.addEventListener('mouseup',function(){drag=false;c.style.cursor='grab';});
+  c.addEventListener('wheel',function(e){e.preventDefault();let r=c.getBoundingClientRect(),s=W/r.width;let mx=(e.clientX-r.left)*s,my=(e.clientY-r.top)*s;let rm=xToRA(mx),dm=yToDec(my);vZoom=Math.max(1,Math.min(50,vZoom*(e.deltaY<0?1.15:1/1.15)));vRA=rm-(1-(mx-mg.left)/pw)*vW()+vW()/2;vDec=dm-(1-(my-mg.top)/ph)*vH()+vH()/2;vDec=Math.max(-90,Math.min(90,vDec));draw();},{passive:false});
+  c.addEventListener('dblclick',function(){vRA=180;vDec=0;vZoom=1;draw();});
+  document.getElementById('skyObsReset').addEventListener('click',function(){vRA=180;vDec=0;vZoom=1;draw();});
+  c.addEventListener('mousemove',function(e){if(drag)return;let r=c.getBoundingClientRect(),s=W/r.width;let x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;let ra=xToRA(x),dec=yToDec(y);document.getElementById('skyObsTooltip').textContent='RA = '+ra.toFixed(2)+'\u00B0  ('+(ra/15).toFixed(2)+'h)   Dec = '+dec.toFixed(2)+'\u00B0';});
+})();
+</script>
+
+<!-- ========================================= -->
+<h3 id="pipeline">הצנרת: מפרמטרים לשמיים</h3>
+
+<p>הפונקציה <code>predict_radec</code> היא הלב. היא מפעילה צנרת של 5 שלבים:</p>
+
+<div class="pipeline">
+  <div class="step"><div class="label">פרמטרים</div><div class="val">θ = (a,e,i,Ω,ω,M₀)</div></div>
+  <div class="arrow">→</div>
+  <div class="step"><div class="label">קפלר</div><div class="val">M → E</div></div>
+  <div class="arrow">→</div>
+  <div class="step"><div class="label">מישור מסלול</div><div class="val">r̄ₚ(E)</div></div>
+  <div class="arrow">→</div>
+  <div class="step"><div class="label">סיבוב</div><div class="val">r̄_ecl</div></div>
+  <div class="arrow">→</div>
+  <div class="step"><div class="label">גאוצנטרי</div><div class="val">+ r̄_ES</div></div>
+  <div class="arrow">→</div>
+  <div class="step"><div class="label">שמיים</div><div class="val">RA, Dec</div></div>
+</div>
+
+<!-- ========================================= -->
+<h3 id="params">6 הפרמטרים שאנחנו מחפשים</h3>
+
+<table>
+  <tr><th>סמל</th><th>שם</th><th>מה הוא קובע</th><th>משתנה בקוד</th></tr>
+  <tr><td>$a$</td><td>חצי-ציר ראשי</td><td>גודל האליפסה (AU)</td><td><code>params[0]</code></td></tr>
+  <tr><td>$e$</td><td>אקסצנטריות</td><td>כמה האליפסה "מאורכת"</td><td><code>params[1]</code></td></tr>
+  <tr><td>$i$</td><td>נטייה</td><td>זווית מישור המסלול מהאקליפטיקה</td><td><code>params[2]</code></td></tr>
+  <tr><td>$\Omega$</td><td>קשר עולה</td><td>סיבוב אופקי של הקשר</td><td><code>params[3]</code></td></tr>
+  <tr><td>$\omega$</td><td>פריהליון</td><td>סיבוב הנקודה הקרובה בתוך המישור</td><td><code>params[4]</code></td></tr>
+  <tr><td>$M_0$</td><td>אנומליה ממוצעת</td><td>"איפה" קרס היה ב-$t_0$</td><td><code>params[5]</code></td></tr>
+</table>
+
+<!-- ========================================= -->
+<h2 id="kepler">שלב 1: פתרון משוואת קפלר</h2>
+
+<p>
+כדי לדעת איפה קרס נמצא בזמן $t$, קודם כל מחשבים את ה-<strong>Mean anomaly</strong>:
+</p>
+
+$$M(t) = M_0 + n \cdot (t - t_0), \quad n = \frac{k_{\text{Gauss}}}{a^{3/2}}$$
+
+<p>
+ואז צריך לפתור את <strong>משוואת קפלר</strong> — לא ניתנת לפתרון אנליטי:
+</p>
+
+$$M = E - e \sin E$$
+
+<div class="explain math">
+<div class="explain-title purple">למה זה קשה?</div>
+$E$ מופיע גם כ-$E$ וגם בתוך $\sin E$. אין נוסחה סגורה. צריך שיטה <strong>נומרית</strong>.
+</div>
+
+<h4>הפתרון: Newton-Raphson</h4>
+
+<p>מגדירים $f(E) = E - e\sin E - M$ ומחפשים שורש. הנגזרת: $f'(E) = 1 - e\cos E$. הנוסחה האיטרטיבית:</p>
+
+$$E_{n+1} = E_n - \frac{E_n - e\sin E_n - M}{1 - e\cos E_n}$$
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">solve_kepler_newton</span>
+</div>
+<pre><code class="language-python">def solve_kepler_newton(M, e, tol=1e-12, max_iter=50):
+    """פתרון משוואת קפלר M = E - e sin E בעזרת ניוטון."""
+    M = np.asarray(M, dtype=float)
+    E = M.copy()                        # ניחוש התחלתי: E₀ = M
+    if e > 0.8:
+        E[:] = np.pi                    # עבור e גדול, M אינו קירוב טוב
+    for _ in range(max_iter):
+        f  = E - e * np.sin(E) - M      # f(E) = E - e·sin(E) - M
+        fp = 1.0 - e * np.cos(E)        # f'(E) = 1 - e·cos(E)
+        dE = -f / fp                     # צעד ניוטון: ΔE = -f/f'
+        E  = E + dE
+        if np.max(np.abs(dE)) < tol:    # התכנסות?
+            break
+    return E</code></pre>
+</div>
+
+<div class="mapping">
+  <div class="math-side">$$E_{n+1} = E_n - \frac{f(E_n)}{f'(E_n)}$$</div>
+  <div class="arrow-mid">⟷</div>
+  <div class="code-side">dE = -f / fp<br>E = E + dE</div>
+</div>
+
+<div class="explain">
+<div class="explain-title blue">שים לב</div>
+הפונקציה עובדת על <strong>מערך שלם</strong> של זמנים בבת-אחת (vectorized). כל 19 התצפיות נפתרות במקביל. הקריטריון לעצירה: $\max|\Delta E| < 10^{-12}$ rad ≈ 0.00003 arcsec.
+</div>
+
+<!-- ========================================= -->
+<h2 id="helio">שלב 2: מיקום הליוצנטרי של קרס</h2>
+
+<p>אחרי שפתרנו $E$, מחשבים את <strong>המיקום במישור המסלול</strong>:</p>
+
+$$x_p = a(\cos E - e), \quad y_p = a\sqrt{1-e^2}\sin E, \quad z_p = 0$$
+
+<p>ואז <strong>מסובבים</strong> למערכת האקליפטיקה באמצעות 3 מטריצות:</p>
+
+$$\vec{r}_{\text{ecl}} = R_z(\Omega) \cdot R_x(i) \cdot R_z(\omega) \cdot \vec{r}_{\text{pqw}}$$
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">ceres_heliocentric_ecliptic_AU</span>
+</div>
+<pre><code class="language-python">def ceres_heliocentric_ecliptic_AU(jd, params, t_ref):
+    a, e, inc, Om, w, M0 = params
+    n = k_gauss / a**1.5                     # n = k / a^(3/2)
+
+    M = M0 + n * (jd - t_ref)               # M(t) = M₀ + n·(t - t₀)
+    E = solve_kepler_newton(M, e)            # פתרון M = E - e·sin(E)
+
+    sqrt1me2 = np.sqrt(1 - e**2)
+    xp = a * (np.cos(E) - e)                # x_p = a·(cos E - e)
+    yp = a * sqrt1me2 * np.sin(E)           # y_p = a·√(1-e²)·sin E
+
+    rot = Rz(Om) @ Rx(inc) @ Rz(w)          # מטריצת סיבוב 3×3
+
+    r_pqw = np.vstack([xp, yp, np.zeros_like(xp)])  # [x_p, y_p, 0]
+    r_ecl = rot @ r_pqw                     # סיבוב → אקליפטיקה
+    return r_ecl                             # 3×N matrix [AU]</code></pre>
+</div>
+
+<div class="mapping">
+  <div class="math-side">$$n = \frac{k_{\text{Gauss}}}{a^{3/2}}$$</div>
+  <div class="arrow-mid">⟷</div>
+  <div class="code-side">n = k_gauss / a**1.5</div>
+</div>
+
+<div class="mapping">
+  <div class="math-side">$$\vec{r}_{\text{ecl}} = R_z(\Omega) R_x(i) R_z(\omega) \vec{r}_{\text{pqw}}$$</div>
+  <div class="arrow-mid">⟷</div>
+  <div class="code-side">rot = Rz(Om) @ Rx(inc) @ Rz(w)<br>r_ecl = rot @ r_pqw</div>
+</div>
+
+<div class="explain warn">
+<div class="explain-title orange">למה $k_{\text{Gauss}}$ ולא $\mu_\odot$?</div>
+<p>
+הקבוע הגאוסיאני $k = 0.01720209895$ הוא ביחידות AU ויום. כשמשתמשים בו, $n$ יוצא ב-rad/day ישירות — בלי צורך ב-$G$ או במסת השמש. זה קריטי כי אנחנו עובדים עם נתונים היסטוריים של 1801.
+</p>
+</div>
+
+<h4>מטריצות הסיבוב</h4>
+
+<p>שתי מטריצות סיבוב פשוטות בונות את כל ההמרה:</p>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">Rz, Rx</span>
+</div>
+<pre><code class="language-python">def Rz(angle):
+    """מטריצת סיבוב סביב ציר z."""
+    c, s = np.cos(angle), np.sin(angle)
+    return np.array([[c, -s, 0],       # ┌ cos θ  -sin θ  0 ┐
+                     [s,  c, 0],       # │ sin θ   cos θ  0 │
+                     [0,  0, 1]])      # └   0       0    1 ┘
+
+def Rx(angle):
+    """מטריצת סיבוב סביב ציר x."""
+    c, s = np.cos(angle), np.sin(angle)
+    return np.array([[1, 0,  0],       # ┌ 1    0      0   ┐
+                     [0, c, -s],       # │ 0  cos θ  -sin θ│
+                     [0, s,  c]])      # └ 0  sin θ   cos θ┘</code></pre>
+</div>
+
+<!-- ========================================= -->
+<h2 id="earth">שלב 3: מיקום כדור הארץ</h2>
+
+<p>
+כדי לחשב RA/Dec, צריכים את הוקטור <strong>ארץ→קרס</strong>. לשם כך צריכים את מיקום כדור הארץ.
+</p>
+
+<p>
+אנחנו <strong>לא</strong> משתמשים ב-astropy (מודרני מדי ל-1801). במקום זה, הנתונים באים מטבלאות פיאצי עצמו:
+</p>
+
+$$\vec{r}_{E \to S}^{\text{ecl}} = R \begin{pmatrix} \cos\lambda_\odot \\ \sin\lambda_\odot \\ 0 \end{pmatrix}$$
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">earth_to_sun_ecliptic_AU</span>
+</div>
+<pre><code class="language-python">def earth_to_sun_ecliptic_AU(lam_sun, R_ES):
+    """וקטור ארץ→שמש באקליפטיקה, מנתוני הטבלה."""
+    x = R_ES * np.cos(lam_sun)       # R · cos(λ☉)
+    y = R_ES * np.sin(lam_sun)       # R · sin(λ☉)
+    z = np.zeros_like(x)             # z = 0 (אקליפטיקה)
+    return np.vstack([x, y, z])      # 3×N</code></pre>
+</div>
+
+<div class="explain">
+<div class="explain-title blue">מאיפה באים הנתונים?</div>
+<code>lam_sun</code> ו-<code>R_ES</code> מחושבים מה-CSV. אורך השמש: $\lambda = 30° \times \text{zodiac} + \text{deg} + \text{min}/60 + \text{sec}/3600$. המרחק: $R = 10^{\text{log\_distance} - 10}$ (מוסכמה היסטורית של לוגריתמים + 10).
+</div>
+
+<!-- ========================================= -->
+<h2 id="forward">שלב 4: המודל המלא — predict_radec</h2>
+
+<p>זו הפונקציה שמחברת הכל. מפרמטרים → RA/Dec חזויים:</p>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">predict_radec — הלב של כל המערכת</span>
+</div>
+<pre><code class="language-python">def predict_radec(jd, params, t_ref, lam_sun, R_ES):
+    # (1) מיקום הליוצנטרי של קרס באקליפטיקה
+    r_sc_ecl = ceres_heliocentric_ecliptic_AU(jd, params, t_ref)  # שמש→קרס
+
+    # (2) וקטור ארץ→שמש באקליפטיקה
+    r_es_ecl = earth_to_sun_ecliptic_AU(lam_sun, R_ES)            # ארץ→שמש
+
+    # (3) ארץ→קרס = ארץ→שמש + שמש→קרס
+    r_ec_ecl = r_es_ecl + r_sc_ecl
+
+    # (4) סיבוב מאקליפטיקה למשווני (equatorial)
+    eps = obliquity_mean_rad(jd)      # נטיית המילקה ε ≈ 23.44°
+    R_ecl2eq = Rx(eps)                # מטריצת סיבוב Rx(ε)
+    r_ec_eq = R_ecl2eq @ r_ec_ecl     # אקליפטי → משווני
+
+    # (5) המרה ל-RA/Dec
+    x, y, z = r_ec_eq
+    ra  = np.arctan2(y, x) % (2 * np.pi)          # α = atan2(y, x)
+    dec = np.arctan2(z, np.sqrt(x**2 + y**2))     # δ = atan2(z, √(x²+y²))
+
+    return ra, dec</code></pre>
+</div>
+
+<div class="explain key">
+<div class="explain-title green">5 השלבים</div>
+<ol>
+<li><strong>שמש→קרס</strong>: $\vec{r}_{S\to C}$ — מחושב מ-6 הפרמטרים + קפלר</li>
+<li><strong>ארץ→שמש</strong>: $\vec{r}_{E\to S}$ — מהטבלה</li>
+<li><strong>חיבור וקטורים</strong>: $\vec{r}_{E\to C} = \vec{r}_{E\to S} + \vec{r}_{S\to C}$</li>
+<li><strong>סיבוב</strong> מאקליפטיקה למשווני: $R_x(\varepsilon)$</li>
+<li><strong>RA/Dec</strong> מקרטזי: $\alpha = \text{atan2}(y,x)$, $\delta = \text{atan2}(z, \sqrt{x^2+y^2})$</li>
+</ol>
+</div>
+
+<div class="mapping">
+  <div class="math-side">$$\vec{r}_{E\to C} = \vec{r}_{E\to S} + \vec{r}_{S\to C}$$</div>
+  <div class="arrow-mid">⟷</div>
+  <div class="code-side">r_ec_ecl = r_es_ecl + r_sc_ecl</div>
+</div>
+
+<div class="mapping">
+  <div class="math-side">$$\alpha = \text{atan2}(y, x)$$</div>
+  <div class="arrow-mid">⟷</div>
+  <div class="code-side">ra = np.arctan2(y, x) % (2 * np.pi)</div>
+</div>
+
+<!-- ========================================= -->
+<h2 id="residuals">מה אנחנו ממזערים? — Residuals</h2>
+
+<p>
+ה-<strong>residuals</strong> הם ההפרש בין מה שהמודל חוזה לבין מה שנצפה. זו <strong>פונקציית המטרה</strong> שאנחנו רוצים למזער.
+</p>
+
+$$r_{1,k} = (\alpha_k^{\text{model}} - \alpha_k^{\text{obs}}) \cos\delta_k^{\text{obs}}, \quad r_{2,k} = \delta_k^{\text{model}} - \delta_k^{\text{obs}}$$
+
+<p>
+עבור 19 תצפיות נקבל <strong>38 residuals</strong> (2 לכל תצפית: אחד ב-RA, אחד ב-Dec).
+</p>
+
+<h3 id="cos-correction">למה צריך תיקון $\cos\delta$?</h3>
+
+<div class="explain math">
+<div class="explain-title purple">גיאומטריה כדורית</div>
+<p>
+מעלה אחת ב-RA ליד קו המשווה ($\delta = 0°$) שווה ~1° על שמיים. אבל ליד הקוטב ($\delta = 90°$) היא שווה 0°! הסיבה: מעגלי RA מתכנסים לקוטב.
+</p>
+<p>
+לכן המרחק האמיתי על שמיים הוא: $\Delta\alpha_{\text{real}} = \Delta\alpha \cdot \cos\delta$
+</p>
+<p>
+בלי זה, שגיאה ב-RA תקבל <strong>משקל שגוי</strong> בפונקציית ההפסד, והמינימום יזוז.
+</p>
+</div>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">residuals_arcsec — הפונקציה שאנחנו ממזערים</span>
+</div>
+<pre><code class="language-python">def residuals_arcsec(params, jd, ra_obs, dec_obs, t_ref, lam_sun, R_ES):
+    # חיזוי RA/Dec מהפרמטרים הנוכחיים
+    ra_pred, dec_pred = predict_radec(jd, params, t_ref, lam_sun, R_ES)
+
+    # הפרשים (עם עטיפה ל-[-π, π] ב-RA)
+    dra  = wrap_to_pi(ra_pred - ra_obs)    # Δα ∈ [-π, π]
+    ddec = dec_pred - dec_obs              # Δδ
+
+    # תיקון כדורי: Δα × cos(δ)
+    dra_star = dra * np.cos(dec_obs)       # ★ התיקון הקריטי
+
+    # המרה ל-arcsec (1 rad = 206264.806 arcsec)
+    r = np.concatenate([
+        dra_star * ARCSEC_PER_RAD,         # 19 ערכי RA
+        ddec     * ARCSEC_PER_RAD          # 19 ערכי Dec
+    ])
+    return r  # וקטור באורך 38</code></pre>
+</div>
+
+<div class="mapping">
+  <div class="math-side">$$r_{1,k} = (\alpha_k^{m} - \alpha_k^{o}) \cos\delta_k^{o} \cdot \frac{206264.8}{\text{rad}}$$</div>
+  <div class="arrow-mid">⟷</div>
+  <div class="code-side">dra_star = dra * np.cos(dec_obs)<br>... * ARCSEC_PER_RAD</div>
+</div>
+
+<div class="explain">
+<div class="explain-title blue">wrap_to_pi — למה צריך?</div>
+<p>
+<code>wrap_to_pi(x) = (x + π) % (2π) - π</code> — מוודא שהפרש RA נשאר בתחום $[-\pi, \pi]$. בלי זה, אם $\alpha^m = 0.01$ ו-$\alpha^o = 6.27$ (שניהם ליד 0°), ההפרש הנאיבי הוא $-6.26$ במקום $+0.02$.
+</p>
+</div>
+
+<!-- ========================================= -->
+<h2 id="loss">פונקציית ההפסד (Loss Function)</h2>
+
+<p>
+האופטימייזר מנסה <strong>למזער</strong> פונקציית הפסד. ב-Least Squares סטנדרטי:
+</p>
+
+$$\mathcal{L}(\theta) = \frac{1}{2} \sum_{k=1}^{38} r_k(\theta)^2 = \frac{1}{2} \|\vec{r}(\theta)\|^2$$
+
+<div class="explain math">
+<div class="explain-title purple">למה "סכום ריבועים"?</div>
+<p>
+<strong>ריבוע</strong> = מעניש שגיאות גדולות חזק. <strong>סכום</strong> = רוצים שכל 38 הרכיבים יהיו קטנים. <strong>חצי</strong> = נוחות: הנגזרת מבטלת את ה-2.
+</p>
+<p>
+המינימום של $\mathcal{L}$ הוא הנקודה שבה המודל הכי מתאים לכל 19 התצפיות <strong>בו-זמנית</strong>.
+</p>
+</div>
+
+<h3 id="soft-l1">Robust Loss: soft_l1</h3>
+
+<p>
+Least Squares רגיל רגיש ל<strong>חריגים</strong> (outliers). תצפית אחת גרועה יכולה למשוך את כל ההתאמה. לכן משתמשים ב-<strong>soft_l1</strong>:
+</p>
+
+$$\rho(z) = 2(\sqrt{1 + z} - 1)$$
+
+<p>
+כאשר $z = (r_k / f_{\text{scale}})^2$. ההתנהגות:
+</p>
+
+<table>
+  <tr><th>תחום</th><th>התנהגות</th><th>משמעות</th></tr>
+  <tr><td>$|r_k| \ll f_{\text{scale}}$</td><td>$\rho \approx z$ (ריבועי)</td><td>שגיאות קטנות → Least Squares רגיל</td></tr>
+  <tr><td>$|r_k| \gg f_{\text{scale}}$</td><td>$\rho \approx 2\sqrt{z}$ (לינארי)</td><td>שגיאות גדולות → השפעה <strong>מופחתת</strong></td></tr>
+</table>
+
+<div class="explain warn">
+<div class="explain-title orange">f_scale = 200 arcsec — מה זה אומר?</div>
+<p>
+"שגיאה של 200 arcsec ומטה → התייחס ברצינות (ריבועי). שגיאה גדולה מ-200 → כנראה חריג, אל תיתן לו להשתלט."
+</p>
+<p>
+זהו <strong>היפר-פרמטר</strong> — לא נלמד מהנתונים, אלא נבחר על-ידינו. ערך קטן מדי → מתעלם מנתונים טובים. גדול מדי → לא מסנן חריגים.
+</p>
+</div>
+
+<!-- ========================================= -->
+<h2 id="bounds">גבולות פיזיקליים</h2>
+
+<p>אנחנו לא נותנים לאופטימייזר "לשוטט" לאן שהוא רוצה. מגדירים גבולות פיזיקליים:</p>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">bounds</span>
+</div>
+<pre><code class="language-python">#              a     e      i        Ω        ω        M₀
+lb = np.array([2.0,  0.0,   0°,      0,       0,      -π ])
+ub = np.array([3.5,  0.6,  45°,     2π,      2π,       π ])</code></pre>
+</div>
+
+<table>
+  <tr><th>פרמטר</th><th>תחתון</th><th>עליון</th><th>הגיון</th></tr>
+  <tr><td>$a$</td><td>2.0 AU</td><td>3.5 AU</td><td>חגורת אסטרואידים: ~2–4 AU</td></tr>
+  <tr><td>$e$</td><td>0</td><td>0.6</td><td>אליפסה סגורה (לא היפרבולה)</td></tr>
+  <tr><td>$i$</td><td>0°</td><td>45°</td><td>אסטרואידים — נטייה מתונה</td></tr>
+  <tr><td>$\Omega, \omega$</td><td>0</td><td>$2\pi$</td><td>זוויות מלאות</td></tr>
+  <tr><td>$M_0$</td><td>$-\pi$</td><td>$\pi$</td><td>זווית עטופה</td></tr>
+</table>
+
+<!-- ========================================= -->
+<h2 id="initial">ניחוש התחלתי</h2>
+
+<p>
+כל אופטימיזציה לא-לינארית צריכה <strong>נקודת התחלה</strong>. הניחוש שלנו "סביר אבל לא מכויל" — כלומר <strong>רחוק מהאמת</strong>, כדי להראות שהאלגוריתם עובד:
+</p>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">initial guess</span>
+</div>
+<pre><code class="language-python">x0 = np.array([
+    3.0,               # a = 3 AU  (אמיתי: ~2.77)
+    0.2,               # e = 0.2   (אמיתי: ~0.08)
+    10.0 * DEG2RAD,    # i = 10°   (אמיתי: ~10.6°)
+    120.0 * DEG2RAD,   # Ω = 120°  (אמיתי: ~81°)
+    40.0 * DEG2RAD,    # ω = 40°   (אמיתי: ~64°)
+    0.5 * np.pi        # M₀ = 90°  (אמיתי: ~-66°)
+])</code></pre>
+</div>
+
+<div class="explain">
+<div class="explain-title blue">למה דווקא ניחוש "גרוע"?</div>
+כדי להוכיח שהאלגוריתם <strong>מתכנס</strong> גם ממרחק — לא רק כשמזלזלים ומתחילים קרוב לתשובה. זה הופך את ההדגמה להרבה יותר משכנעת.
+</div>
+
+<!-- ========================================= -->
+<h2 id="least-squares">האופטימייזר: מ-Gradient Descent ל-Gauss-Newton</h2>
+
+<p>
+יש לנו פונקציה <code>residuals_arcsec(params, ...)</code> שמקבלת 6 פרמטרים ומחזירה 38 residuals. אנחנו רוצים למצוא את ה-<code>params</code> שעבורם הresiduals הכי קטנים. איך?
+</p>
+
+<h3>הגישה הנאיבית: Gradient Descent</h3>
+
+<p>
+הרעיון הפשוט ביותר: מחשבים את <strong>הגרדיאנט</strong> — הכיוון שבו הפונקציה עולה הכי מהר — וזזים <strong>בכיוון ההפוך</strong>:
+</p>
+
+$$\theta_{n+1} = \theta_n - \alpha \nabla \mathcal{L}(\theta_n)$$
+
+<p>כאשר $\alpha$ הוא ה-learning rate. זה עובד, אבל יש שתי בעיות:</p>
+
+<div class="explain warn">
+<div class="explain-title orange">למה Gradient Descent לא מספיק טוב כאן?</div>
+<ol>
+<li><strong>איטי מאוד</strong> — הגרדיאנט אומר רק "לאיזה כיוון" אבל לא "כמה". צעד גדול מדי → מתבדרים. קטן מדי → מתכנסים תוך אלפי צעדים.</li>
+<li><strong>לא מנצל את המבנה של Least Squares</strong> — אנחנו לא ממזערים פונקציה כללית, אלא <strong>סכום ריבועי residuals</strong>. למבנה הזה יש מידע נוסף שאפשר לנצל.</li>
+</ol>
+</div>
+
+<h3 id="jacobian">המידע הנוסף: היעקוביאן (Jacobian)</h3>
+
+<p>
+היעקוביאן הוא מטריצה שאומרת: <strong>"כמה ישתנה כל residual אם אזיז כל פרמטר קצת?"</strong>
+</p>
+
+$$J_{k,j} = \frac{\partial r_k}{\partial \theta_j}$$
+
+<p>
+במקרה שלנו זו מטריצה $38 \times 6$: 38 residuals × 6 פרמטרים. כל איבר $J_{k,j}$ אומר: "אם אגדיל את $\theta_j$ ב-$\epsilon$ קטן, כמה ישתנה $r_k$?"
+</p>
+
+<div class="explain math">
+<div class="explain-title purple">דוגמה קונקרטית</div>
+<p>
+$J_{3,1} = \frac{\partial r_3}{\partial a}$ — "כמה ה-residual של Dec בתצפית ה-2 ישתנה אם $a$ יגדל ב-0.001 AU?"
+</p>
+<p>
+אם $J_{3,1}$ גדול → הפרמטר $a$ "אחראי" על ה-residual הזה. אם קטן → שינוי ב-$a$ כמעט לא משפיע עליו.
+</p>
+</div>
+
+<p>
+בפועל, <code>least_squares</code> מחשב את $J$ <strong>נומרית</strong>: מזיז כל פרמטר ב-$\epsilon$ קטן, מודד כמה השתנו כל 38 ה-residuals, וכך בונה שורה אחרי שורה.
+</p>
+
+<h3>Gauss-Newton: ניצול המבנה של Least Squares</h3>
+
+<p>
+עכשיו שיש לנו את $J$, אפשר לעשות משהו הרבה יותר חכם מ-Gradient Descent. במקום "לאיזה כיוון לזוז?", שואלים: <strong>"מה הצעד $\Delta\theta$ שיגרום לכל 38 ה-residuals להתקרב ל-0 בו-זמנית?"</strong>
+</p>
+
+<p>מתמטית, מחפשים $\Delta\theta$ שממזער:</p>
+
+$$\|J \cdot \Delta\theta + \vec{r}\|^2$$
+
+<p>זו בעיית Least Squares <strong>לינארית</strong> (ב-$\Delta\theta$), ויש לה פתרון סגור:</p>
+
+$$\Delta\theta = -(J^T J)^{-1} J^T \vec{r}$$
+
+<div class="explain key">
+<div class="explain-title green">למה זה עדיף?</div>
+<ul>
+<li><strong>Gradient Descent</strong>: "תזוז קצת שמאלה" — כיוון בלבד.</li>
+<li><strong>Gauss-Newton</strong>: "תזוז 0.023 AU ב-$a$, תקטין $e$ ב-0.005, ותגדיל $\Omega$ ב-2°" — <strong>גודל וכיוון מדויקים</strong>, לכל פרמטר בנפרד.</li>
+</ul>
+<p>
+בפועל, Gauss-Newton מתכנס ב-<strong>עשרות צעדים</strong> במקום אלפים.
+</p>
+</div>
+
+<h3 id="trust-region">Trust Region: לא לקפוץ חזק מדי</h3>
+
+<p>
+Gauss-Newton נותן צעד אופטימלי <strong>אם הקירוב הלינארי מדויק</strong>. אבל כשאנחנו רחוקים מהפתרון, הקירוב גרוע — והצעד עלול להיות ענק ולשלוח אותנו לכיוון מוטעה.
+</p>
+
+<p>הפתרון: <strong>Trust Region</strong> — "אני סומך על הקירוב הלינארי רק בתוך אזור קטן":</p>
+
+$$\min_{\Delta\theta} \|J \cdot \Delta\theta + \vec{r}\|^2 \quad \text{בכפוף ל:} \quad \|\Delta\theta\| \leq \Delta$$
+
+<p>
+הרדיוס $\Delta$ (אזור האמון) <strong>משתנה דינמית</strong>:
+</p>
+<ul>
+<li>הצעד הצליח (cost ירד) → <strong>מגדילים</strong> את $\Delta$ — "סומכים יותר"</li>
+<li>הצעד נכשל (cost עלה) → <strong>מקטינים</strong> את $\Delta$ — "פחות אמון, צעדים זהירים"</li>
+</ul>
+
+<div class="explain">
+<div class="explain-title blue">אנלוגיה</div>
+<p>
+נניח שאתה הולך בחושך בשטח הררי ומחפש את העמק הנמוך ביותר. אתה מרגיש את הקרקע עם הרגליים (= יעקוביאן, מישור משיק). אם השיפוע עקבי — עושים צעד גדול. אם פתאום מגלים שהקרקע התנהגה שונה מהצפוי — צעדים קטנים וזהירים. זה Trust Region.
+</p>
+</div>
+
+<h3>סיכום: מה <code>least_squares</code> עושה בכל איטרציה</h3>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">פסאודו-קוד של מה שקורה בפנים</span>
+</div>
+<pre><code class="language-python"># פסאודו-קוד — לא קוד אמיתי, אלא תיאור של מה שקורה
+theta = x_init                        # ניחוש התחלתי (6 פרמטרים)
+Delta = 1.0                           # רדיוס Trust Region
+
+for step in range(max_nfev):
+    r = residuals_arcsec(theta)       # 1. חישוב 38 residuals
+
+    J = compute_jacobian(theta)       # 2. חישוב יעקוביאן 38×6
+                                      #    (מזיז כל פרמטר ב-ε, מודד שינוי)
+
+    d = solve_trust_region(J, r, Delta)  # 3. פתרון: min ‖J·d + r‖²
+                                         #    בכפוף ל: ‖d‖ ≤ Δ
+
+    theta_new = clip(theta + d, lb, ub)  # 4. עדכון + שמירה בגבולות
+
+    if cost(theta_new) < cost(theta):    # 5. האם השתפר?
+        theta = theta_new                #    ← כן: מקבלים את הצעד
+        Delta *= 1.5                     #    ← מגדילים אזור אמון
+    else:
+        Delta *= 0.25                    #    ← לא: מקטינים, מנסים שוב
+
+    if converged(r):
+        break                            # 6. התכנסות: השיפור זניח
+
+return theta                             # 6 הפרמטרים הסופיים</code></pre>
+</div>
+
+<h3>הקוד שלנו: עטיפה של least_squares</h3>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">run_one_ls</span>
+</div>
+<pre><code class="language-python">def run_one_ls(x_init, max_nfev=600, f_scale=200.0):
+    return least_squares(
+        residuals_arcsec,           # פונקציית ה-residuals שלנו
+        x_init,                     # ניחוש התחלתי (6 פרמטרים)
+        bounds=(lb, ub),            # גבולות פיזיקליים
+        args=(jd_obs, ra_obs, dec_obs, t_ref, lam_sun, R_ES),  # נתונים קבועים
+        loss="soft_l1",             # robust loss function
+        f_scale=f_scale,            # סף לחריגים (200 arcsec)
+        max_nfev=max_nfev,          # תקציב: 600 הערכות פונקציה
+        verbose=0
+    )</code></pre>
+</div>
+
+<table>
+  <tr><th>פרמטר</th><th>ערך</th><th>משמעות</th></tr>
+  <tr><td><code>residuals_arcsec</code></td><td>—</td><td>הפונקציה שמחזירה 38 residuals — <strong>זה מה שממזערים</strong></td></tr>
+  <tr><td><code>bounds=(lb, ub)</code></td><td>—</td><td>גבולות פיזיקליים (צעד 4 בפסאודו-קוד: <code>clip</code>)</td></tr>
+  <tr><td><code>loss="soft_l1"</code></td><td>—</td><td>Robust loss — מפחית השפעת חריגים</td></tr>
+  <tr><td><code>f_scale=200</code></td><td>200 arcsec</td><td>סף: מתחתיו ריבועי, מעליו לינארי</td></tr>
+  <tr><td><code>max_nfev=600</code></td><td>600</td><td>תקציב: מקסימום הערכות של <code>residuals_arcsec</code></td></tr>
+</table>
+
+<div class="explain key">
+<div class="explain-title green">סיכום ההשוואה</div>
+<table>
+  <tr><th></th><th>Gradient Descent</th><th>Gauss-Newton + Trust Region</th></tr>
+  <tr><td>מידע שנדרש</td><td>גרדיאנט (וקטור 6)</td><td>יעקוביאן (מטריצה 38×6)</td></tr>
+  <tr><td>מה מחליט</td><td>כיוון בלבד</td><td>כיוון + גודל צעד לכל פרמטר</td></tr>
+  <tr><td>בקרת צעד</td><td>learning rate (קבוע, ידני)</td><td>Trust Region (דינמי, אוטומטי)</td></tr>
+  <tr><td>מתכנס ב-</td><td>אלפי צעדים</td><td>עשרות צעדים</td></tr>
+  <tr><td>גבולות</td><td>צריך לטפל ידנית</td><td>מובנה (<code>bounds</code>)</td></tr>
+</table>
+</div>
+
+<!-- ========================================= -->
+<h2 id="multi-start">Multi-Start: למה ניחוש אחד לא מספיק?</h2>
+
+<div class="explain warn">
+<div class="explain-title orange">הבעיה: מינימומים מקומיים</div>
+<p>
+פונקציית ההפסד שלנו <strong>לא קמורה</strong> (not convex). יש לה הרבה "שקעים" (מינימומים מקומיים). האופטימייזר יתכנס <strong>לשקע הקרוב ביותר</strong> לניחוש ההתחלתי — ולא בהכרח לגלובלי.
+</p>
+</div>
+
+<p>הפתרון: <strong>Multi-Start</strong> — מריצים הרבה פעמים מנקודות שונות ובוחרים את הטוב ביותר:</p>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">Multi-Start Optimization Loop</span>
+</div>
+<pre><code class="language-python">N_STARTS = 10
+results = []
+
+# (1) הניחוש הידני שלנו
+res_manual = run_one_ls(x0)
+results.append(res_manual)
+
+# (2) 10 ניחושים אקראיים בתוך הגבולות
+for k in range(N_STARTS):
+    x_init = random_initial_guess()     # דגימה אחידה בין lb ל-ub
+    try:
+        res = run_one_ls(x_init)
+        results.append(res)
+    except Exception as ex:
+        print(f"Start {k+1}: FAILED ({ex})")
+
+# (3) בוחרים את הטוב ביותר (cost הנמוך ביותר)
+best_idx = np.argmin([r.cost for r in results])
+best_x = results[best_idx].x</code></pre>
+</div>
+
+<div class="explain key">
+<div class="explain-title green">מה הקוד הזה מוכיח?</div>
+<p>
+מתוך 11 ריצות (1 ידנית + 10 אקראיות), רק חלק מתכנסות למינימום הגלובלי. הטבלה:
+</p>
+</div>
+
+<table>
+  <tr><th>Start</th><th>Cost</th><th>מה קרה?</th></tr>
+  <tr><td>Manual</td><td style="color:var(--red)">24,615,508</td><td>מינימום מקומי רחוק</td></tr>
+  <tr><td>#1</td><td style="color:var(--yellow)">2,723</td><td>מינימום מקומי סביר</td></tr>
+  <tr><td>#8</td><td style="color:var(--green)"><strong>194</strong></td><td>מינימום גלובלי!</td></tr>
+  <tr><td>#2, #5, #6, #9</td><td style="color:var(--red)">~24M</td><td>נתקעו במינימום גרוע</td></tr>
+</table>
+
+<p>
+הניחוש הידני שלנו הצליח — אבל <strong>רק start #8</strong> מצא את המינימום הגלובלי (cost = 194). בלי multi-start, היינו תקועים עם cost = 24 מיליון!
+</p>
+
+<h4>הפונקציה random_initial_guess</h4>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">random_initial_guess</span>
+</div>
+<pre><code class="language-python">rng = np.random.default_rng(123)    # seed קבוע = תוצאות ניתנות לשחזור
+
+def random_initial_guess():
+    """דגימה אחידה בתוך גבולות."""
+    a     = rng.uniform(2.0, 3.5)         # a ∈ [2, 3.5] AU
+    e     = rng.uniform(0.0, 0.6)         # e ∈ [0, 0.6]
+    inc   = rng.uniform(0.0, 45° rad)     # i ∈ [0°, 45°]
+    Omega = rng.uniform(0.0, 2π)          # Ω ∈ [0, 360°]
+    omega = rng.uniform(0.0, 2π)          # ω ∈ [0, 360°]
+    M0    = rng.uniform(-π, π)            # M₀ ∈ [-180°, 180°]
+    return np.array([a, e, inc, Omega, omega, M0])</code></pre>
+</div>
+
+<!-- ========================================= -->
+<h2 id="refinement">שלב העידון (Refinement)</h2>
+
+<p>
+אחרי שמצאנו את ה-<code>best_x</code> מה-multi-start, מריצים <strong>שוב</strong> עם תקציב גדול יותר כדי לסחוט דיוק נוסף:
+</p>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">Refinement</span>
+</div>
+<pre><code class="language-python">refined = least_squares(
+    residuals_arcsec, best_x,          # מתחילים מהתוצאה הטובה ביותר
+    bounds=(lb, ub),
+    args=(jd_obs, ra_obs, dec_obs, t_ref, lam_sun, R_ES),
+    loss="soft_l1", f_scale=200.0,
+    max_nfev=3000,                     # ★ תקציב x5 יותר גדול!
+    verbose=0
+)
+
+best_fit = refined.x                   # 6 הפרמטרים הסופיים
+
+# חישוב RMS
+r = residuals_arcsec(best_fit, jd_obs, ra_obs, dec_obs, t_ref, lam_sun, R_ES)
+rms = np.sqrt(np.mean(r**2))          # √(Σrᵢ² / 38)
+# → rms ≈ 3.195 arcsec</code></pre>
+</div>
+
+<div class="explain">
+<div class="explain-title blue">למה שני שלבים?</div>
+<p>
+<strong>שלב 1</strong> (multi-start, 600 evals): סורק הרבה שטח עם תקציב קטן — מוצא את "השכונה" של המינימום הגלובלי.<br>
+<strong>שלב 2</strong> (refinement, 3000 evals): מתמקד בשכונה ומשפר את הדיוק.
+</p>
+<p>
+זו אסטרטגיה קלאסית: <strong>exploration</strong> ואז <strong>exploitation</strong>.
+</p>
+</div>
+
+<!-- ========================================= -->
+<h2 id="results">התוצאות</h2>
+
+<table>
+  <tr><th>פרמטר</th><th>ערך שנמצא</th><th>ערך JPL</th><th>הפרש</th></tr>
+  <tr><td>$a$ [AU]</td><td>2.786</td><td>2.766</td><td>+0.020</td></tr>
+  <tr><td>$e$</td><td>0.091</td><td>0.081</td><td>+0.010</td></tr>
+  <tr><td>$i$ [°]</td><td>10.60</td><td>10.63</td><td>-0.03</td></tr>
+  <tr><td>$\Omega$ [°]</td><td>81.01</td><td>83.63</td><td>-2.62</td></tr>
+  <tr><td>$\omega$ [°]</td><td>63.70</td><td>65.68</td><td>-1.98</td></tr>
+  <tr><td>$M_0$ [°]</td><td>-66.03</td><td>—</td><td>—</td></tr>
+</table>
+
+<div class="explain key">
+<div class="explain-title green">RMS = 3.195 arcsec</div>
+<p>
+ממוצע השגיאה הוא כ-3.2 שניות קשת. לפיאצי, שמדד בעין (דרך טלסקופ), זה <strong>מצוין</strong> — מתאים לדיוק המכשיר שלו.
+</p>
+<p>
+הפרמטרים $a, e, i$ מדויקים מאוד. $\Omega$ ו-$\omega$ פחות — כי מ-41 יום של תצפיות קשה לקבע את הזוויות האלה.
+</p>
+</div>
+
+<!-- Interactive Sky Map: Fit vs Observations — pan & zoom -->
+<div style="margin: 32px 0;">
+<div style="text-align:center;color:var(--green);font-weight:bold;font-size:1.1em;margin-bottom:8px;">מפת שמיים — התאמה (ירוק) מול תצפיות (כתום)</div>
+<canvas id="skyFit" width="880" height="460" style="width:100%;border-radius:10px;border:1px solid var(--border);cursor:grab;"></canvas>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+  <div id="skyFitTooltip" style="color:var(--dim);font-size:0.85em;direction:ltr;">🖱️ גרור להזיז | גלגלת לזום | דאבל-קליק לאיפוס</div>
+  <button id="skyFitReset" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:0.8em;">Reset</button>
+</div>
+</div>
+<script>
+(function(){
+  const obsRA = [51.7969,51.7244,51.66,51.5965,51.3837,51.3762,51.3822,51.534,51.6428,51.7059,51.7788,52.2273,52.4506,52.5719,52.6967,52.8294,53.2612,53.7437,54.2772];
+  const obsDec = [15.6288,15.6849,15.7421,15.7993,16.1756,16.3804,16.4516,16.8211,16.9766,17.0551,17.1349,17.5484,17.7197,17.806,17.8935,17.9826,18.2503,18.5231,18.7997];
+  const modelRA = [51.7986,51.7241,51.6576,51.5976,51.3841,51.376,51.3817,51.5315,51.6434,51.7075,51.7783,52.2276,52.4507,52.5713,52.6978,52.8302,53.2617,53.7439,54.2758];
+  const modelDec = [15.6289,15.6845,15.7416,15.8,16.1762,16.3815,16.4513,16.8202,16.9759,17.055,17.135,17.5484,17.7195,17.8062,17.8936,17.9817,18.2498,18.5231,18.8011];
+  const c = document.getElementById('skyFit');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const mg = {top:35, bottom:30, left:50, right:20};
+  const pw = W-mg.left-mg.right, ph = H-mg.top-mg.bottom;
+  let vRA=180,vDec=0,vZoom=1;
+  function vW(){return 360/vZoom;} function vH(){return 180/vZoom;}
+  function raToX(ra){let h=vW()/2;return mg.left+(1-(ra-(vRA-h))/(2*h))*pw;}
+  function decToY(dec){let h=vH()/2;return mg.top+(1-(dec-(vDec-h))/(2*h))*ph;}
+  function xToRA(x){return vRA-vW()/2+(1-(x-mg.left)/pw)*vW();}
+  function yToDec(y){return vDec-vH()/2+(1-(y-mg.top)/ph)*vH();}
+  function draw(){
+    ctx.fillStyle="#0d1117";ctx.fillRect(0,0,W,H);
+    ctx.save();ctx.beginPath();ctx.rect(mg.left,mg.top,pw,ph);ctx.clip();
+    let raStep=vW()>180?30:(vW()>60?15:(vW()>20?5:1));
+    let decStep=vH()>90?15:(vH()>30?5:(vH()>10?2:1));
+    ctx.strokeStyle="#21262d";ctx.lineWidth=0.5;
+    let rs=Math.floor((vRA-vW()/2)/raStep)*raStep,re=Math.ceil((vRA+vW()/2)/raStep)*raStep;
+    for(let ra=rs;ra<=re;ra+=raStep){let x=raToX(ra);if(x>=mg.left&&x<=W-mg.right){ctx.beginPath();ctx.moveTo(x,mg.top);ctx.lineTo(x,H-mg.bottom);ctx.stroke();}}
+    let ds=Math.floor((vDec-vH()/2)/decStep)*decStep,de_=Math.ceil((vDec+vH()/2)/decStep)*decStep;
+    for(let dec=ds;dec<=de_;dec+=decStep){let y=decToY(dec);if(y>=mg.top&&y<=H-mg.bottom){ctx.beginPath();ctx.moveTo(mg.left,y);ctx.lineTo(W-mg.right,y);ctx.stroke();}}
+    let eqY=decToY(0);if(eqY>mg.top&&eqY<H-mg.bottom){ctx.strokeStyle="rgba(88,166,255,0.15)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(mg.left,eqY);ctx.lineTo(W-mg.right,eqY);ctx.stroke();}
+    ctx.strokeStyle="rgba(227,179,65,0.2)";ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();let st=false;
+    for(let ra=0;ra<=360;ra+=1){let l=ra*Math.PI/180,d=Math.asin(Math.sin(23.44*Math.PI/180)*Math.sin(l))*180/Math.PI;let x=raToX(ra),y=decToY(d);if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);}
+    ctx.stroke();ctx.setLineDash([]);
+    // Model path
+    ctx.strokeStyle="#7ee787";ctx.lineWidth=2;ctx.beginPath();
+    for(let i=0;i<modelRA.length;i++){let x=raToX(modelRA[i]),y=decToY(modelDec[i]);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+    ctx.stroke();
+    for(let i=0;i<modelRA.length;i++){let x=raToX(modelRA[i]),y=decToY(modelDec[i]);ctx.beginPath();ctx.arc(x,y,3,0,2*Math.PI);ctx.fillStyle="#7ee787";ctx.fill();}
+    // Observations
+    for(let i=0;i<obsRA.length;i++){let x=raToX(obsRA[i]),y=decToY(obsDec[i]);ctx.beginPath();ctx.arc(x,y,5,0,2*Math.PI);ctx.fillStyle="#ffa657";ctx.fill();ctx.strokeStyle="#ffcf8a";ctx.lineWidth=1;ctx.stroke();}
+    ctx.restore();
+    ctx.fillStyle="#484f58";ctx.font="11px monospace";
+    for(let ra=rs;ra<=re;ra+=raStep){let x=raToX(ra);if(x>=mg.left&&x<=W-mg.right){ctx.textAlign="center";ctx.fillText(ra+"\u00B0",x,mg.top-8);ctx.fillText((ra/15).toFixed(1)+"h",x,H-mg.bottom+14);}}
+    for(let dec=ds;dec<=de_;dec+=decStep){let y=decToY(dec);if(y>=mg.top&&y<=H-mg.bottom){ctx.textAlign="right";ctx.fillText(dec+"\u00B0",mg.left-5,y+4);}}
+    ctx.fillStyle="#8b949e";ctx.font="bold 12px sans-serif";ctx.textAlign="center";
+    ctx.fillText("Right Ascension (RA)",W/2,H-4);
+    ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText("Declination (Dec)",0,0);ctx.restore();
+    // Legend
+    let lx=mg.left+8,ly=mg.top+8;ctx.font="10px sans-serif";ctx.textAlign="left";
+    ctx.fillStyle="#ffa657";ctx.fillRect(lx,ly,10,10);ctx.fillStyle="#8b949e";ctx.fillText("Observed",lx+14,ly+9);
+    ctx.fillStyle="#7ee787";ctx.fillRect(lx+80,ly,10,10);ctx.fillStyle="#8b949e";ctx.fillText("Model fit",lx+94,ly+9);
+    if(vZoom>1.05){ctx.fillStyle="rgba(88,166,255,0.8)";ctx.font="bold 10px monospace";ctx.textAlign="right";ctx.fillText("Zoom: "+vZoom.toFixed(1)+"x",W-mg.right-4,mg.top+14);}
+  }
+  draw();
+  let drag=false,lx=0,ly=0;
+  c.addEventListener('mousedown',function(e){drag=true;lx=e.clientX;ly=e.clientY;c.style.cursor='grabbing';});
+  window.addEventListener('mousemove',function(e){if(!drag)return;let r=c.getBoundingClientRect(),s=W/r.width;vRA+=(e.clientX-lx)*s/pw*vW();vDec+=(e.clientY-ly)*s/ph*vH();vDec=Math.max(-90,Math.min(90,vDec));lx=e.clientX;ly=e.clientY;draw();});
+  window.addEventListener('mouseup',function(){drag=false;c.style.cursor='grab';});
+  c.addEventListener('wheel',function(e){e.preventDefault();let r=c.getBoundingClientRect(),s=W/r.width;let mx=(e.clientX-r.left)*s,my=(e.clientY-r.top)*s;let rm=xToRA(mx),dm=yToDec(my);vZoom=Math.max(1,Math.min(50,vZoom*(e.deltaY<0?1.15:1/1.15)));vRA=rm-(1-(mx-mg.left)/pw)*vW()+vW()/2;vDec=dm-(1-(my-mg.top)/ph)*vH()+vH()/2;vDec=Math.max(-90,Math.min(90,vDec));draw();},{passive:false});
+  c.addEventListener('dblclick',function(){vRA=180;vDec=0;vZoom=1;draw();});
+  document.getElementById('skyFitReset').addEventListener('click',function(){vRA=180;vDec=0;vZoom=1;draw();});
+  c.addEventListener('mousemove',function(e){if(drag)return;let r=c.getBoundingClientRect(),s=W/r.width;let x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;let ra=xToRA(x),dec=yToDec(y);document.getElementById('skyFitTooltip').textContent='RA = '+ra.toFixed(2)+'\u00B0  ('+(ra/15).toFixed(2)+'h)   Dec = '+dec.toFixed(2)+'\u00B0';});
+})();
+</script>
+
+<!-- ========================================= -->
+<h2 id="diagnostics">דיאגנוסטיקה</h2>
+
+<p>
+אחרי ההתאמה, בודקים ש-residuals "נראים טוב":
+</p>
+
+<div class="code-section">
+<div class="code-header">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="filename">Diagnostics</span>
+</div>
+<pre><code class="language-python"># חישוב residuals עם הפרמטרים הסופיים
+ra_pred, dec_pred = predict_radec(jd_obs, best_fit, t_ref, lam_sun, R_ES)
+
+dra = wrap_to_pi(ra_pred - ra_obs)
+ddec = dec_pred - dec_obs
+
+# residuals ב-arcsec
+dra_star_arcsec = dra * np.cos(dec_obs) * ARCSEC_PER_RAD
+ddec_arcsec     = ddec * ARCSEC_PER_RAD</code></pre>
+</div>
+
+<p>מה בודקים:</p>
+<ul>
+<li><strong>Sky path</strong>: המודל עובר דרך הנקודות? (ויזואלי)</li>
+<li><strong>Residuals vs time</strong>: אין מגמה שיטתית? (אם יש — המודל חסר משהו)</li>
+<li><strong>היסטוגרמה</strong>: הresiduals מפוזרים סימטרית סביב 0?</li>
+</ul>
+
+<!-- Interactive Residual Dashboard -->
+<div style="margin: 32px 0;">
+<div style="text-align:center;color:var(--cyan);font-weight:bold;font-size:1.1em;margin-bottom:8px;">Residual Dashboard &nbsp;|&nbsp; <span style="color:var(--green);">RMS = 3.195 arcsec</span></div>
+<div style="display:flex;gap:12px;">
+  <canvas id="resTsCanvas" width="600" height="360" style="flex:2;border-radius:10px;border:1px solid var(--border);"></canvas>
+  <canvas id="resHistCanvas" width="260" height="360" style="flex:1;border-radius:10px;border:1px solid var(--border);"></canvas>
+</div>
+<div id="resTooltip" style="text-align:center;color:var(--dim);font-size:0.85em;margin-top:4px;height:1.2em;direction:ltr;"></div>
+</div>
+<script>
+(function(){
+  const tDays = [0,1,1.99,2.99,8.97,11.97,12.96,17.95,19.94,20.94,21.94,26.93,28.92,29.92,30.92,31.92,34.91,37.9,40.89];
+  const draAS = [5.85,-0.8,-8.48,3.99,1.07,-0.75,-1.47,-8.48,1.94,5.58,-1.47,1.14,0.51,-2.04,3.85,2.58,1.67,0.39,-5.07];
+  const ddecAS = [0.53,-1.34,-1.71,2.31,2.37,4.03,-0.92,-3.35,-2.56,-0.56,0.53,0.25,-0.66,0.85,0.46,-3.45,-1.9,-0.13,5.31];
+  const rms = 3.195;
+
+  // Time series
+  const ts = document.getElementById('resTsCanvas');
+  const ctx = ts.getContext('2d');
+  const W = ts.width, H = ts.height;
+  const mg = {top:30, bottom:35, left:55, right:15};
+  const pw = W-mg.left-mg.right, ph = H-mg.top-mg.bottom;
+  const tMax = 45, rMax = 12;
+
+  function tToX(t){ return mg.left + t/tMax * pw; }
+  function rToY(r){ return mg.top + (1 - (r+rMax)/(2*rMax)) * ph; }
+
+  ctx.fillStyle="#0d1117"; ctx.fillRect(0,0,W,H);
+  // Grid
+  ctx.strokeStyle="#21262d"; ctx.lineWidth=0.5;
+  for(let t=0;t<=40;t+=10){let x=tToX(t);ctx.beginPath();ctx.moveTo(x,mg.top);ctx.lineTo(x,H-mg.bottom);ctx.stroke();ctx.fillStyle="#484f58";ctx.font="11px monospace";ctx.textAlign="center";ctx.fillText(t+"d",x,H-mg.bottom+14);}
+  for(let r=-10;r<=10;r+=5){let y=rToY(r);ctx.beginPath();ctx.moveTo(mg.left,y);ctx.lineTo(W-mg.right,y);ctx.stroke();ctx.fillStyle="#484f58";ctx.font="11px monospace";ctx.textAlign="right";ctx.fillText(r+'"',mg.left-5,y+4);}
+  // Zero line
+  ctx.strokeStyle="rgba(88,166,255,0.3)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(mg.left,rToY(0));ctx.lineTo(W-mg.right,rToY(0));ctx.stroke();
+  // RMS band
+  ctx.fillStyle="rgba(126,231,135,0.08)";ctx.fillRect(mg.left,rToY(rms),pw,rToY(-rms)-rToY(rms));
+  ctx.strokeStyle="rgba(126,231,135,0.3)";ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(mg.left,rToY(rms));ctx.lineTo(W-mg.right,rToY(rms));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(mg.left,rToY(-rms));ctx.lineTo(W-mg.right,rToY(-rms));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle="rgba(126,231,135,0.5)";ctx.font="9px sans-serif";ctx.textAlign="left";ctx.fillText("+RMS",W-mg.right+2,rToY(rms)+3);ctx.fillText("-RMS",W-mg.right+2,rToY(-rms)+3);
+  // Data points
+  for(let i=0;i<tDays.length;i++){
+    let x=tToX(tDays[i]);
+    // dRA
+    ctx.beginPath();ctx.arc(x,rToY(draAS[i]),4,0,2*Math.PI);ctx.fillStyle="#ffa657";ctx.fill();
+    // dDec
+    ctx.beginPath();ctx.arc(x,rToY(ddecAS[i]),4,0,2*Math.PI);ctx.fillStyle="#79c0ff";ctx.fill();
+  }
+  // Legend
+  ctx.fillStyle="#ffa657";ctx.fillRect(mg.left+10,mg.top+5,10,10);ctx.fillStyle="#8b949e";ctx.font="10px sans-serif";ctx.textAlign="left";ctx.fillText("\u0394RA*cos(\u03B4)",mg.left+24,mg.top+14);
+  ctx.fillStyle="#79c0ff";ctx.fillRect(mg.left+110,mg.top+5,10,10);ctx.fillStyle="#8b949e";ctx.fillText("\u0394Dec",mg.left+124,mg.top+14);
+  // Labels
+  ctx.fillStyle="#8b949e";ctx.font="bold 11px sans-serif";ctx.textAlign="center";
+  ctx.fillText("Days since first observation",W/2,H-4);
+  ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText("Residual [arcsec]",0,0);ctx.restore();
+  ctx.fillText("Residuals vs Time",W/2,mg.top-10);
+
+  // Histogram
+  const hc = document.getElementById('resHistCanvas');
+  const hctx = hc.getContext('2d');
+  const HW=hc.width, HH=hc.height;
+  const hm={top:30,bottom:35,left:40,right:15};
+  const hpw=HW-hm.left-hm.right, hph=HH-hm.top-hm.bottom;
+  hctx.fillStyle="#0d1117";hctx.fillRect(0,0,HW,HH);
+  // Compute histogram
+  const allRes = draAS.concat(ddecAS);
+  const binMin=-10, binMax=10, nBins=10;
+  const binW=(binMax-binMin)/nBins;
+  const counts = new Array(nBins).fill(0);
+  for(let v of allRes){let b=Math.floor((v-binMin)/binW);if(b>=0&&b<nBins)counts[b]++;}
+  const maxCount = Math.max(...counts);
+  // Bars
+  for(let b=0;b<nBins;b++){
+    let bx=hm.left+(b/nBins)*hpw, bw=(hpw/nBins)-2;
+    let bh=(counts[b]/maxCount)*hph;
+    let by=hm.top+hph-bh;
+    let frac=b/nBins;
+    let col = frac<0.5 ? "#79c0ff" : "#ffa657";
+    hctx.fillStyle=col; hctx.globalAlpha=0.7;
+    hctx.fillRect(bx+1,by,bw,bh);
+    hctx.globalAlpha=1;
+    if(counts[b]>0){hctx.fillStyle="#e6edf3";hctx.font="10px monospace";hctx.textAlign="center";hctx.fillText(counts[b],bx+bw/2+1,by-4);}
+  }
+  // X axis
+  for(let v=binMin;v<=binMax;v+=5){let x=hm.left+((v-binMin)/(binMax-binMin))*hpw;hctx.fillStyle="#484f58";hctx.font="10px monospace";hctx.textAlign="center";hctx.fillText(v+'"',x,hm.top+hph+14);}
+  // Zero line
+  let zx=hm.left+((0-binMin)/(binMax-binMin))*hpw;
+  hctx.strokeStyle="rgba(255,123,114,0.5)";hctx.lineWidth=1.5;hctx.beginPath();hctx.moveTo(zx,hm.top);hctx.lineTo(zx,hm.top+hph);hctx.stroke();
+  hctx.fillStyle="#8b949e";hctx.font="bold 11px sans-serif";hctx.textAlign="center";
+  hctx.fillText("Residual Histogram",HW/2,hm.top-10);
+  hctx.fillText("arcsec",HW/2,HH-4);
+
+  // Hover for time series
+  ts.addEventListener('mousemove',function(e){
+    let rect=ts.getBoundingClientRect(),sx=ts.width/rect.width;
+    let mx=(e.clientX-rect.left)*sx,my=(e.clientY-rect.top)*sx;
+    let best=-1,bestD=999;
+    for(let i=0;i<tDays.length;i++){
+      let x=tToX(tDays[i]);
+      let d1=Math.hypot(mx-x,my-rToY(draAS[i])), d2=Math.hypot(mx-x,my-rToY(ddecAS[i]));
+      let d=Math.min(d1,d2);
+      if(d<bestD){bestD=d;best=i;}
+    }
+    if(best>=0&&bestD<30){
+      document.getElementById('resTooltip').textContent='Day '+tDays[best].toFixed(1)+': \u0394RA*cos\u03B4 = '+draAS[best].toFixed(2)+'" , \u0394Dec = '+ddecAS[best].toFixed(2)+'"';
+    } else document.getElementById('resTooltip').textContent='';
+  });
+})();
+</script>
+
+<!-- ========================================= -->
+<h2 id="ml-connection">הקשר ללמידת מכונה</h2>
+
+<p>
+מה שעשינו כאן הוא <strong>בדיוק</strong> מה שקורה בלמידת מכונה:
+</p>
+
+<table>
+  <tr><th>מונח באסטרונומיה</th><th>מונח ב-ML</th></tr>
+  <tr><td>פרמטרי מסלול $(a,e,i,\Omega,\omega,M_0)$</td><td><strong>Weights / Parameters</strong></td></tr>
+  <tr><td>הפונקציה <code>predict_radec</code></td><td><strong>Forward pass</strong></td></tr>
+  <tr><td>Residuals (הפרש מודל–תצפיות)</td><td><strong>Loss function</strong></td></tr>
+  <tr><td><code>least_squares</code> optimizer</td><td><strong>Training algorithm</strong> (כמו Adam, SGD)</td></tr>
+  <tr><td>Multi-start</td><td><strong>Random initialization</strong></td></tr>
+  <tr><td><code>f_scale</code></td><td><strong>Hyperparameter</strong></td></tr>
+  <tr><td>תצפיות פיאצי</td><td><strong>Training data</strong></td></tr>
+  <tr><td>ערכי JPL</td><td><strong>Ground truth</strong></td></tr>
+  <tr><td>RMS residual</td><td><strong>Test metric</strong></td></tr>
+</table>
+
+<div class="explain key">
+<div class="explain-title green">ההבדל העיקרי</div>
+<p>
+ב-ML, המודל (רשת נוירונים) הוא "קופסה שחורה" עם מיליוני פרמטרים.<br>
+כאן, המודל הוא <strong>פיזיקה</strong> — חוקי קפלר — עם רק <strong>6 פרמטרים</strong>. זה מה שמאפשר לנו להתכנס מ-19 תצפיות בלבד.
+</p>
+</div>
+
+<!-- ========================================= -->
+<h2 style="border: none; margin-top: 80px; text-align: center; color: var(--dim); font-size: 1em;">
+  ✦ &nbsp; Milestone 4 — Computational Astrophysics &nbsp; ✦
+</h2>
+
+</main>
+</div>
+
+<!-- ==================== SCROLL SPY ==================== -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const links = document.querySelectorAll('nav a');
+  const sections = [];
+  links.forEach(a => {
+    const id = a.getAttribute('href')?.replace('#','');
+    if (id) {
+      const el = document.getElementById(id);
+      if (el) sections.push({ el, a });
+    }
+  });
+
+  function onScroll() {
+    let current = sections[0];
+    for (const s of sections) {
+      if (s.el.getBoundingClientRect().top <= 120) current = s;
+    }
+    links.forEach(a => a.classList.remove('active'));
+    if (current) current.a.classList.add('active');
+  }
+  window.addEventListener('scroll', onScroll);
+  onScroll();
+});
+</script>
+
+<!-- ═══ PhysiTal Recording Module ═══ -->
+<div id="rec-frame">
+    <div id="rec-frame-border">
+        <div class="rec-handle rec-handle-nw" data-dir="nw"></div>
+        <div class="rec-handle rec-handle-n"  data-dir="n"></div>
+        <div class="rec-handle rec-handle-ne" data-dir="ne"></div>
+        <div class="rec-handle rec-handle-e"  data-dir="e"></div>
+        <div class="rec-handle rec-handle-se" data-dir="se"></div>
+        <div class="rec-handle rec-handle-s"  data-dir="s"></div>
+        <div class="rec-handle rec-handle-sw" data-dir="sw"></div>
+        <div class="rec-handle rec-handle-w"  data-dir="w"></div>
+        <div id="rec-frame-dims">1920 × 1080</div>
+    </div>
+    <div id="rec-controls">
+        <button class="rc-btn" id="rc-rec" title="Record / Stop">⏺</button>
+        <button class="rc-btn" id="rc-pause" title="Pause" style="display:none;">⏸</button>
+        <span id="rc-timer">0:00</span>
+        <div class="rc-sep"></div>
+        <button class="rc-btn" id="rc-screenshot" title="Screenshot">📷</button>
+        <div class="rc-sep"></div>
+        <select id="rc-aspect">
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="21:9">21:9</option>
+            <option value="free">Free</option>
+        </select>
+        <select id="rc-resolution">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="3840x2160">4K</option>
+        </select>
+        <select id="rc-fps">
+            <option value="30" selected>30fps</option>
+            <option value="24">24fps</option>
+            <option value="60">60fps</option>
+        </select>
+        <div class="rc-sep"></div>
+        <button id="rc-close" title="Close">✕</button>
+    </div>
+</div>
+<div id="rec-download-overlay">
+    <div id="rec-download-dialog">
+        <h3 data-he="שמירת הקלטה" data-en="Save Recording">שמירת הקלטה</h3>
+        <input type="text" id="rec-filename" placeholder="filename" dir="ltr">
+        <div class="dl-btns">
+            <button class="dl-btn dl-btn-secondary" id="dl-cancel" data-he="ביטול" data-en="Cancel">ביטול</button>
+            <button class="dl-btn dl-btn-primary" id="dl-confirm" data-he="הורדה" data-en="Download">הורדה</button>
+        </div>
+    </div>
+</div>
+<div id="rec-hint">Press <b>R</b> to open recording frame</div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════
+// PhysiTal Recording Module (auto-injected)
+// ═══════════════════════════════════════════════════════════
+(function() {
+    var REC_SIM_NAME = 'code-explained';
+
+    // ── State ──
+    var rec = window._rec = {
+        isActive: false,
+        isPaused: false,
+        mediaRecorder: null,
+        chunks: [],
+        offscreenCanvas: null,
+        offscreenCtx: null,
+        stream: null,
+        startTimestamp: 0,
+        pausedElapsed: 0,
+        timerInterval: null,
+        lastBlob: null,
+        resolution: { w: 1920, h: 1080 },
+        fps: 30,
+        frame: { x: 0, y: 0, w: 0, h: 0 },
+        aspectRatio: 16 / 9,
+        _domCache: null,
+        _domCaptureActive: false,
+        _lastDomCapture: 0,
+        _domCaptureInterval: 120
+    };
+
+    // ── Aspect Ratio ──
+    rec.parseAspect = function(val) {
+        if (val === 'free') return null;
+        var parts = val.split(':').map(Number);
+        return parts[0] / parts[1];
+    };
+
+    rec.enforceAspect = function() {
+        if (!this.aspectRatio) return;
+        var border = document.getElementById('rec-frame-border');
+        var w = parseInt(border.style.width) || 0;
+        var newH = Math.round(w / this.aspectRatio);
+        border.style.height = newH + 'px';
+        this.syncFrameFromDOM();
+        this.positionControls();
+    };
+
+    // ── Offscreen Canvas ──
+    rec.setupOffscreen = function() {
+        if (!this.offscreenCanvas) {
+            this.offscreenCanvas = document.createElement('canvas');
+            this.offscreenCanvas.id = '_rec_offscreen';
+        }
+        this.offscreenCanvas.width = this.resolution.w;
+        this.offscreenCanvas.height = this.resolution.h;
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    };
+
+    // ── Universal compositeOnto — draws all visible canvases ──
+    rec.compositeOnto = function(targetCtx, targetW, targetH, region) {
+        var r = region || { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+        var sx = targetW / r.w;
+        var sy = targetH / r.h;
+
+        // Fill background
+        var bgColor = getComputedStyle(document.body).backgroundColor;
+        targetCtx.fillStyle = (bgColor && bgColor !== 'rgba(0, 0, 0, 0)') ? bgColor : '#0a0a14';
+        targetCtx.fillRect(0, 0, targetW, targetH);
+
+        // Draw all visible canvases at correct positions
+        var canvases = document.querySelectorAll('canvas');
+        for (var i = 0; i < canvases.length; i++) {
+            var cvs = canvases[i];
+            if (cvs.id === '_rec_offscreen') continue;
+            if (cvs.offsetWidth === 0 && cvs.offsetHeight === 0) continue;
+
+            var rect = cvs.getBoundingClientRect();
+            // Check overlap with recording frame
+            if (rect.right <= r.x || rect.left >= r.x + r.w) continue;
+            if (rect.bottom <= r.y || rect.top >= r.y + r.h) continue;
+
+            var dx = (rect.left - r.x) * sx;
+            var dy = (rect.top - r.y) * sy;
+            var dw = rect.width * sx;
+            var dh = rect.height * sy;
+
+            try { targetCtx.drawImage(cvs, dx, dy, dw, dh); } catch(e) {}
+        }
+    };
+
+    // ── Update recording frame (called each animation frame) ──
+    rec.updateFrame = function() {
+        if (!this.offscreenCtx) return;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        // Draw canvases (fast, every frame)
+        this.compositeOnto(this.offscreenCtx, this.resolution.w, this.resolution.h, region);
+
+        // Draw cached DOM overlay
+        if (this._domCache) {
+            this.offscreenCtx.drawImage(this._domCache, 0, 0);
+        }
+
+        // Trigger async DOM capture (throttled)
+        var now = performance.now();
+        if (!this._domCaptureActive && now - this._lastDomCapture >= this._domCaptureInterval) {
+            this._lastDomCapture = now;
+            this._captureDomOverlay();
+        }
+    };
+
+    // ── Async DOM overlay capture via html2canvas ──
+    rec._captureDomOverlay = async function() {
+        if (typeof html2canvas === 'undefined') return;
+        this._domCaptureActive = true;
+
+        try {
+            var f = this.frame;
+            var scaleX = this.resolution.w / f.w;
+            var scaleY = this.resolution.h / f.h;
+
+            var tempCanvas = document.createElement('canvas');
+            tempCanvas.width = this.resolution.w;
+            tempCanvas.height = this.resolution.h;
+            var tempCtx = tempCanvas.getContext('2d');
+
+            // Find visible dialogues / overlay panels
+            var selectors = '.dialogue, .glass-panel, [class*="dialog"], [class*="panel"]:not(#rec-controls)';
+            var elements = document.querySelectorAll(selectors);
+            var anyRendered = false;
+
+            for (var j = 0; j < elements.length; j++) {
+                var dlg = elements[j];
+                if (dlg.style.display === 'none' || dlg.offsetParent === null) continue;
+                if (dlg.id === 'rec-frame' || dlg.id === 'rec-download-overlay' || dlg.id === 'rec-controls') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+
+                var rendered = await html2canvas(dlg, {
+                    backgroundColor: null, logging: false, useCORS: true
+                });
+                var ddx = (rect.left - f.x) * scaleX;
+                var ddy = (rect.top - f.y) * scaleY;
+                var ddw = rect.width * scaleX;
+                var ddh = rect.height * scaleY;
+                tempCtx.drawImage(rendered, ddx, ddy, ddw, ddh);
+                anyRendered = true;
+            }
+
+            this._domCache = anyRendered ? tempCanvas : null;
+        } catch (e) {
+            console.warn('DOM overlay capture failed:', e);
+        }
+
+        this._domCaptureActive = false;
+    };
+
+    // ── Start Recording ──
+    rec.start = function(options) {
+        var opts = options || {};
+        if (opts.width) this.resolution.w = opts.width;
+        if (opts.height) this.resolution.h = opts.height;
+        if (opts.fps) this.fps = opts.fps;
+
+        this.setupOffscreen();
+        this.chunks = [];
+        this.isPaused = false;
+        this.pausedElapsed = 0;
+
+        this.stream = this.offscreenCanvas.captureStream(this.fps);
+
+        var mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        var mimeType = '';
+        for (var i = 0; i < mimeTypes.length; i++) {
+            if (MediaRecorder.isTypeSupported(mimeTypes[i])) { mimeType = mimeTypes[i]; break; }
+        }
+
+        this.mediaRecorder = new MediaRecorder(this.stream, {
+            mimeType: mimeType,
+            videoBitsPerSecond: this.resolution.w >= 3840 ? 20000000 :
+                               this.resolution.w >= 1920 ? 10000000 : 5000000
+        });
+
+        this.mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size > 0) rec.chunks.push(e.data);
+        };
+
+        this.mediaRecorder.start(1000);
+        this.isActive = true;
+        this.startTimestamp = Date.now();
+        this._startTimer();
+
+        var border = document.getElementById('rec-frame-border');
+        var recBtn = document.getElementById('rc-rec');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('recording');
+        recBtn.classList.add('rec-active');
+        recBtn.textContent = '⏹';
+        recBtn.title = 'Stop';
+        pauseBtn.style.display = 'inline-flex';
+    };
+
+    // ── Stop Recording ──
+    rec.stop = function() {
+        return new Promise(function(resolve) {
+            if (!rec.mediaRecorder || rec.mediaRecorder.state === 'inactive') {
+                resolve(null); return;
+            }
+            if (rec.mediaRecorder.state === 'paused') {
+                rec.mediaRecorder.resume();
+            }
+            rec.mediaRecorder.onstop = function() {
+                var blob = new Blob(rec.chunks, { type: rec.mediaRecorder.mimeType });
+                rec.isActive = false;
+                rec.isPaused = false;
+                rec._stopTimer();
+                rec.lastBlob = blob;
+                rec._domCache = null;
+                rec._domCaptureActive = false;
+
+                var border = document.getElementById('rec-frame-border');
+                var recBtn = document.getElementById('rc-rec');
+                var pauseBtn = document.getElementById('rc-pause');
+                border.classList.remove('recording', 'paused');
+                recBtn.classList.remove('rec-active');
+                recBtn.textContent = '⏺';
+                recBtn.title = 'Record';
+                pauseBtn.style.display = 'none';
+                pauseBtn.classList.remove('paused-active');
+                pauseBtn.textContent = '⏸';
+
+                rec._showDownloadDialog(blob);
+                resolve(blob);
+            };
+            rec.mediaRecorder.stop();
+        });
+    };
+
+    // ── Pause ──
+    rec.pause = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+        this.mediaRecorder.pause();
+        this.isPaused = true;
+        this.pausedElapsed += Date.now() - this.startTimestamp;
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('paused');
+        pauseBtn.classList.add('paused-active');
+        pauseBtn.textContent = '▶';
+        pauseBtn.title = 'Resume';
+    };
+
+    // ── Resume ──
+    rec.resume = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+        this.mediaRecorder.resume();
+        this.isPaused = false;
+        this.startTimestamp = Date.now();
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.remove('paused');
+        pauseBtn.classList.remove('paused-active');
+        pauseBtn.textContent = '⏸';
+        pauseBtn.title = 'Pause';
+    };
+
+    // ── Screenshot ──
+    rec.screenshot = async function(options) {
+        var opts = options || {};
+        var w = opts.width || this.resolution.w;
+        var h = opts.height || this.resolution.h;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        var offscreen = document.createElement('canvas');
+        offscreen.width = w;
+        offscreen.height = h;
+        var ctx = offscreen.getContext('2d');
+
+        this.compositeOnto(ctx, w, h, region);
+
+        if (typeof html2canvas !== 'undefined') {
+            var scaleX = w / f.w;
+            var scaleY = h / f.h;
+            var dlgs = document.querySelectorAll('.dialogue, .glass-panel');
+            for (var i = 0; i < dlgs.length; i++) {
+                var dlg = dlgs[i];
+                if (dlg.style.display === 'none') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+                try {
+                    var rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+                    ctx.drawImage(rendered, (rect.left - f.x) * scaleX, (rect.top - f.y) * scaleY, rect.width * scaleX, rect.height * scaleY);
+                } catch(e) {}
+            }
+        }
+
+        return offscreen.toDataURL(opts.format || 'image/png', opts.quality || 0.95);
+    };
+
+    // ── Download helpers ──
+    rec.downloadBlob = function(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    };
+
+    rec.downloadDataURL = function(dataURL, filename) {
+        var a = document.createElement('a');
+        a.href = dataURL; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+
+    // ── Timer ──
+    rec._startTimer = function() {
+        var el = document.getElementById('rc-timer');
+        this.timerInterval = setInterval(function() {
+            var elapsed;
+            if (rec.isPaused) {
+                elapsed = Math.floor(rec.pausedElapsed / 1000);
+            } else {
+                elapsed = Math.floor((rec.pausedElapsed + Date.now() - rec.startTimestamp) / 1000);
+            }
+            var min = Math.floor(elapsed / 60);
+            var sec = String(elapsed % 60).padStart(2, '0');
+            el.textContent = min + ':' + sec;
+        }, 250);
+    };
+
+    rec._stopTimer = function() {
+        clearInterval(this.timerInterval);
+        document.getElementById('rc-timer').textContent = '0:00';
+    };
+
+    // ── Download Dialog ──
+    rec._showDownloadDialog = function(blob) {
+        var overlay = document.getElementById('rec-download-overlay');
+        var input = document.getElementById('rec-filename');
+        var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        input.value = 'physital-' + REC_SIM_NAME + '-' + ts;
+        overlay.style.display = 'flex';
+        input.focus(); input.select();
+        overlay._pendingBlob = blob;
+    };
+
+    rec._hideDownloadDialog = function() {
+        document.getElementById('rec-download-overlay').style.display = 'none';
+    };
+
+    // ── Sync frame from DOM ──
+    rec.syncFrameFromDOM = function() {
+        var border = document.getElementById('rec-frame-border');
+        this.frame.x = parseInt(border.style.left) || 0;
+        this.frame.y = parseInt(border.style.top) || 0;
+        this.frame.w = parseInt(border.style.width) || window.innerWidth;
+        this.frame.h = parseInt(border.style.height) || window.innerHeight;
+        document.getElementById('rec-frame-dims').textContent = this.frame.w + ' \u00d7 ' + this.frame.h;
+    };
+
+    // ── Position controls below frame ──
+    rec.positionControls = function() {
+        var border = document.getElementById('rec-frame-border');
+        var controls = document.getElementById('rec-controls');
+        var bLeft = parseInt(border.style.left) || 0;
+        var bWidth = parseInt(border.style.width) || 0;
+        var bTop = parseInt(border.style.top) || 0;
+        var bHeight = parseInt(border.style.height) || 0;
+        controls.style.left = (bLeft + bWidth / 2) + 'px';
+        controls.style.transform = 'translateX(-50%)';
+        controls.style.top = (bTop + bHeight + 12) + 'px';
+        controls.style.bottom = 'auto';
+    };
+
+    // ── Toggle Recording Frame ──
+    function toggleRecFrame() {
+        var frame = document.getElementById('rec-frame');
+        var isVisible = frame.classList.contains('active');
+
+        // Close context menu if present
+        var ctxMenu = document.getElementById('ctx-menu') || document.getElementById('context-menu');
+        if (ctxMenu) ctxMenu.style.display = 'none';
+
+        if (isVisible) {
+            if (rec.isActive) return; // don't close while recording
+            frame.classList.remove('active');
+        } else {
+            frame.classList.add('active');
+            var border = document.getElementById('rec-frame-border');
+            var pad = 60;
+            var maxW = window.innerWidth - pad * 2;
+            var maxH = window.innerHeight - pad * 2 - 60;
+            var ar = rec.aspectRatio;
+            var fw, fh;
+            if (ar) {
+                if (maxW / maxH > ar) { fh = maxH; fw = Math.round(fh * ar); }
+                else { fw = maxW; fh = Math.round(fw / ar); }
+            } else { fw = maxW; fh = maxH; }
+            var offsetX = pad + Math.round((maxW - fw) / 2);
+            var offsetY = pad + Math.round((maxH - fh) / 2);
+            border.style.left = offsetX + 'px';
+            border.style.top = offsetY + 'px';
+            border.style.width = fw + 'px';
+            border.style.height = fh + 'px';
+            rec.syncFrameFromDOM();
+            rec.positionControls();
+        }
+    }
+
+    // Expose for context menu integration
+    window._recToggle = toggleRecFrame;
+
+    // ── Bind events after DOM ready ──
+    function bindRecEvents() {
+        // Record / Stop
+        document.getElementById('rc-rec').addEventListener('click', function() {
+            if (rec.isActive) { rec.stop(); } else { rec.start(); }
+        });
+
+        // Pause / Resume
+        document.getElementById('rc-pause').addEventListener('click', function() {
+            if (rec.isPaused) { rec.resume(); } else { rec.pause(); }
+        });
+
+        // Screenshot
+        document.getElementById('rc-screenshot').addEventListener('click', async function() {
+            var dataURL = await rec.screenshot();
+            var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            rec.downloadDataURL(dataURL, 'physital-' + REC_SIM_NAME + '-' + ts + '.png');
+        });
+
+        // Aspect ratio
+        document.getElementById('rc-aspect').addEventListener('change', function(e) {
+            rec.aspectRatio = rec.parseAspect(e.target.value);
+            rec.enforceAspect();
+        });
+
+        // Resolution
+        document.getElementById('rc-resolution').addEventListener('change', function(e) {
+            var parts = e.target.value.split('x').map(Number);
+            rec.resolution = { w: parts[0], h: parts[1] };
+        });
+
+        // FPS
+        document.getElementById('rc-fps').addEventListener('change', function(e) {
+            rec.fps = parseInt(e.target.value);
+        });
+
+        // Close
+        document.getElementById('rc-close').addEventListener('click', function() {
+            if (rec.isActive) return;
+            toggleRecFrame();
+        });
+
+        // Download confirm
+        document.getElementById('dl-confirm').addEventListener('click', function() {
+            var overlay = document.getElementById('rec-download-overlay');
+            var filename = document.getElementById('rec-filename').value.trim() || 'recording';
+            var blob = overlay._pendingBlob;
+            if (blob) rec.downloadBlob(blob, filename + '.webm');
+            rec._hideDownloadDialog();
+        });
+
+        // Download cancel
+        document.getElementById('dl-cancel').addEventListener('click', function() {
+            rec._hideDownloadDialog();
+        });
+
+        // Download Enter/Escape
+        document.getElementById('rec-filename').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('dl-confirm').click();
+            if (e.key === 'Escape') rec._hideDownloadDialog();
+        });
+
+        // Frame drag
+        document.getElementById('rec-frame-border').addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('rec-handle')) return;
+            e.preventDefault();
+            var border = document.getElementById('rec-frame-border');
+            var startX = e.clientX - (parseInt(border.style.left) || 0);
+            var startY = e.clientY - (parseInt(border.style.top) || 0);
+            function onMove(ev) {
+                border.style.left = (ev.clientX - startX) + 'px';
+                border.style.top = (ev.clientY - startY) + 'px';
+                rec.syncFrameFromDOM();
+                rec.positionControls();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        // Frame resize handles
+        document.querySelectorAll('.rec-handle').forEach(function(handle) {
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var dir = handle.dataset.dir;
+                var border = document.getElementById('rec-frame-border');
+                var startMouseX = e.clientX;
+                var startMouseY = e.clientY;
+                var startLeft = parseInt(border.style.left) || 0;
+                var startTop = parseInt(border.style.top) || 0;
+                var startW = parseInt(border.style.width) || 0;
+                var startH = parseInt(border.style.height) || 0;
+                var MIN = 100;
+                function onMove(ev) {
+                    var dx = ev.clientX - startMouseX;
+                    var dy = ev.clientY - startMouseY;
+                    var l = startLeft, t = startTop, w = startW, h = startH;
+                    var ar = rec.aspectRatio;
+                    if (dir.includes('e')) { w = Math.max(MIN, startW + dx); }
+                    if (dir.includes('w')) { w = Math.max(MIN, startW - dx); l = startLeft + (startW - w); }
+                    if (dir.includes('s')) { h = Math.max(MIN, startH + dy); }
+                    if (dir.includes('n')) { h = Math.max(MIN, startH - dy); t = startTop + (startH - h); }
+                    if (ar) {
+                        if (dir === 'e' || dir === 'w') { h = Math.round(w / ar); }
+                        else if (dir === 'n' || dir === 's') { w = Math.round(h * ar); }
+                        else {
+                            if (Math.abs(w - startW) >= Math.abs(h - startH)) { h = Math.round(w / ar); }
+                            else { w = Math.round(h * ar); }
+                        }
+                        if (w < MIN) { w = MIN; h = Math.round(w / ar); }
+                        if (h < MIN) { h = MIN; w = Math.round(h * ar); }
+                        if (dir.includes('n')) { t = startTop + startH - h; }
+                        if (dir.includes('w')) { l = startLeft + startW - w; }
+                    }
+                    border.style.left = l + 'px';
+                    border.style.top = t + 'px';
+                    border.style.width = w + 'px';
+                    border.style.height = h + 'px';
+                    rec.syncFrameFromDOM();
+                    rec.positionControls();
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+
+        // Keyboard shortcut: R to toggle recording frame
+        document.addEventListener('keydown', function(e) {
+            // Skip if typing in an input/textarea/select
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.key === 'r' || e.key === 'R') {
+                if (e.ctrlKey || e.altKey || e.metaKey) return;
+                toggleRecFrame();
+            }
+        });
+
+        // Show hint briefly on load
+        var hint = document.getElementById('rec-hint');
+        if (hint) {
+            setTimeout(function() { hint.classList.add('show'); }, 1500);
+            setTimeout(function() { hint.classList.remove('show'); }, 5000);
+        }
+    }
+
+    // ── Self-sustaining recording render loop ──
+    function recLoop() {
+        if (rec.isActive) { rec.updateFrame(); }
+        requestAnimationFrame(recLoop);
+    }
+
+    // ── Init ──
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { bindRecEvents(); requestAnimationFrame(recLoop); });
+    } else {
+        bindRecEvents();
+        requestAnimationFrame(recLoop);
+    }
+})();
+
+</script>
+</body>
+</html>

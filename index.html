@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhysiTal Simulations — Ceres Orbit Determination</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600&family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  background: #050510;
+  font-family: 'Rubik', 'Assistant', sans-serif;
+  color: #e2e8f0;
+}
+.hero {
+  text-align: center;
+  padding: 60px 20px 40px;
+  background: linear-gradient(180deg, rgba(96,165,250,0.08) 0%, transparent 100%);
+}
+.hero h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero p { color: #8b949e; font-size: 1rem; max-width: 600px; margin: 0 auto; line-height: 1.7; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+.card {
+  background: rgba(18, 18, 24, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+  padding: 24px;
+  backdrop-filter: blur(16px);
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(96,165,250,0.15);
+  border-color: rgba(96,165,250,0.3);
+}
+.card .tag {
+  display: inline-block;
+  background: rgba(96,165,250,0.15);
+  color: #60a5fa;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 99px;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.card .tag.green { background: rgba(45,206,137,0.15); color: #2dce89; }
+.card .tag.gold { background: rgba(255,215,0,0.15); color: #ffd700; }
+.card .tag.red { background: rgba(233,69,96,0.15); color: #e94560; }
+.card h2 { font-size: 1.15rem; font-weight: 500; margin-bottom: 8px; }
+.card p { color: #8b949e; font-size: 0.85rem; line-height: 1.6; }
+.footer {
+  text-align: center;
+  padding: 40px 20px;
+  color: #484f58;
+  font-size: 0.78rem;
+}
+.footer a { color: #60a5fa; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>PhysiTal Simulations</h1>
+  <p>
+    Milestone 4 — Ceres Orbit Determination<br>
+    19 observations by Giuseppe Piazzi (Jan–Feb 1801)
+  </p>
+</div>
+
+<div class="grid">
+
+  <a class="card" href="convergence_simulation.html">
+    <span class="tag green">PhysiTal 2.0</span>
+    <h2>Convergence Explorer</h2>
+    <p>Multi-start optimization convergence visualization. Morph animation from initial guesses to converged results + detailed step-by-step iteration viewer with loss curves and gradient analysis.</p>
+  </a>
+
+  <a class="card" href="orbital_explorer_v2.html">
+    <span class="tag green">PhysiTal 2.0</span>
+    <h2>Orbital Explorer v2</h2>
+    <p>Interactive 3D + 2D orbital simulation with real-time parameter sliders, time control, sight lines, orbit tracing, forward projection, and Ceres observation fitting mode.</p>
+  </a>
+
+  <a class="card" href="radec_simulation.html">
+    <span class="tag green">PhysiTal 2.0</span>
+    <h2>RA/Dec Simulation</h2>
+    <p>Full RADEC simulation with Three.js 3D view and sky map. Earth-Ceres sight line visualization with time animation and trail accumulation.</p>
+  </a>
+
+  <a class="card" href="fitting_visualization.html">
+    <span class="tag">Interactive</span>
+    <h2>Fitting Visualization</h2>
+    <p>Visual comparison of predicted vs observed sky positions. Shows how orbital parameters affect the fit quality with real-time RMS calculation.</p>
+  </a>
+
+  <a class="card" href="kepler_equation.html">
+    <span class="tag">Interactive</span>
+    <h2>Kepler Equation</h2>
+    <p>Interactive visualization of Kepler's equation M = E - e sin(E). Newton-Raphson solver convergence with adjustable eccentricity and mean anomaly.</p>
+  </a>
+
+  <a class="card" href="code_explained.html">
+    <span class="tag gold">Documentation</span>
+    <h2>Code Explained</h2>
+    <p>Step-by-step walkthrough of the computational pipeline — from raw CSV observations through orbit fitting to final parameter estimation.</p>
+  </a>
+
+</div>
+
+<div class="footer">
+  <p>Weizmann Institute of Science — Computational Astrophysics</p>
+  <p style="margin-top:4px;">Built with <a href="https://github.com/kingTB">kingTB</a> + Claude</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,2401 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbital Explorer — PhysiTal 2.0</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600&family=Rubik:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+:root {
+  --glass-bg: rgba(18, 18, 24, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --accent: #60a5fa;
+  --accent-red: #e94560;
+  --accent-gold: #ffd700;
+  --accent-green: #2dce89;
+  --text-main: #e2e8f0;
+  --text-dim: #8b949e;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  overflow: hidden;
+  background: #050510;
+  font-family: 'Rubik', 'Assistant', sans-serif;
+  color: var(--text-main);
+  user-select: none;
+  -webkit-user-select: none;
+}
+#container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+}
+#orbit-view, #sky-view {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  transition: width 0.35s ease;
+}
+#orbit-view { width: 50%; background: #050510; }
+#sky-view { width: 50%; background: #080810; border-right: 1px solid #222; cursor: crosshair; }
+#orbit-view canvas, #sky-view canvas { display: block; outline: none; width: 100%; height: 100%; }
+
+/* View toggle pill */
+#view-pill {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 200;
+  display: flex; gap: 2px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 99px; padding: 3px;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.pill-btn {
+  padding: 5px 14px; border-radius: 99px; cursor: pointer;
+  font-size: 0.8rem; color: #888; transition: 0.2s; white-space: nowrap; border: none; background: none;
+}
+.pill-btn.active { background: rgba(255,255,255,0.12); color: #fff; font-weight: 500; }
+.pill-btn:hover { color: #ccc; }
+
+/* Context menu */
+#ctx-menu {
+  display: none; position: fixed; z-index: 900;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 12px; padding: 6px 0; min-width: 220px;
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  flex-direction: column;
+}
+.ctx-item {
+  padding: 8px 18px; cursor: pointer; font-size: 0.85rem; color: var(--text-main);
+  display: flex; align-items: center; gap: 10px; transition: background 0.15s;
+}
+.ctx-item:hover { background: rgba(255,255,255,0.08); }
+.ctx-item .icon { width: 18px; text-align: center; font-size: 0.9rem; }
+.ctx-sep { height: 1px; background: var(--glass-border); margin: 4px 10px; }
+.ctx-sub { position: relative; }
+.ctx-sub::after { content: '◂'; position: absolute; left: 14px; font-size: 0.7rem; color: #666; }
+.ctx-submenu {
+  display: none; position: absolute; top: -4px; right: 100%; margin-right: 4px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 10px; padding: 4px 0; min-width: 160px;
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.ctx-sub:hover .ctx-submenu { display: flex; flex-direction: column; }
+
+/* Glassmorphism dialogues */
+.dialogue {
+  display: none; position: fixed; z-index: 500;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 16px; min-width: 300px; max-width: 420px;
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  overflow: hidden; resize: both;
+}
+.dialogue.open { display: block; }
+.dlg-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 18px; cursor: grab; border-bottom: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.03);
+}
+.dlg-header:active { cursor: grabbing; }
+.dlg-title { font-size: 0.95rem; font-weight: 500; }
+.dlg-close {
+  width: 24px; height: 24px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(255,255,255,0.08); color: #888; font-size: 1rem; display: flex;
+  align-items: center; justify-content: center; transition: 0.15s;
+}
+.dlg-close:hover { background: rgba(233,69,96,0.3); color: #e94560; }
+.dlg-body { padding: 14px 18px; max-height: 60vh; overflow-y: auto; }
+.dlg-body::-webkit-scrollbar { width: 5px; }
+.dlg-body::-webkit-scrollbar-track { background: transparent; }
+.dlg-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+/* Slider styling */
+.param-row { margin-bottom: 10px; }
+.param-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 3px; }
+.param-val { color: var(--accent); font-weight: 500; font-family: 'Assistant', monospace; }
+input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 6px; background: rgba(255,255,255,0.08);
+  border-radius: 3px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 2px solid rgba(255,255,255,0.2);
+}
+input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 2px solid rgba(255,255,255,0.2);
+}
+
+/* Toggle buttons */
+.toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 0.82rem; }
+.toggle-sw {
+  width: 36px; height: 20px; border-radius: 10px; border: none; cursor: pointer;
+  position: relative; transition: 0.25s; padding: 0;
+}
+.toggle-sw.on { background: var(--accent-green); }
+.toggle-sw.off { background: rgba(255,255,255,0.12); }
+.toggle-sw::after {
+  content: ''; position: absolute; top: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; transition: 0.25s;
+}
+.toggle-sw.on::after { right: 2px; left: auto; }
+.toggle-sw.off::after { left: 2px; right: auto; }
+
+/* Ceres HUD */
+#ceres-hud {
+  display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 300;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 14px; padding: 10px 24px;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  display: flex; align-items: center; gap: 16px; font-size: 0.85rem;
+}
+#ceres-hud.hidden { display: none !important; }
+#rms-value { font-size: 1.3rem; font-weight: 500; font-family: 'Assistant', monospace; }
+.rms-bar {
+  width: 120px; height: 6px; border-radius: 3px; position: relative;
+  background: linear-gradient(to left, #2dce89, #ffd700, #e94560);
+}
+.rms-indicator {
+  position: absolute; top: -4px; width: 3px; height: 14px; border-radius: 2px;
+  background: #fff; box-shadow: 0 0 6px rgba(255,255,255,0.5);
+}
+
+/* Time HUD */
+#time-hud {
+  position: fixed; bottom: 20px; right: 20px; z-index: 300;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 10px; padding: 6px 14px;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  font-size: 0.75rem; color: var(--text-dim);
+  font-family: 'Assistant', monospace;
+}
+#time-hud.hidden { display: none; }
+
+/* Buttons */
+.btn-sm {
+  padding: 5px 12px; border-radius: 8px; border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.06); color: var(--text-main); cursor: pointer;
+  font-size: 0.78rem; transition: 0.2s; font-family: inherit;
+}
+.btn-sm:hover { background: rgba(255,255,255,0.12); }
+.btn-accent {
+  background: rgba(96,165,250,0.15); border-color: rgba(96,165,250,0.3); color: var(--accent);
+}
+.btn-accent:hover { background: rgba(96,165,250,0.25); }
+
+/* View labels */
+.view-label {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  font-size: 0.72rem; color: #555; z-index: 10;
+  background: rgba(5,5,16,0.7); padding: 2px 12px; border-radius: 6px;
+  pointer-events: none;
+}
+
+/* Entry animation */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+body { animation: fadeIn 0.8s ease; }
+
+
+/* ═══ PhysiTal Recording Module ═══ */
+#rec-frame { position:fixed; inset:0; z-index:400; display:none; pointer-events:none; }
+#rec-frame.active { display:block; }
+#rec-frame-border { position:absolute; border:2px solid #60a5fa; box-shadow:0 0 0 9999px rgba(0,0,0,0.35); pointer-events:auto; cursor:move; transition:border-color 0.3s; }
+#rec-frame-border.recording { border-color:#dc2626; box-shadow:0 0 0 9999px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(220,38,38,0.3); }
+#rec-frame-border.paused { border-color:#f59e0b; animation:pulse-border-rec 1.2s ease-in-out infinite; }
+.rec-handle { position:absolute; width:12px; height:12px; background:#60a5fa; border-radius:2px; pointer-events:auto; z-index:2; }
+.rec-handle-nw { top:-6px; left:-6px; cursor:nw-resize; }
+.rec-handle-ne { top:-6px; right:-6px; cursor:ne-resize; }
+.rec-handle-sw { bottom:-6px; left:-6px; cursor:sw-resize; }
+.rec-handle-se { bottom:-6px; right:-6px; cursor:se-resize; }
+.rec-handle-n  { top:-6px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rec-handle-s  { bottom:-6px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rec-handle-e  { right:-6px; top:50%; transform:translateY(-50%); cursor:e-resize; }
+.rec-handle-w  { left:-6px; top:50%; transform:translateY(-50%); cursor:w-resize; }
+#rec-frame-dims { position:absolute; top:-28px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); padding:2px 10px; border-radius:4px; font-size:0.75rem; color:#8b949e; white-space:nowrap; font-variant-numeric:tabular-nums; pointer-events:none; }
+#rec-controls { position:fixed; display:flex; align-items:center; gap:8px; background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 14px; pointer-events:auto; white-space:nowrap; z-index:401; }
+#rec-controls select { padding:4px 6px; font-size:0.78rem; border-radius:6px; background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.1); }
+.rc-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; border:none; cursor:pointer; font-size:1rem; transition:all 0.2s; color:white; background:rgba(255,255,255,0.1); }
+.rc-btn:hover { background:rgba(255,255,255,0.2); }
+.rc-btn.rec-active { background:#dc2626; animation:pulse-rec-btn 1.5s ease-in-out infinite; }
+.rc-btn.paused-active { background:#f59e0b; }
+#rc-timer { font-size:0.82rem; font-variant-numeric:tabular-nums; color:#8b949e; min-width:42px; text-align:center; }
+.rc-sep { width:1px; height:20px; background:rgba(255,255,255,0.1); }
+#rc-close { opacity:0.5; transition:opacity 0.2s; background:none; border:none; color:#8b949e; cursor:pointer; font-size:1rem; }
+#rc-close:hover { opacity:1; }
+@keyframes pulse-rec-btn { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+@keyframes pulse-border-rec { 0%,100%{border-color:#f59e0b;} 50%{border-color:rgba(245,158,11,0.4);} }
+#rec-download-overlay { position:fixed; inset:0; z-index:800; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); }
+#rec-download-dialog { background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:24px; min-width:340px; box-shadow:0 20px 50px rgba(0,0,0,0.6); }
+#rec-download-dialog h3 { font-size:1rem; font-weight:500; margin-bottom:14px; color:#e2e8f0; }
+#rec-filename { width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-family:inherit; font-size:0.9rem; direction:ltr; margin-bottom:14px; }
+#rec-filename:focus { outline:none; border-color:#60a5fa; }
+#rec-download-dialog .dl-btns { display:flex; gap:10px; justify-content:flex-end; }
+.dl-btn { padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:white; transition:background 0.2s; }
+.dl-btn-primary { background:#60a5fa; }
+.dl-btn-primary:hover { background:#3b82f6; }
+.dl-btn-secondary { background:rgba(255,255,255,0.1); }
+.dl-btn-secondary:hover { background:rgba(255,255,255,0.2); }
+#rec-hint { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 16px; font-size:0.75rem; color:#8b949e; z-index:50; pointer-events:none; opacity:0; transition:opacity 1s; }
+#rec-hint.show { opacity:1; }
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+<!-- View Toggle Pill -->
+<div id="view-pill">
+  <button class="pill-btn" data-view="3d">תלת-ממד</button>
+  <button class="pill-btn active" data-view="split">מפוצל</button>
+  <button class="pill-btn" data-view="sky">מפת שמיים</button>
+</div>
+
+<!-- Main Container -->
+<div id="container">
+  <div id="orbit-view">
+    <div class="view-label">3D Orbit View</div>
+  </div>
+  <div id="sky-view">
+    <div class="view-label">Sky Map (RA / Dec)</div>
+    <canvas id="sky-canvas"></canvas>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div id="ctx-menu">
+  <div class="ctx-item" data-action="instructions"><span class="icon">📖</span>הוראות שימוש</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="params"><span class="icon">⚙️</span>פרמטרים מסלוליים</div>
+  <div class="ctx-item" data-action="time"><span class="icon">⏱️</span>זמן ואנימציה</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="display"><span class="icon">👁️</span>תצוגה</div>
+  <div class="ctx-item" data-action="camera"><span class="icon">🎥</span>מצלמה</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="ceres"><span class="icon">🔭</span>מצב קרס</div>
+  <div class="ctx-sub ctx-item" data-action="none"><span class="icon">🪐</span>פריסטים
+    <div class="ctx-submenu">
+      <div class="ctx-item" data-action="preset-ceres"><span class="icon">🟢</span>Ceres (JPL)</div>
+      <div class="ctx-item" data-action="preset-mars"><span class="icon">🔴</span>Mars</div>
+      <div class="ctx-item" data-action="preset-jupiter"><span class="icon">🟠</span>Jupiter</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" data-action="preset-random"><span class="icon">🎲</span>אקראי</div>
+    </div>
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="settings"><span class="icon">⚙</span>הגדרות</div>
+  <div class="ctx-item" data-action="docs"><span class="icon">📄</span>תיעוד</div>
+    <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="window._recToggle()" data-he="הקלטה" data-en="Recording">הקלטה</div>
+    </div>
+
+<!-- Dialogues -->
+
+<!-- Instructions -->
+<div class="dialogue" id="dlg-instructions" style="top:80px;left:50px;">
+  <div class="dlg-header"><span class="dlg-title">📖 הוראות שימוש</span><button class="dlg-close">&times;</button></div>
+  <div class="dlg-body" dir="rtl" style="line-height:1.7;">
+    <p style="font-size:1rem;font-weight:500;margin-bottom:8px;">ברוכים הבאים ל-Orbital Explorer!</p>
+    <p style="color:var(--text-dim);margin-bottom:10px;">סימולציה אינטראקטיבית לחקירת מסלולים קפלריאניים וצפייה במפת שמיים.</p>
+    <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 14px;margin-bottom:10px;">
+      <p style="font-weight:500;margin-bottom:4px;">🖱️ בקרות:</p>
+      <ul style="color:var(--text-dim);font-size:0.82rem;padding-right:16px;">
+        <li><b>לחיצה ימנית</b> — תפריט הקשר (כל האפשרויות)</li>
+        <li><b>גרירה</b> — סיבוב מצלמה (תלת-ממד) / פאן (מפת שמיים)</li>
+        <li><b>גלגלת</b> — זום (שני החלונות)</li>
+        <li><b>רווח</b> — Play / Pause</li>
+        <li><b>← →</b> — צעד קדימה/אחורה בזמן</li>
+      </ul>
+    </div>
+    <div style="background:rgba(96,165,250,0.08);border-radius:10px;padding:10px 14px;">
+      <p style="font-weight:500;margin-bottom:4px;">🔭 מצב קרס:</p>
+      <p style="color:var(--text-dim);font-size:0.82rem;">הפעל מצב קרס מתפריט ההקשר כדי לראות את תצפיות פיאצי (1801) ולנסות להתאים פרמטרים מסלוליים כך שה-RMS יהיה מינימלי.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Orbital Parameters -->
+<div class="dialogue" id="dlg-params" style="top:80px;right:50px;min-width:340px;">
+  <div class="dlg-header"><span class="dlg-title">⚙️ פרמטרים מסלוליים</span><button class="dlg-close">&times;</button></div>
+  <div class="dlg-body">
+    <div class="param-row">
+      <div class="param-label"><span>a — חצי ציר גדול (AU)</span><span class="param-val" id="pv-a">2.7876</span></div>
+      <input type="range" id="sl-a" min="0.5" max="6.0" step="0.0001" value="2.7876">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>e — אקסצנטריות</span><span class="param-val" id="pv-e">0.0916</span></div>
+      <input type="range" id="sl-e" min="0.0" max="0.9" step="0.0001" value="0.0916">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>i — נטייה (°)</span><span class="param-val" id="pv-i">10.60</span></div>
+      <input type="range" id="sl-i" min="0" max="90" step="0.01" value="10.60">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>&Omega; — אורך הצומת העולה (°)</span><span class="param-val" id="pv-Om">81.01</span></div>
+      <input type="range" id="sl-Om" min="0" max="360" step="0.01" value="81.01">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>&omega; — ארגומנט הפריהליון (°)</span><span class="param-val" id="pv-w">63.56</span></div>
+      <input type="range" id="sl-w" min="0" max="360" step="0.01" value="63.56">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>M₀ — אנומליה ממוצעת (°)</span><span class="param-val" id="pv-M0">-65.86</span></div>
+      <input type="range" id="sl-M0" min="-180" max="180" step="0.01" value="-65.86">
+    </div>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:0.78rem;color:var(--text-dim);">RMS (arcsec):</span>
+      <span id="rms-params" style="font-size:1.1rem;font-weight:500;color:var(--accent-green);font-family:'Assistant',monospace;">—</span>
+    </div>
+  </div>
+</div>
+
+<!-- Time & Animation -->
+<div class="dialogue" id="dlg-time" style="top:120px;left:200px;min-width:320px;">
+  <div class="dlg-header"><span class="dlg-title">⏱️ זמן ואנימציה</span><button class="dlg-close">&times;</button></div>
+  <div class="dlg-body">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <button class="btn-sm btn-accent" id="btn-playpause" style="font-size:1.1rem;padding:6px 16px;">▶</button>
+      <div style="flex:1;">
+        <div class="param-label"><span>מהירות (ימים/שנייה)</span><span class="param-val" id="pv-speed">0</span></div>
+        <input type="range" id="sl-speed" min="0" max="50" step="0.5" value="0">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <div class="param-label" style="flex:1;margin:0;"><span>זמן (ימים מ-tRef)</span><span class="param-val" id="pv-time">20.0</span></div>
+    </div>
+    <input type="range" id="sl-time" min="-50" max="100" step="0.1" value="20" style="width:100%;margin-bottom:12px;">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn-sm" id="btn-step-back" title="צעד אחורה">◀ -1 יום</button>
+      <button class="btn-sm" id="btn-step-fwd" title="צעד קדימה">+1 יום ▶</button>
+      <button class="btn-sm" id="btn-goto-start">תחילת תצפיות</button>
+      <button class="btn-sm" id="btn-goto-end">סוף תצפיות</button>
+      <button class="btn-sm" id="btn-reset-time">t = 0</button>
+    </div>
+  </div>
+</div>
+
+<!-- View & Display -->
+<div class="dialogue" id="dlg-display" style="top:160px;left:80px;">
+  <div class="dlg-header"><span class="dlg-title">👁️ תצוגה</span><button class="dlg-close">&times;</button></div>
+  <div class="dlg-body">
+    <div class="toggle-row"><span>קו ראייה (כדה"א → עצם)</span><button class="toggle-sw on" data-key="showSightLine"></button></div>
+    <div class="toggle-row"><span>שובל מסלול (בזמן אמת)</span><button class="toggle-sw on" data-key="showTrail"></button></div>
+    <div class="toggle-row"><span>הקרנה קדימה</span><button class="toggle-sw on" data-key="showForward"></button></div>
+    <div class="toggle-row"><span>נקודות פיאצי</span><button class="toggle-sw on" data-key="showPiazzi"></button></div>
+    <div class="toggle-row"><span>מישור מילקת</span><button class="toggle-sw on" data-key="showEcliptic"></button></div>
+    <div class="toggle-row"><span>מסלול כדה"א</span><button class="toggle-sw on" data-key="showEarthOrbit"></button></div>
+    <div class="toggle-row"><span>תוויות</span><button class="toggle-sw on" data-key="showLabels"></button></div>
+    <div class="toggle-row"><span>כוכבי רקע</span><button class="toggle-sw on" data-key="showStars"></button></div>
+    <div class="toggle-row"><span>צירים</span><button class="toggle-sw on" data-key="showAxes"></button></div>
+  </div>
+</div>
+
+<!-- Camera -->
+<div class="dialogue" id="dlg-camera" style="top:200px;left:120px;">
+  <div class="dlg-header"><span class="dlg-title">🎥 מצלמה</span><button class="dlg-close">&times;</button></div>
+  <div class="dlg-body">
+    <div style="margin-bottom:10px;">
+      <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:4px;">מצב מצלמה</div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-sm btn-accent" data-cam="free">חופשי</button>
+        <button class="btn-sm" data-cam="follow">עקוב אחרי עצם</button>
+        <button class="btn-sm" data-cam="top">מבט עליון</button>
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <button class="btn-sm" id="btn-reset-cam">אפס מצלמה</button>
+    </div>
+    <div class="toggle-row"><span>מעקב אוטומטי (מפת שמיים)</span><button class="toggle-sw on" data-key="skyAutoTrack"></button></div>
+  </div>
+</div>
+
+<!-- Ceres Mode -->
+<div class="dialogue" id="dlg-ceres" style="top:100px;left:100px;min-width:340px;">
+  <div class="dlg-header"><span class="dlg-title">🔭 מצב קרס — התאמת תצפיות פיאצי</span><button class="dlg-close">&times;</button></div>
+  <div class="dlg-body" dir="rtl">
+    <div class="toggle-row" style="margin-bottom:8px;"><span style="font-weight:500;">הפעל מצב קרס</span><button class="toggle-sw on" data-key="ceresMode" id="ceres-toggle"></button></div>
+    <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px;">במצב קרס, 19 תצפיות של ג'וזפה פיאצי (ינואר–פברואר 1801) מוצגות על מפת השמיים. שנה את הפרמטרים המסלוליים כדי למזער את ה-RMS.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="btn-sm btn-accent" id="btn-load-jpl">טען פתרון JPL</button>
+      <button class="btn-sm" id="btn-autoplay">הפעל אנימציה (41 ימים)</button>
+    </div>
+    <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:0.8rem;">RMS:</span>
+        <span id="rms-ceres" style="font-size:1.2rem;font-weight:500;color:var(--accent-green);font-family:'Assistant',monospace;">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="dialogue" id="dlg-settings" style="top:200px;right:100px;">
+  <div class="dlg-header"><span class="dlg-title">⚙ הגדרות</span><button class="dlg-close">&times;</button></div>
+  <div class="dlg-body">
+    <div class="toggle-row"><span>RTL</span><button class="toggle-sw on" data-key="rtl"></button></div>
+  </div>
+</div>
+
+<!-- Documentation -->
+<div class="dialogue" id="dlg-docs" style="top:60px;left:150px;max-width:460px;">
+  <div class="dlg-header"><span class="dlg-title">📄 תיעוד</span><button class="dlg-close">&times;</button></div>
+  <div class="dlg-body" dir="rtl" style="font-size:0.82rem;line-height:1.7;color:var(--text-dim);">
+    <h3 style="color:var(--text-main);margin-bottom:6px;">מכניקה מסלולית</h3>
+    <p>כל מסלול קפלריאני מוגדר ע"י 6 פרמטרים: a (חצי ציר גדול), e (אקסצנטריות), i (נטייה), &Omega; (אורך צומת עולה), &omega; (ארגומנט פריהליון), M₀ (אנומליה ממוצעת ב-tRef).</p>
+    <h3 style="color:var(--text-main);margin:10px 0 6px;">משוואת קפלר</h3>
+    <p>M = E - e&middot;sin(E) נפתרת בשיטת ניוטון-רפסון עם 50 איטרציות וטולרנס 10⁻¹².</p>
+    <h3 style="color:var(--text-main);margin:10px 0 6px;">מערכת צירים</h3>
+    <p>קואורדינטות אקליפטיות → משוויאניות באמצעות סיבוב Rx(&epsilon;) כאשר &epsilon; = 23.465164° (IAU 2006, עידן 1801).</p>
+    <h3 style="color:var(--text-main);margin:10px 0 6px;">RMS</h3>
+    <p>RMS = &radic;(&Sigma;[(ΔRA&middot;cos&delta;)² + ΔDec²] / N) בשניות קשת. תיקון cos(&delta;) מבטיח מדידה נכונה על הכדור השמימי.</p>
+    <h3 style="color:var(--text-main);margin:10px 0 6px;">נתונים</h3>
+    <p>19 תצפיות של ג'וזפה פיאצי מפלרמו, סיציליה (ינואר-פברואר 1801). k_gauss = 0.01720209895 AU³/²/day.</p>
+  </div>
+</div>
+
+<!-- Ceres HUD -->
+<div id="ceres-hud" class="hidden">
+  <span style="color:var(--text-dim);">RMS</span>
+  <span id="rms-value" style="font-size:1.3rem;font-weight:500;font-family:'Assistant',monospace;">—</span>
+  <span style="color:var(--text-dim);font-size:0.75rem;">arcsec</span>
+  <div class="rms-bar"><div class="rms-indicator" id="rms-ind" style="left:50%;"></div></div>
+</div>
+
+<!-- Time HUD -->
+<div id="time-hud">
+  t = <span id="time-display">20.0</span> days
+</div>
+
+<script>
+// =========================================================================
+// ORBITAL EXPLORER v2 — PhysiTal 2.0
+// =========================================================================
+
+// roundRect polyfill for older browsers
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    r = Math.min(r, w/2, h/2);
+    this.moveTo(x+r, y);
+    this.arcTo(x+w, y, x+w, y+h, r);
+    this.arcTo(x+w, y+h, x, y+h, r);
+    this.arcTo(x, y+h, x, y, r);
+    this.arcTo(x, y, x+w, y, r);
+  };
+}
+
+// ===== Constants =====
+const K_GAUSS = 0.01720209895;
+const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+// Obliquity for epoch J1801.0 (IAU 2006): T = (2378861.46 - 2451545.0)/36525 = -1.9893
+// eps = 84381.448 - 46.815*T - 0.00059*T^2 + 0.001813*T^3 = 84474.59" = 23.465164°
+const OBLIQUITY = 23.465164 * DEG2RAD;
+const TWO_PI = 2 * Math.PI;
+const ARCSEC_PER_DEG = 3600;
+
+// ===== Piazzi Data (1801) — corrected from notebook CSV pipeline =====
+const piazzi_ra  = [51.797,51.724,51.660,51.596,51.384,51.376,51.382,51.534,51.643,51.706,51.779,52.227,52.451,52.572,52.697,52.829,53.261,53.744,54.277];
+const piazzi_dec = [15.629,15.685,15.742,15.799,16.176,16.380,16.452,16.821,16.977,17.055,17.135,17.548,17.720,17.806,17.893,17.983,18.250,18.523,18.800];
+const piazzi_days= [0.3634,1.3605,2.3576,3.3547,9.3377,12.3295,13.3268,18.3135,20.3084,21.3058,22.3033,27.2909,29.2860,30.2836,31.2812,32.2789,35.2719,38.2650,41.2583];
+
+// Sun ecliptic longitude (radians) and Earth-Sun distance (AU) for each observation
+const lam_sun = [4.904816,4.922549,4.940283,4.958019,5.064449,5.117372,5.135406,5.224322,5.259454,5.277158,5.294857,5.383275,5.418599,5.436257,5.453910,5.471558,5.524479,5.577361,5.630197];
+const R_ES    = [0.9831405,0.9831770,0.9831786,0.9831998,0.9834768,0.9836690,0.9837413,0.9841486,0.9843361,0.9844385,0.9845433,0.9851587,0.9854468,0.9856000,0.9857580,0.9859214,0.9864501,0.9870237,0.9876028];
+
+// ===== Presets =====
+const PRESETS = {
+  ceres:   { a:2.7875954739, e:0.0916148801, i:10.602214, Om:81.005585, w:63.555854, M0:-65.861296 },
+  mars:    { a:1.524, e:0.093, i:1.85, Om:49.6, w:286.5,M0:19.4 },
+  jupiter: { a:5.203, e:0.048, i:1.3,  Om:100.5,w:273.9,M0:20.0 }
+};
+
+// ===== Global App State =====
+const app = {
+  params: {
+    a: 2.7875954739, e: 0.0916148801, i: 10.602214, Om: 81.005585, w: 63.555854, M0: -65.861296,
+    time: 20, timeSpeed: 0, paused: true,
+    tRef: 2378861.462886111  // Midnight Palermo, Jan 1 1801
+  },
+  view: {
+    mode: 'split', // 'split' | '3d' | 'sky'
+    showSightLine: true,
+    showTrail: true,
+    showForward: true,
+    showPiazzi: true,
+    showEcliptic: true,
+    showEarthOrbit: true,
+    showLabels: true,
+    showStars: true,
+    showAxes: true,
+    ceresMode: true,
+    skyAutoTrack: true,
+    rtl: true
+  },
+  camera: { mode: 'free' },
+  sky: { panX: 0, panY: 0, zoom: 1, dragging: false, lastX: 0, lastY: 0 },
+  trail3D: [],
+  trailSky: [],
+  trailMax: 2000,
+  three: {},
+  dirty: true,
+  _lastForwardParams: null,
+  _forwardPath3D: [],
+  _forwardPathSky: []
+};
+
+// ===== DOM References =====
+const orbitDiv = document.getElementById('orbit-view');
+const skyDiv = document.getElementById('sky-view');
+const skyCanvas = document.getElementById('sky-canvas');
+const skyCtx = skyCanvas.getContext('2d');
+
+const sliders = {
+  a: document.getElementById('sl-a'),
+  e: document.getElementById('sl-e'),
+  i: document.getElementById('sl-i'),
+  Om: document.getElementById('sl-Om'),
+  w: document.getElementById('sl-w'),
+  M0: document.getElementById('sl-M0')
+};
+const paramVals = {
+  a: document.getElementById('pv-a'),
+  e: document.getElementById('pv-e'),
+  i: document.getElementById('pv-i'),
+  Om: document.getElementById('pv-Om'),
+  w: document.getElementById('pv-w'),
+  M0: document.getElementById('pv-M0')
+};
+
+// =========================================================================
+// PHASE 3: Orbital Mechanics (preserved exactly from v1)
+// =========================================================================
+
+function solveKepler(M, e, tol) {
+  tol = tol || 1e-12;
+  let E = M;
+  for (let iter = 0; iter < 50; iter++) {
+    const dE = -(E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    E += dE;
+    if (Math.abs(dE) < tol) break;
+  }
+  return E;
+}
+
+function RotZ(angle) {
+  const c = Math.cos(angle), s = Math.sin(angle);
+  return [[ c,-s, 0],[ s, c, 0],[ 0, 0, 1]];
+}
+function RotX(angle) {
+  const c = Math.cos(angle), s = Math.sin(angle);
+  return [[1, 0, 0],[0, c,-s],[0, s, c]];
+}
+function matMul(A, B) {
+  const C = [[0,0,0],[0,0,0],[0,0,0]];
+  for (let i = 0; i < 3; i++)
+    for (let j = 0; j < 3; j++)
+      for (let k = 0; k < 3; k++)
+        C[i][j] += A[i][k] * B[k][j];
+  return C;
+}
+function matVec(A, v) {
+  return [
+    A[0][0]*v[0] + A[0][1]*v[1] + A[0][2]*v[2],
+    A[1][0]*v[0] + A[1][1]*v[1] + A[1][2]*v[2],
+    A[2][0]*v[0] + A[2][1]*v[1] + A[2][2]*v[2]
+  ];
+}
+
+function getOrbitalPosition(a, e, i_rad, Om_rad, w_rad, M) {
+  const E = solveKepler(M, e);
+  const xp = a * (Math.cos(E) - e);
+  const yp = a * Math.sqrt(1 - e * e) * Math.sin(E);
+  const rot = matMul(RotZ(Om_rad), matMul(RotX(i_rad), RotZ(w_rad)));
+  return matVec(rot, [xp, yp, 0]);
+}
+
+// Earth position from Sun data: Earth heliocentric = opposite Sun
+// lam_earth = lam_sun + π, R_earth = R_ES
+// For observation times: use exact lam_sun[i], R_ES[i]
+// For arbitrary times: interpolate linearly from the Sun data
+
+// Linear fit to lam_sun(t): lam_sun ≈ lam0 + rate * t
+const _lamRate = (lam_sun[lam_sun.length-1] - lam_sun[0]) / (piazzi_days[piazzi_days.length-1] - piazzi_days[0]);
+const _lam0 = lam_sun[0] - _lamRate * piazzi_days[0];
+// Linear fit to R_ES(t)
+const _RRate = (R_ES[R_ES.length-1] - R_ES[0]) / (piazzi_days[piazzi_days.length-1] - piazzi_days[0]);
+const _R0 = R_ES[0] - _RRate * piazzi_days[0];
+
+function getEarthPosition(t) {
+  // Interpolated Sun position → Earth heliocentric
+  const lamSun = _lam0 + _lamRate * t;
+  const lamEarth = lamSun + Math.PI;
+  const R = _R0 + _RRate * t;
+  return [R * Math.cos(lamEarth), R * Math.sin(lamEarth), 0];
+}
+
+function getEarthPositionExact(lamSunVal, RVal) {
+  // Exact Earth position from observation-specific Sun data
+  const lamEarth = lamSunVal + Math.PI;
+  return [RVal * Math.cos(lamEarth), RVal * Math.sin(lamEarth), 0];
+}
+
+function eclipticToEquatorial(vec) {
+  return matVec(RotX(OBLIQUITY), vec);
+}
+
+function toRADec(vec) {
+  const x = vec[0], y = vec[1], z = vec[2];
+  const r = Math.sqrt(x*x + y*y + z*z);
+  const dec = Math.asin(z / r) * RAD2DEG;
+  let ra = Math.atan2(y, x) * RAD2DEG;
+  if (ra < 0) ra += 360;
+  return { ra, dec };
+}
+
+// Compute sky path at observation times using EXACT Sun data
+function computeSkyPathObs(params) {
+  const a = params.a, e = params.e;
+  const i_rad = params.i * DEG2RAD, Om_rad = params.Om * DEG2RAD;
+  const w_rad = params.w * DEG2RAD, M0 = params.M0 * DEG2RAD;
+  const n = K_GAUSS / Math.pow(a, 1.5);
+  const results = [];
+  for (let k = 0; k < piazzi_days.length; k++) {
+    const t = piazzi_days[k];
+    const M = M0 + n * t;
+    const r_ecl = getOrbitalPosition(a, e, i_rad, Om_rad, w_rad, M);
+    const r_earth = getEarthPositionExact(lam_sun[k], R_ES[k]);
+    const r_geo = [r_ecl[0]-r_earth[0], r_ecl[1]-r_earth[1], r_ecl[2]-r_earth[2]];
+    results.push(toRADec(eclipticToEquatorial(r_geo)));
+  }
+  return results;
+}
+
+// Compute sky path at arbitrary times using interpolated Sun data
+function computeSkyPath(params, times) {
+  const a = params.a, e = params.e;
+  const i_rad = params.i * DEG2RAD, Om_rad = params.Om * DEG2RAD;
+  const w_rad = params.w * DEG2RAD, M0 = params.M0 * DEG2RAD;
+  const n = K_GAUSS / Math.pow(a, 1.5);
+  const results = [];
+  for (const t of times) {
+    const M = M0 + n * t;
+    const r_ecl = getOrbitalPosition(a, e, i_rad, Om_rad, w_rad, M);
+    const r_earth = getEarthPosition(t);
+    const r_geo = [r_ecl[0]-r_earth[0], r_ecl[1]-r_earth[1], r_ecl[2]-r_earth[2]];
+    results.push(toRADec(eclipticToEquatorial(r_geo)));
+  }
+  return results;
+}
+
+function computeRMS(params) {
+  // Use EXACT Sun data for RMS (matches notebook)
+  const predicted = computeSkyPathObs(params);
+  let sumSq = 0;
+  for (let i = 0; i < piazzi_ra.length; i++) {
+    const dRA = (predicted[i].ra - piazzi_ra[i]) * Math.cos(piazzi_dec[i] * DEG2RAD);
+    const dDec = predicted[i].dec - piazzi_dec[i];
+    sumSq += dRA * dRA + dDec * dDec;
+  }
+  return Math.sqrt(sumSq / piazzi_ra.length) * ARCSEC_PER_DEG;
+}
+
+function getObjectRADec(params, t) {
+  const a = params.a, e = params.e;
+  const i_rad = params.i * DEG2RAD, Om_rad = params.Om * DEG2RAD;
+  const w_rad = params.w * DEG2RAD, M0 = params.M0 * DEG2RAD;
+  const n = K_GAUSS / Math.pow(a, 1.5);
+  const M = M0 + n * t;
+  const r_ecl = getOrbitalPosition(a, e, i_rad, Om_rad, w_rad, M);
+  const r_earth = getEarthPosition(t);
+  const r_geo = [r_ecl[0]-r_earth[0], r_ecl[1]-r_earth[1], r_ecl[2]-r_earth[2]];
+  return toRADec(eclipticToEquatorial(r_geo));
+}
+
+function eclToThree(ex, ey, ez) {
+  return new THREE.Vector3(ex, ez, -ey);
+}
+
+// =========================================================================
+// PHASE 2: Three.js 3D Scene
+// =========================================================================
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050510);
+
+const camera3D = new THREE.PerspectiveCamera(50, 1, 0.01, 200);
+camera3D.position.set(3, 4, 5);
+camera3D.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+orbitDiv.appendChild(renderer.domElement);
+
+const controls3D = new THREE.OrbitControls(camera3D, renderer.domElement);
+controls3D.enableDamping = true;
+controls3D.dampingFactor = 0.08;
+controls3D.minDistance = 0.3;
+controls3D.maxDistance = 40;
+controls3D.target.set(0, 0, 0);
+
+// Ambient + Sun light
+scene.add(new THREE.AmbientLight(0x404060, 0.5));
+const sunLight = new THREE.PointLight(0xffffff, 2, 60);
+sunLight.position.set(0, 0, 0);
+scene.add(sunLight);
+
+// ---- Star field ----
+const starCount = 2500;
+const starGeo = new THREE.BufferGeometry();
+const starPos = new Float32Array(starCount * 3);
+const starSizes = new Float32Array(starCount);
+for (let i = 0; i < starCount; i++) {
+  const theta = Math.random() * TWO_PI;
+  const phi = Math.acos(2 * Math.random() - 1);
+  const r = 60 + Math.random() * 30;
+  starPos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+  starPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+  starPos[i*3+2] = r * Math.cos(phi);
+  starSizes[i] = 0.5 + Math.random() * 1.5;
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+starGeo.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, sizeAttenuation: true, transparent: true, opacity: 0.7 });
+const starField = new THREE.Points(starGeo, starMat);
+scene.add(starField);
+
+// ---- Sun ----
+const sunMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.08, 32, 32),
+  new THREE.MeshBasicMaterial({ color: 0xffd700 })
+);
+scene.add(sunMesh);
+
+// Sun glow
+const glowCanvas = document.createElement('canvas');
+glowCanvas.width = 128; glowCanvas.height = 128;
+const gc = glowCanvas.getContext('2d');
+const grad = gc.createRadialGradient(64,64,8,64,64,64);
+grad.addColorStop(0, 'rgba(255,215,0,0.7)');
+grad.addColorStop(0.3, 'rgba(255,180,0,0.25)');
+grad.addColorStop(1, 'rgba(255,150,0,0)');
+gc.fillStyle = grad;
+gc.fillRect(0,0,128,128);
+const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: new THREE.CanvasTexture(glowCanvas), transparent: true, depthWrite: false
+}));
+glowSprite.scale.set(0.8, 0.8, 1);
+scene.add(glowSprite);
+
+// ---- Ecliptic Grid ----
+const gridHelper = new THREE.GridHelper(14, 28, 0x181828, 0x181828);
+scene.add(gridHelper);
+
+// ---- Axes ----
+const axLen = 1.5;
+const xArrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(0,0,0), axLen, 0xff4444, 0.08, 0.04);
+const yArrow = new THREE.ArrowHelper(new THREE.Vector3(0,0,-1), new THREE.Vector3(0,0,0), axLen, 0x44ff44, 0.08, 0.04);
+const zArrow = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,0), axLen*0.7, 0x4444ff, 0.08, 0.04);
+scene.add(xArrow, yArrow, zArrow);
+
+// ---- Earth orbit ----
+const earthOrbitGeo = new THREE.BufferGeometry();
+const earthOrbitPts = [];
+for (let i = 0; i <= 128; i++) {
+  const ang = (i / 128) * TWO_PI;
+  earthOrbitPts.push(0.9832 * Math.cos(ang), 0, -0.9832 * Math.sin(ang));
+}
+earthOrbitGeo.setAttribute('position', new THREE.Float32BufferAttribute(earthOrbitPts, 3));
+const earthOrbitLine = new THREE.Line(earthOrbitGeo,
+  new THREE.LineDashedMaterial({ color: 0x1f6feb, dashSize: 0.08, gapSize: 0.04 })
+);
+earthOrbitLine.computeLineDistances();
+scene.add(earthOrbitLine);
+
+// ---- Earth ----
+const earthMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.045, 16, 16),
+  new THREE.MeshStandardMaterial({ color: 0x58a6ff, emissive: 0x1f6feb, emissiveIntensity: 0.5 })
+);
+scene.add(earthMesh);
+
+// ---- Object orbit line (full ellipse) ----
+const objOrbitMaxPts = 201;
+const objOrbitGeo = new THREE.BufferGeometry();
+objOrbitGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(objOrbitMaxPts * 3), 3));
+const objOrbitLine = new THREE.Line(objOrbitGeo, new THREE.LineBasicMaterial({ color: 0x8b949e, transparent: true, opacity: 0.4 }));
+scene.add(objOrbitLine);
+
+// ---- Object ----
+const objMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.055, 16, 16),
+  new THREE.MeshStandardMaterial({ color: 0x2dce89, emissive: 0x1aaa66, emissiveIntensity: 0.5 })
+);
+scene.add(objMesh);
+
+// Object glow
+const objGlowCanvas = document.createElement('canvas');
+objGlowCanvas.width = 64; objGlowCanvas.height = 64;
+const ogc = objGlowCanvas.getContext('2d');
+const ograd = ogc.createRadialGradient(32,32,4,32,32,32);
+ograd.addColorStop(0, 'rgba(45,206,137,0.5)');
+ograd.addColorStop(0.5, 'rgba(45,206,137,0.15)');
+ograd.addColorStop(1, 'rgba(45,206,137,0)');
+ogc.fillStyle = ograd;
+ogc.fillRect(0,0,64,64);
+const objGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: new THREE.CanvasTexture(objGlowCanvas), transparent: true, depthWrite: false
+}));
+objGlow.scale.set(0.35, 0.35, 1);
+scene.add(objGlow);
+
+// ---- Line of sight ----
+const losGeo = new THREE.BufferGeometry();
+losGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6), 3));
+const losLine = new THREE.Line(losGeo,
+  new THREE.LineDashedMaterial({ color: 0xe94560, dashSize: 0.1, gapSize: 0.06 })
+);
+scene.add(losLine);
+
+// ---- Trail line (3D) ----
+const trailMaxVerts = 2000;
+const trail3DGeo = new THREE.BufferGeometry();
+trail3DGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(trailMaxVerts * 3), 3));
+const trail3DLine = new THREE.Line(trail3DGeo, new THREE.LineBasicMaterial({ color: 0x2dce89, transparent: true, opacity: 0.6 }));
+trail3DLine.geometry.setDrawRange(0, 0);
+scene.add(trail3DLine);
+
+// ---- Forward projection line (3D) ----
+const fwdMaxPts = 300;
+const fwd3DGeo = new THREE.BufferGeometry();
+fwd3DGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(fwdMaxPts * 3), 3));
+const fwd3DLine = new THREE.Line(fwd3DGeo, new THREE.LineBasicMaterial({ color: 0xff9f43, transparent: true, opacity: 0.35 }));
+fwd3DLine.geometry.setDrawRange(0, 0);
+scene.add(fwd3DLine);
+
+// ---- Labels ----
+function makeTextSprite(text, color) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 32;
+  const ctx = c.getContext('2d');
+  ctx.font = 'bold 20px Rubik, sans-serif';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 64, 16);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));
+  sp.scale.set(0.5, 0.125, 1);
+  return sp;
+}
+const sunLabel = makeTextSprite('Sun', '#ffd700');
+sunLabel.position.set(0, 0.18, 0);
+scene.add(sunLabel);
+const earthLabel = makeTextSprite('Earth', '#58a6ff');
+scene.add(earthLabel);
+const objLabel = makeTextSprite('Object', '#2dce89');
+scene.add(objLabel);
+const eclLabel = makeTextSprite('Ecliptic Plane', '#383848');
+eclLabel.position.set(3, 0.05, -3);
+eclLabel.scale.set(0.8, 0.2, 1);
+scene.add(eclLabel);
+
+// Store references
+app.three = {
+  scene, camera: camera3D, renderer, controls: controls3D,
+  sunMesh, earthMesh, objMesh, objGlow, glowSprite,
+  objOrbitLine, objOrbitGeo, losLine, losGeo,
+  earthOrbitLine, gridHelper, starField,
+  trail3DLine, trail3DGeo, fwd3DLine, fwd3DGeo,
+  xArrow, yArrow, zArrow,
+  sunLabel, earthLabel, objLabel, eclLabel
+};
+
+// =========================================================================
+// PHASE 4: Sky Map (Canvas 2D)
+// =========================================================================
+
+function resizeSkyCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const rect = skyDiv.getBoundingClientRect();
+  skyCanvas.width = rect.width * dpr;
+  skyCanvas.height = rect.height * dpr;
+  skyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function niceStep(range, maxTicks) {
+  const rough = range / maxTicks;
+  const pow10 = Math.pow(10, Math.floor(Math.log10(rough)));
+  const frac = rough / pow10;
+  let nice;
+  if (frac <= 1) nice = 1; else if (frac <= 2) nice = 2; else if (frac <= 5) nice = 5; else nice = 10;
+  return nice * pow10;
+}
+
+function drawSkyView() {
+  const ctx = skyCtx;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = skyCanvas.width / dpr;
+  const H = skyCanvas.height / dpr;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background gradient
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0, '#080810');
+  bgGrad.addColorStop(1, '#0a0a18');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Compute bounds
+  const p = app.params;
+  const currentRaDec = getObjectRADec(p, p.time);
+
+  // Use auto-track or manual pan/zoom
+  let raCenter, decCenter, raSpan, decSpan;
+  if (app.view.skyAutoTrack && app.view.ceresMode) {
+    // Center on Piazzi observation region (stable view, ignores current position)
+    const pRaMin = Math.min(...piazzi_ra), pRaMax = Math.max(...piazzi_ra);
+    const pDecMin = Math.min(...piazzi_dec), pDecMax = Math.max(...piazzi_dec);
+    raCenter = (pRaMin + pRaMax) / 2;
+    decCenter = (pDecMin + pDecMax) / 2;
+    raSpan = (pRaMax - pRaMin) + 6;
+    decSpan = (pDecMax - pDecMin) + 6;
+    // Ensure aspect ratio is reasonable
+    if (raSpan < 8) raSpan = 8;
+    if (decSpan < 6) decSpan = 6;
+  } else if (app.view.skyAutoTrack) {
+    raCenter = currentRaDec.ra;
+    decCenter = currentRaDec.dec;
+    raSpan = 16;
+    decSpan = 12;
+  } else {
+    raCenter = 52.5 + app.sky.panX;
+    decCenter = 17 + app.sky.panY;
+    raSpan = 16;
+    decSpan = 12;
+  }
+  raSpan /= app.sky.zoom;
+  decSpan /= app.sky.zoom;
+
+  let raMin = raCenter - raSpan/2, raMax = raCenter + raSpan/2;
+  let decMin = decCenter - decSpan/2, decMax = decCenter + decSpan/2;
+
+  const margin = { top: 30, bottom: 36, left: 50, right: 20 };
+  const plotW = W - margin.left - margin.right;
+  const plotH = H - margin.top - margin.bottom;
+
+  function mapRA(ra) { return margin.left + plotW * (1 - (ra - raMin) / (raMax - raMin)); }
+  function mapDec(dec) { return margin.top + plotH * (1 - (dec - decMin) / (decMax - decMin)); }
+
+  // Grid
+  ctx.strokeStyle = '#1e1e35'; ctx.lineWidth = 0.7;
+  const raStep = niceStep(raMax - raMin, 6);
+  ctx.font = '11px Assistant, sans-serif';
+  ctx.fillStyle = '#667';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let ra = Math.ceil(raMin / raStep) * raStep; ra <= raMax; ra += raStep) {
+    const x = mapRA(ra);
+    if (x < margin.left || x > W - margin.right) continue;
+    ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, H - margin.bottom); ctx.stroke();
+    ctx.fillText(ra.toFixed(1) + '\u00B0', x, H - margin.bottom + 5);
+  }
+  const decStep = niceStep(decMax - decMin, 6);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let dec = Math.ceil(decMin / decStep) * decStep; dec <= decMax; dec += decStep) {
+    const y = mapDec(dec);
+    if (y < margin.top || y > H - margin.bottom) continue;
+    ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(W - margin.right, y); ctx.stroke();
+    ctx.fillText(dec.toFixed(1) + '\u00B0', margin.left - 5, y);
+  }
+
+  // Border
+  ctx.strokeStyle = '#3a3a55'; ctx.lineWidth = 1.2;
+  ctx.strokeRect(margin.left, margin.top, plotW, plotH);
+
+  // Axis labels
+  ctx.fillStyle = '#99a'; ctx.font = '12px Assistant, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('RA (deg)', margin.left + plotW / 2, H - 10);
+  ctx.save(); ctx.translate(12, margin.top + plotH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText('Dec (deg)', 0, 0); ctx.restore();
+
+  // Clip to plot area
+  ctx.save();
+  ctx.beginPath(); ctx.rect(margin.left, margin.top, plotW, plotH); ctx.clip();
+
+  // Forward projection (dashed orange)
+  if (app.view.showForward && app._forwardPathSky.length > 1) {
+    ctx.strokeStyle = 'rgba(255,159,67,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    let moved = false;
+    for (let i = 0; i < app._forwardPathSky.length; i++) {
+      const pt = app._forwardPathSky[i];
+      const x = mapRA(pt.ra), y = mapDec(pt.dec);
+      if (i > 0 && Math.abs(pt.ra - app._forwardPathSky[i-1].ra) > 180) {
+        ctx.moveTo(x, y); continue;
+      }
+      if (!moved) { ctx.moveTo(x, y); moved = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Trail (green, fading)
+  if (app.view.showTrail && app.trailSky.length > 1) {
+    for (let i = 1; i < app.trailSky.length; i++) {
+      const alpha = 0.15 + 0.65 * (i / app.trailSky.length);
+      ctx.strokeStyle = `rgba(45,206,137,${alpha})`;
+      ctx.lineWidth = 2;
+      const prev = app.trailSky[i-1], cur = app.trailSky[i];
+      if (Math.abs(cur.ra - prev.ra) > 180) continue; // wrap
+      ctx.beginPath();
+      ctx.moveTo(mapRA(prev.ra), mapDec(prev.dec));
+      ctx.lineTo(mapRA(cur.ra), mapDec(cur.dec));
+      ctx.stroke();
+    }
+  }
+
+  // Piazzi observations
+  if (app.view.showPiazzi && app.view.ceresMode) {
+    // Predicted at obs times
+    const predicted = computeSkyPathObs(p);
+    for (const pt of predicted) {
+      ctx.strokeStyle = 'rgba(255,159,67,0.6)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(mapRA(pt.ra), mapDec(pt.dec), 6, 0, TWO_PI); ctx.stroke();
+    }
+
+    // Observed dots (blue, prominent)
+    for (let i = 0; i < piazzi_ra.length; i++) {
+      const x = mapRA(piazzi_ra[i]), y = mapDec(piazzi_dec[i]);
+      // Glow behind
+      ctx.fillStyle = 'rgba(88,166,255,0.2)';
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, TWO_PI); ctx.fill();
+      // Dot
+      ctx.fillStyle = '#58a6ff';
+      ctx.beginPath(); ctx.arc(x, y, 5, 0, TWO_PI); ctx.fill();
+      ctx.strokeStyle = '#3388ff'; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+
+    // Residual lines
+    ctx.strokeStyle = 'rgba(233,69,96,0.4)'; ctx.lineWidth = 1.2;
+    for (let i = 0; i < piazzi_ra.length; i++) {
+      ctx.beginPath();
+      ctx.moveTo(mapRA(piazzi_ra[i]), mapDec(piazzi_dec[i]));
+      ctx.lineTo(mapRA(predicted[i].ra), mapDec(predicted[i].dec));
+      ctx.stroke();
+    }
+  }
+
+  // Current position marker
+  {
+    const x = mapRA(currentRaDec.ra), y = mapDec(currentRaDec.dec);
+    // Only draw if within or near the visible area
+    if (x > margin.left - 50 && x < W - margin.right + 50 &&
+        y > margin.top - 50 && y < H - margin.bottom + 50) {
+      // Glow
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, 18);
+      grd.addColorStop(0, 'rgba(45,206,137,0.5)');
+      grd.addColorStop(0.5, 'rgba(45,206,137,0.15)');
+      grd.addColorStop(1, 'rgba(45,206,137,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(x, y, 18, 0, TWO_PI); ctx.fill();
+      // Dot
+      ctx.fillStyle = '#2dce89';
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, TWO_PI); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    } else if (app.view.ceresMode) {
+      // Draw an arrow at the edge pointing toward the object
+      const cx = margin.left + plotW / 2, cy = margin.top + plotH / 2;
+      const angle = Math.atan2(y - cy, x - cx);
+      const edgeX = Math.max(margin.left + 10, Math.min(W - margin.right - 10, cx + Math.cos(angle) * plotW * 0.45));
+      const edgeY = Math.max(margin.top + 10, Math.min(H - margin.bottom - 10, cy + Math.sin(angle) * plotH * 0.45));
+      ctx.fillStyle = '#2dce89';
+      ctx.beginPath();
+      ctx.moveTo(edgeX + 8 * Math.cos(angle), edgeY + 8 * Math.sin(angle));
+      ctx.lineTo(edgeX + 6 * Math.cos(angle + 2.4), edgeY + 6 * Math.sin(angle + 2.4));
+      ctx.lineTo(edgeX + 6 * Math.cos(angle - 2.4), edgeY + 6 * Math.sin(angle - 2.4));
+      ctx.closePath(); ctx.fill();
+      ctx.font = '10px Rubik, sans-serif'; ctx.fillStyle = '#2dce89';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Object', edgeX - 14 * Math.cos(angle), edgeY - 14 * Math.sin(angle));
+    }
+  }
+
+  ctx.restore(); // unclip
+
+  // Legend (with semi-transparent background)
+  const lx = margin.left + 12, ly = margin.top + 14;
+  const legendH = app.view.ceresMode ? (app.view.showForward ? 54 : 38) : (app.view.showForward ? 38 : 22);
+  ctx.fillStyle = 'rgba(8,8,16,0.7)';
+  ctx.beginPath(); ctx.roundRect(lx - 10, ly - 10, 150, legendH + 6, 6); ctx.fill();
+
+  ctx.font = '11px Rubik, sans-serif';
+  let legendY = ly;
+  if (app.view.ceresMode) {
+    ctx.fillStyle = '#58a6ff'; ctx.beginPath(); ctx.arc(lx, legendY, 4, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = '#aab'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('Piazzi obs.', lx + 10, legendY);
+    legendY += 16;
+  }
+  ctx.fillStyle = '#2dce89'; ctx.beginPath(); ctx.arc(lx, legendY, 4, 0, TWO_PI); ctx.fill();
+  ctx.fillStyle = '#aab'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText('Current position', lx + 10, legendY);
+  legendY += 16;
+  if (app.view.showForward) {
+    ctx.strokeStyle = '#ff9f43'; ctx.lineWidth = 2; ctx.setLineDash([5,3]);
+    ctx.beginPath(); ctx.moveTo(lx - 6, legendY); ctx.lineTo(lx + 6, legendY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#aab'; ctx.fillText('Forward projection', lx + 10, legendY);
+  }
+}
+
+// Sky map pan/zoom handlers
+skyCanvas.addEventListener('mousedown', (e) => {
+  if (e.button === 0) {
+    app.sky.dragging = true;
+    app.sky.lastX = e.clientX;
+    app.sky.lastY = e.clientY;
+    app.view.skyAutoTrack = false;
+    // Update toggle if visible
+    document.querySelectorAll('[data-key="skyAutoTrack"]').forEach(b => { b.classList.remove('on'); b.classList.add('off'); });
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  if (app.sky.dragging) {
+    const dx = e.clientX - app.sky.lastX;
+    const dy = e.clientY - app.sky.lastY;
+    app.sky.panX += dx * 0.05 / app.sky.zoom;
+    app.sky.panY -= dy * 0.05 / app.sky.zoom;
+    app.sky.lastX = e.clientX;
+    app.sky.lastY = e.clientY;
+    app.dirty = true;
+  }
+});
+window.addEventListener('mouseup', () => { app.sky.dragging = false; });
+skyCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 0.89;
+  app.sky.zoom = Math.max(0.015, Math.min(30, app.sky.zoom * factor));
+  app.dirty = true;
+}, { passive: false });
+
+// =========================================================================
+// PHASE 5: Time System + Animation Loop
+// =========================================================================
+
+function updateForwardProjection() {
+  const p = app.params;
+  const period = TWO_PI * Math.pow(p.a, 1.5) / K_GAUSS;
+  const duration = Math.min(period, 500);
+  const numPts = Math.min(fwdMaxPts, 250);
+  const pts3D = [];
+  const ptsSky = [];
+  const a = p.a, e = p.e;
+  const i_rad = p.i * DEG2RAD, Om_rad = p.Om * DEG2RAD;
+  const w_rad = p.w * DEG2RAD, M0 = p.M0 * DEG2RAD;
+  const n = K_GAUSS / Math.pow(a, 1.5);
+
+  for (let k = 0; k < numPts; k++) {
+    const t = p.time + (duration * k / (numPts - 1));
+    const M = M0 + n * t;
+    const r_ecl = getOrbitalPosition(a, e, i_rad, Om_rad, w_rad, M);
+    const r_earth = getEarthPosition(t);
+    pts3D.push(eclToThree(r_ecl[0], r_ecl[1], r_ecl[2]));
+    const r_geo = [r_ecl[0]-r_earth[0], r_ecl[1]-r_earth[1], r_ecl[2]-r_earth[2]];
+    ptsSky.push(toRADec(eclipticToEquatorial(r_geo)));
+  }
+
+  // Update 3D buffer
+  const fArr = app.three.fwd3DGeo.attributes.position.array;
+  for (let i = 0; i < numPts; i++) {
+    fArr[i*3]   = pts3D[i].x;
+    fArr[i*3+1] = pts3D[i].y;
+    fArr[i*3+2] = pts3D[i].z;
+  }
+  app.three.fwd3DGeo.attributes.position.needsUpdate = true;
+  app.three.fwd3DLine.geometry.setDrawRange(0, numPts);
+
+  app._forwardPathSky = ptsSky;
+}
+
+function update3DScene() {
+  const p = app.params;
+  const a = p.a, e = p.e;
+  const i_rad = p.i * DEG2RAD, Om_rad = p.Om * DEG2RAD, w_rad = p.w * DEG2RAD;
+  const M0 = p.M0 * DEG2RAD;
+  const n = K_GAUSS / Math.pow(a, 1.5);
+  const t = p.time;
+
+  // Earth
+  const rEarth = getEarthPosition(t);
+  const ep = eclToThree(rEarth[0], rEarth[1], rEarth[2]);
+  earthMesh.position.copy(ep);
+  earthLabel.position.set(ep.x, ep.y + 0.12, ep.z);
+
+  // Object
+  const M = M0 + n * t;
+  const rObj = getOrbitalPosition(a, e, i_rad, Om_rad, w_rad, M);
+  const op = eclToThree(rObj[0], rObj[1], rObj[2]);
+  objMesh.position.copy(op);
+  objGlow.position.copy(op);
+  objLabel.position.set(op.x, op.y + 0.14, op.z);
+
+  // Object orbit (full ellipse)
+  const rot = matMul(RotZ(Om_rad), matMul(RotX(i_rad), RotZ(w_rad)));
+  const positions = objOrbitGeo.attributes.position.array;
+  for (let idx = 0; idx < objOrbitMaxPts; idx++) {
+    const Ea = (idx / (objOrbitMaxPts - 1)) * TWO_PI;
+    const xp = a * (Math.cos(Ea) - e);
+    const yp = a * Math.sqrt(1 - e * e) * Math.sin(Ea);
+    const r_ecl = matVec(rot, [xp, yp, 0]);
+    const p3 = eclToThree(r_ecl[0], r_ecl[1], r_ecl[2]);
+    positions[idx * 3] = p3.x;
+    positions[idx * 3 + 1] = p3.y;
+    positions[idx * 3 + 2] = p3.z;
+  }
+  objOrbitGeo.attributes.position.needsUpdate = true;
+
+  // Sight line
+  const losArr = losGeo.attributes.position.array;
+  losArr[0] = ep.x; losArr[1] = ep.y; losArr[2] = ep.z;
+  losArr[3] = op.x; losArr[4] = op.y; losArr[5] = op.z;
+  losGeo.attributes.position.needsUpdate = true;
+  losLine.computeLineDistances();
+
+  // 3D trail
+  const tArr = trail3DGeo.attributes.position.array;
+  const len = Math.min(app.trail3D.length, trailMaxVerts);
+  for (let i = 0; i < len; i++) {
+    tArr[i*3]   = app.trail3D[i].x;
+    tArr[i*3+1] = app.trail3D[i].y;
+    tArr[i*3+2] = app.trail3D[i].z;
+  }
+  trail3DGeo.attributes.position.needsUpdate = true;
+  trail3DLine.geometry.setDrawRange(0, len);
+
+  // Visibility
+  losLine.visible = app.view.showSightLine;
+  trail3DLine.visible = app.view.showTrail;
+  fwd3DLine.visible = app.view.showForward;
+  gridHelper.visible = app.view.showEcliptic;
+  earthOrbitLine.visible = app.view.showEarthOrbit;
+  sunLabel.visible = app.view.showLabels;
+  earthLabel.visible = app.view.showLabels;
+  objLabel.visible = app.view.showLabels;
+  eclLabel.visible = app.view.showLabels && app.view.showEcliptic;
+  starField.visible = app.view.showStars;
+  xArrow.visible = app.view.showAxes;
+  yArrow.visible = app.view.showAxes;
+  zArrow.visible = app.view.showAxes;
+
+  // Camera follow mode
+  if (app.camera.mode === 'follow') {
+    controls3D.target.copy(op);
+  } else if (app.camera.mode === 'top') {
+    const dist = Math.max(a * 1.5, 3);
+    camera3D.position.set(0, dist, 0);
+    controls3D.target.set(0, 0, 0);
+  }
+}
+
+function updateRMS() {
+  const rms = computeRMS(app.params);
+  const rmsStr = rms.toFixed(1);
+  document.getElementById('rms-params').textContent = rmsStr;
+  document.getElementById('rms-ceres').textContent = rmsStr;
+  document.getElementById('rms-value').textContent = rmsStr;
+
+  // Color code
+  let col;
+  if (rms < 10) col = '#2dce89';
+  else if (rms < 60) col = '#ffd700';
+  else col = '#e94560';
+  document.getElementById('rms-value').style.color = col;
+  document.getElementById('rms-params').style.color = col;
+  document.getElementById('rms-ceres').style.color = col;
+
+  // RMS bar indicator (0-200 arcsec scale)
+  const pct = Math.min(100, (rms / 200) * 100);
+  document.getElementById('rms-ind').style.left = (100 - pct) + '%';
+}
+
+function resize3D() {
+  const rect = orbitDiv.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  if (w === 0 || h === 0) return;
+  camera3D.aspect = w / h;
+  camera3D.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+
+// Animation loop
+let lastTimestamp = 0;
+let forwardDirty = true;
+
+function animate(timestamp) {
+  requestAnimationFrame(animate);
+  const dt = lastTimestamp ? (timestamp - lastTimestamp) / 1000 : 0;
+  lastTimestamp = timestamp;
+
+  // Time advance
+  if (!app.params.paused && app.params.timeSpeed > 0) {
+    app.params.time += dt * app.params.timeSpeed;
+    app.dirty = true;
+
+    // Update time UI
+    document.getElementById('pv-time').textContent = app.params.time.toFixed(1);
+    document.getElementById('sl-time').value = app.params.time;
+    document.getElementById('time-display').textContent = app.params.time.toFixed(1);
+
+    // Accumulate trail
+    const p = app.params;
+    const a = p.a, e = p.e;
+    const i_rad = p.i * DEG2RAD, Om_rad = p.Om * DEG2RAD, w_rad = p.w * DEG2RAD;
+    const M0 = p.M0 * DEG2RAD;
+    const n = K_GAUSS / Math.pow(a, 1.5);
+    const M = M0 + n * p.time;
+    const rObj = getOrbitalPosition(a, e, i_rad, Om_rad, w_rad, M);
+    app.trail3D.push(eclToThree(rObj[0], rObj[1], rObj[2]));
+    if (app.trail3D.length > app.trailMax) app.trail3D.shift();
+
+    const rd = getObjectRADec(p, p.time);
+    app.trailSky.push(rd);
+    if (app.trailSky.length > app.trailMax) app.trailSky.shift();
+
+    forwardDirty = true;
+  }
+
+  // Sun glow pulse
+  const pulse = 0.75 + 0.1 * Math.sin(timestamp * 0.002);
+  glowSprite.scale.set(pulse, pulse, 1);
+
+  // Update if dirty
+  if (app.dirty || !app.params.paused) {
+    update3DScene();
+    if (app.view.mode !== '3d') drawSkyView();
+    updateRMS();
+    app.dirty = false;
+  }
+
+  // Forward projection (throttled)
+  if (forwardDirty) {
+    updateForwardProjection();
+    forwardDirty = false;
+  }
+
+  controls3D.update();
+  if (app.view.mode !== 'sky') {
+    renderer.render(scene, camera3D);
+  }
+}
+
+// =========================================================================
+// PHASE 6: Context Menu + Dialogue System
+// =========================================================================
+
+// Context menu
+const ctxMenu = document.getElementById('ctx-menu');
+
+document.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  ctxMenu.style.display = 'flex';
+  // Position: keep within viewport
+  const x = Math.min(e.clientX, window.innerWidth - 240);
+  const y = Math.min(e.clientY, window.innerHeight - 400);
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top = y + 'px';
+});
+
+document.addEventListener('click', (e) => {
+  if (!ctxMenu.contains(e.target)) {
+    ctxMenu.style.display = 'none';
+  }
+});
+
+// Context menu actions
+ctxMenu.addEventListener('click', (e) => {
+  const item = e.target.closest('.ctx-item');
+  if (!item) return;
+  const action = item.dataset.action;
+  ctxMenu.style.display = 'none';
+
+  switch (action) {
+    case 'instructions': toggleDialogue('dlg-instructions'); break;
+    case 'params': toggleDialogue('dlg-params'); break;
+    case 'time': toggleDialogue('dlg-time'); break;
+    case 'display': toggleDialogue('dlg-display'); break;
+    case 'camera': toggleDialogue('dlg-camera'); break;
+    case 'ceres': toggleDialogue('dlg-ceres'); break;
+    case 'settings': toggleDialogue('dlg-settings'); break;
+    case 'docs': toggleDialogue('dlg-docs'); break;
+    case 'preset-ceres': loadPreset('ceres'); break;
+    case 'preset-mars': loadPreset('mars'); break;
+    case 'preset-jupiter': loadPreset('jupiter'); break;
+    case 'preset-random': loadRandomPreset(); break;
+  }
+});
+
+// Dialogue management
+function toggleDialogue(id) {
+  const dlg = document.getElementById(id);
+  dlg.classList.toggle('open');
+}
+
+// Close buttons
+document.querySelectorAll('.dlg-close').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.closest('.dialogue').classList.remove('open');
+  });
+});
+
+// Draggable dialogues
+document.querySelectorAll('.dlg-header').forEach(header => {
+  let dragging = false, startX, startY, origLeft, origTop;
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('dlg-close')) return;
+    dragging = true;
+    const dlg = header.parentElement;
+    const rect = dlg.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    origLeft = rect.left; origTop = rect.top;
+    dlg.style.right = 'auto';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const dlg = header.parentElement;
+    dlg.style.left = (origLeft + e.clientX - startX) + 'px';
+    dlg.style.top = (origTop + e.clientY - startY) + 'px';
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+});
+
+// Prevent dialogue interactions from propagating to canvas
+document.querySelectorAll('.dialogue').forEach(dlg => {
+  dlg.addEventListener('mousedown', (e) => e.stopPropagation());
+  dlg.addEventListener('wheel', (e) => e.stopPropagation());
+});
+
+// =========================================================================
+// PHASE 7: Dialogue Content Wiring
+// =========================================================================
+
+// Slider listeners
+Object.keys(sliders).forEach(key => {
+  sliders[key].addEventListener('input', () => {
+    const val = parseFloat(sliders[key].value);
+    app.params[key] = val;
+    paramVals[key].textContent = (key === 'a' || key === 'e') ? val.toFixed(4) : val.toFixed(2);
+    app.dirty = true;
+    forwardDirty = true;
+  });
+});
+
+// Speed slider
+document.getElementById('sl-speed').addEventListener('input', function() {
+  app.params.timeSpeed = parseFloat(this.value);
+  document.getElementById('pv-speed').textContent = this.value;
+});
+
+// Time slider
+document.getElementById('sl-time').addEventListener('input', function() {
+  app.params.time = parseFloat(this.value);
+  document.getElementById('pv-time').textContent = parseFloat(this.value).toFixed(1);
+  document.getElementById('time-display').textContent = parseFloat(this.value).toFixed(1);
+  app.dirty = true;
+  forwardDirty = true;
+});
+
+// Play/Pause
+document.getElementById('btn-playpause').addEventListener('click', () => {
+  app.params.paused = !app.params.paused;
+  document.getElementById('btn-playpause').textContent = app.params.paused ? '▶' : '⏸';
+  if (!app.params.paused && app.params.timeSpeed === 0) {
+    app.params.timeSpeed = 5;
+    document.getElementById('sl-speed').value = 5;
+    document.getElementById('pv-speed').textContent = '5';
+  }
+});
+
+// Time navigation buttons
+document.getElementById('btn-step-back').addEventListener('click', () => {
+  app.params.time -= 1;
+  syncTimeUI();
+});
+document.getElementById('btn-step-fwd').addEventListener('click', () => {
+  app.params.time += 1;
+  syncTimeUI();
+});
+document.getElementById('btn-goto-start').addEventListener('click', () => {
+  app.params.time = piazzi_days[0];
+  syncTimeUI();
+});
+document.getElementById('btn-goto-end').addEventListener('click', () => {
+  app.params.time = piazzi_days[piazzi_days.length - 1];
+  syncTimeUI();
+});
+document.getElementById('btn-reset-time').addEventListener('click', () => {
+  app.params.time = 0;
+  syncTimeUI();
+});
+
+function syncTimeUI() {
+  document.getElementById('sl-time').value = app.params.time;
+  document.getElementById('pv-time').textContent = app.params.time.toFixed(1);
+  document.getElementById('time-display').textContent = app.params.time.toFixed(1);
+  app.dirty = true;
+  forwardDirty = true;
+}
+
+// Toggle switches
+document.querySelectorAll('.toggle-sw').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.key;
+    if (!key) return;
+    const isOn = btn.classList.contains('on');
+    btn.classList.toggle('on', !isOn);
+    btn.classList.toggle('off', isOn);
+    if (key in app.view) app.view[key] = !isOn;
+
+    // Special handling
+    if (key === 'ceresMode') {
+      const hud = document.getElementById('ceres-hud');
+      hud.classList.toggle('hidden', isOn);
+    }
+    app.dirty = true;
+  });
+});
+
+// View mode pill
+document.querySelectorAll('.pill-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.view;
+    app.view.mode = mode;
+    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyViewMode();
+  });
+});
+
+function applyViewMode() {
+  const mode = app.view.mode;
+  if (mode === '3d') {
+    orbitDiv.style.width = '100%';
+    skyDiv.style.width = '0';
+  } else if (mode === 'sky') {
+    orbitDiv.style.width = '0';
+    skyDiv.style.width = '100%';
+  } else {
+    orbitDiv.style.width = '50%';
+    skyDiv.style.width = '50%';
+  }
+  setTimeout(() => {
+    resize3D();
+    resizeSkyCanvas();
+    app.dirty = true;
+  }, 400);
+}
+
+// Camera buttons
+document.querySelectorAll('[data-cam]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    app.camera.mode = btn.dataset.cam;
+    document.querySelectorAll('[data-cam]').forEach(b => {
+      b.classList.toggle('btn-accent', b.dataset.cam === app.camera.mode);
+    });
+    if (app.camera.mode === 'free') {
+      controls3D.target.set(0, 0, 0);
+    }
+  });
+});
+
+document.getElementById('btn-reset-cam').addEventListener('click', () => {
+  camera3D.position.set(3, 4, 5);
+  controls3D.target.set(0, 0, 0);
+  controls3D.update();
+  app.camera.mode = 'free';
+  document.querySelectorAll('[data-cam]').forEach(b => {
+    b.classList.toggle('btn-accent', b.dataset.cam === 'free');
+  });
+});
+
+// =========================================================================
+// PHASE 8: Ceres Mode
+// =========================================================================
+
+function loadPreset(name) {
+  const preset = PRESETS[name];
+  if (!preset) return;
+  Object.keys(preset).forEach(key => {
+    app.params[key] = preset[key];
+    if (sliders[key]) {
+      sliders[key].value = preset[key];
+      paramVals[key].textContent = (key === 'a' || key === 'e') ? Number(preset[key]).toFixed(4) : Number(preset[key]).toFixed(2);
+    }
+  });
+  // Clear trails
+  app.trail3D = [];
+  app.trailSky = [];
+  app.dirty = true;
+  forwardDirty = true;
+}
+
+function loadRandomPreset() {
+  app.params.a = 0.5 + Math.random() * 5;
+  app.params.e = Math.random() * 0.8;
+  app.params.i = Math.random() * 45;
+  app.params.Om = Math.random() * 360;
+  app.params.w = Math.random() * 360;
+  app.params.M0 = -180 + Math.random() * 360;
+  Object.keys(sliders).forEach(key => {
+    sliders[key].value = app.params[key];
+    paramVals[key].textContent = Number(app.params[key]).toFixed(key === 'a' || key === 'e' ? 3 : 1);
+  });
+  app.trail3D = [];
+  app.trailSky = [];
+  app.dirty = true;
+  forwardDirty = true;
+}
+
+document.getElementById('btn-load-jpl').addEventListener('click', () => {
+  loadPreset('ceres');
+});
+
+document.getElementById('btn-autoplay').addEventListener('click', () => {
+  app.params.time = piazzi_days[0] - 2;
+  app.params.timeSpeed = 3;
+  app.params.paused = false;
+  document.getElementById('btn-playpause').textContent = '⏸';
+  document.getElementById('sl-speed').value = 3;
+  document.getElementById('pv-speed').textContent = '3';
+  app.trail3D = [];
+  app.trailSky = [];
+  syncTimeUI();
+
+  // Auto-pause at end
+  const endTime = piazzi_days[piazzi_days.length - 1] + 5;
+  const checkInterval = setInterval(() => {
+    if (app.params.time >= endTime) {
+      app.params.paused = true;
+      document.getElementById('btn-playpause').textContent = '▶';
+      clearInterval(checkInterval);
+    }
+  }, 200);
+});
+
+// =========================================================================
+// PHASE 9 & 10: Keyboard, Init
+// =========================================================================
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+
+  switch (e.code) {
+    case 'Space':
+      e.preventDefault();
+      app.params.paused = !app.params.paused;
+      document.getElementById('btn-playpause').textContent = app.params.paused ? '▶' : '⏸';
+      if (!app.params.paused && app.params.timeSpeed === 0) {
+        app.params.timeSpeed = 5;
+        document.getElementById('sl-speed').value = 5;
+        document.getElementById('pv-speed').textContent = '5';
+      }
+      break;
+    case 'ArrowRight':
+      app.params.time += 1;
+      syncTimeUI();
+      break;
+    case 'ArrowLeft':
+      app.params.time -= 1;
+      syncTimeUI();
+      break;
+    case 'KeyR':
+      loadPreset('ceres');
+      break;
+  }
+});
+
+// Window resize
+window.addEventListener('resize', () => {
+  resize3D();
+  resizeSkyCanvas();
+  app.dirty = true;
+});
+
+// ===== Initial Setup =====
+function init() {
+  resize3D();
+  resizeSkyCanvas();
+
+  // Show Ceres HUD by default
+  document.getElementById('ceres-hud').classList.remove('hidden');
+
+  // Initial forward projection
+  updateForwardProjection();
+
+  // Initial draw
+  update3DScene();
+  drawSkyView();
+  updateRMS();
+
+  // Start animation
+  requestAnimationFrame(animate);
+
+  // Show instructions on first load
+  setTimeout(() => toggleDialogue('dlg-instructions'), 600);
+}
+
+init();
+</script>
+
+<!-- ═══ PhysiTal Recording Module ═══ -->
+<div id="rec-frame">
+    <div id="rec-frame-border">
+        <div class="rec-handle rec-handle-nw" data-dir="nw"></div>
+        <div class="rec-handle rec-handle-n"  data-dir="n"></div>
+        <div class="rec-handle rec-handle-ne" data-dir="ne"></div>
+        <div class="rec-handle rec-handle-e"  data-dir="e"></div>
+        <div class="rec-handle rec-handle-se" data-dir="se"></div>
+        <div class="rec-handle rec-handle-s"  data-dir="s"></div>
+        <div class="rec-handle rec-handle-sw" data-dir="sw"></div>
+        <div class="rec-handle rec-handle-w"  data-dir="w"></div>
+        <div id="rec-frame-dims">1920 × 1080</div>
+    </div>
+    <div id="rec-controls">
+        <button class="rc-btn" id="rc-rec" title="Record / Stop">⏺</button>
+        <button class="rc-btn" id="rc-pause" title="Pause" style="display:none;">⏸</button>
+        <span id="rc-timer">0:00</span>
+        <div class="rc-sep"></div>
+        <button class="rc-btn" id="rc-screenshot" title="Screenshot">📷</button>
+        <div class="rc-sep"></div>
+        <select id="rc-aspect">
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="21:9">21:9</option>
+            <option value="free">Free</option>
+        </select>
+        <select id="rc-resolution">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="3840x2160">4K</option>
+        </select>
+        <select id="rc-fps">
+            <option value="30" selected>30fps</option>
+            <option value="24">24fps</option>
+            <option value="60">60fps</option>
+        </select>
+        <div class="rc-sep"></div>
+        <button id="rc-close" title="Close">✕</button>
+    </div>
+</div>
+<div id="rec-download-overlay">
+    <div id="rec-download-dialog">
+        <h3 data-he="שמירת הקלטה" data-en="Save Recording">שמירת הקלטה</h3>
+        <input type="text" id="rec-filename" placeholder="filename" dir="ltr">
+        <div class="dl-btns">
+            <button class="dl-btn dl-btn-secondary" id="dl-cancel" data-he="ביטול" data-en="Cancel">ביטול</button>
+            <button class="dl-btn dl-btn-primary" id="dl-confirm" data-he="הורדה" data-en="Download">הורדה</button>
+        </div>
+    </div>
+</div>
+<div id="rec-hint">Press <b>R</b> to open recording frame</div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════
+// PhysiTal Recording Module (auto-injected)
+// ═══════════════════════════════════════════════════════════
+(function() {
+    var REC_SIM_NAME = 'orbital-explorer';
+
+    // ── State ──
+    var rec = window._rec = {
+        isActive: false,
+        isPaused: false,
+        mediaRecorder: null,
+        chunks: [],
+        offscreenCanvas: null,
+        offscreenCtx: null,
+        stream: null,
+        startTimestamp: 0,
+        pausedElapsed: 0,
+        timerInterval: null,
+        lastBlob: null,
+        resolution: { w: 1920, h: 1080 },
+        fps: 30,
+        frame: { x: 0, y: 0, w: 0, h: 0 },
+        aspectRatio: 16 / 9,
+        _domCache: null,
+        _domCaptureActive: false,
+        _lastDomCapture: 0,
+        _domCaptureInterval: 120
+    };
+
+    // ── Aspect Ratio ──
+    rec.parseAspect = function(val) {
+        if (val === 'free') return null;
+        var parts = val.split(':').map(Number);
+        return parts[0] / parts[1];
+    };
+
+    rec.enforceAspect = function() {
+        if (!this.aspectRatio) return;
+        var border = document.getElementById('rec-frame-border');
+        var w = parseInt(border.style.width) || 0;
+        var newH = Math.round(w / this.aspectRatio);
+        border.style.height = newH + 'px';
+        this.syncFrameFromDOM();
+        this.positionControls();
+    };
+
+    // ── Offscreen Canvas ──
+    rec.setupOffscreen = function() {
+        if (!this.offscreenCanvas) {
+            this.offscreenCanvas = document.createElement('canvas');
+            this.offscreenCanvas.id = '_rec_offscreen';
+        }
+        this.offscreenCanvas.width = this.resolution.w;
+        this.offscreenCanvas.height = this.resolution.h;
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    };
+
+    // ── Universal compositeOnto — draws all visible canvases ──
+    rec.compositeOnto = function(targetCtx, targetW, targetH, region) {
+        var r = region || { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+        var sx = targetW / r.w;
+        var sy = targetH / r.h;
+
+        // Fill background
+        var bgColor = getComputedStyle(document.body).backgroundColor;
+        targetCtx.fillStyle = (bgColor && bgColor !== 'rgba(0, 0, 0, 0)') ? bgColor : '#0a0a14';
+        targetCtx.fillRect(0, 0, targetW, targetH);
+
+        // Draw all visible canvases at correct positions
+        var canvases = document.querySelectorAll('canvas');
+        for (var i = 0; i < canvases.length; i++) {
+            var cvs = canvases[i];
+            if (cvs.id === '_rec_offscreen') continue;
+            if (cvs.offsetWidth === 0 && cvs.offsetHeight === 0) continue;
+
+            var rect = cvs.getBoundingClientRect();
+            // Check overlap with recording frame
+            if (rect.right <= r.x || rect.left >= r.x + r.w) continue;
+            if (rect.bottom <= r.y || rect.top >= r.y + r.h) continue;
+
+            var dx = (rect.left - r.x) * sx;
+            var dy = (rect.top - r.y) * sy;
+            var dw = rect.width * sx;
+            var dh = rect.height * sy;
+
+            try { targetCtx.drawImage(cvs, dx, dy, dw, dh); } catch(e) {}
+        }
+    };
+
+    // ── Update recording frame (called each animation frame) ──
+    rec.updateFrame = function() {
+        if (!this.offscreenCtx) return;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        // Draw canvases (fast, every frame)
+        this.compositeOnto(this.offscreenCtx, this.resolution.w, this.resolution.h, region);
+
+        // Draw cached DOM overlay
+        if (this._domCache) {
+            this.offscreenCtx.drawImage(this._domCache, 0, 0);
+        }
+
+        // Trigger async DOM capture (throttled)
+        var now = performance.now();
+        if (!this._domCaptureActive && now - this._lastDomCapture >= this._domCaptureInterval) {
+            this._lastDomCapture = now;
+            this._captureDomOverlay();
+        }
+    };
+
+    // ── Async DOM overlay capture via html2canvas ──
+    rec._captureDomOverlay = async function() {
+        if (typeof html2canvas === 'undefined') return;
+        this._domCaptureActive = true;
+
+        try {
+            var f = this.frame;
+            var scaleX = this.resolution.w / f.w;
+            var scaleY = this.resolution.h / f.h;
+
+            var tempCanvas = document.createElement('canvas');
+            tempCanvas.width = this.resolution.w;
+            tempCanvas.height = this.resolution.h;
+            var tempCtx = tempCanvas.getContext('2d');
+
+            // Find visible dialogues / overlay panels
+            var selectors = '.dialogue, .glass-panel, [class*="dialog"], [class*="panel"]:not(#rec-controls)';
+            var elements = document.querySelectorAll(selectors);
+            var anyRendered = false;
+
+            for (var j = 0; j < elements.length; j++) {
+                var dlg = elements[j];
+                if (dlg.style.display === 'none' || dlg.offsetParent === null) continue;
+                if (dlg.id === 'rec-frame' || dlg.id === 'rec-download-overlay' || dlg.id === 'rec-controls') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+
+                var rendered = await html2canvas(dlg, {
+                    backgroundColor: null, logging: false, useCORS: true
+                });
+                var ddx = (rect.left - f.x) * scaleX;
+                var ddy = (rect.top - f.y) * scaleY;
+                var ddw = rect.width * scaleX;
+                var ddh = rect.height * scaleY;
+                tempCtx.drawImage(rendered, ddx, ddy, ddw, ddh);
+                anyRendered = true;
+            }
+
+            this._domCache = anyRendered ? tempCanvas : null;
+        } catch (e) {
+            console.warn('DOM overlay capture failed:', e);
+        }
+
+        this._domCaptureActive = false;
+    };
+
+    // ── Start Recording ──
+    rec.start = function(options) {
+        var opts = options || {};
+        if (opts.width) this.resolution.w = opts.width;
+        if (opts.height) this.resolution.h = opts.height;
+        if (opts.fps) this.fps = opts.fps;
+
+        this.setupOffscreen();
+        this.chunks = [];
+        this.isPaused = false;
+        this.pausedElapsed = 0;
+
+        this.stream = this.offscreenCanvas.captureStream(this.fps);
+
+        var mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        var mimeType = '';
+        for (var i = 0; i < mimeTypes.length; i++) {
+            if (MediaRecorder.isTypeSupported(mimeTypes[i])) { mimeType = mimeTypes[i]; break; }
+        }
+
+        this.mediaRecorder = new MediaRecorder(this.stream, {
+            mimeType: mimeType,
+            videoBitsPerSecond: this.resolution.w >= 3840 ? 20000000 :
+                               this.resolution.w >= 1920 ? 10000000 : 5000000
+        });
+
+        this.mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size > 0) rec.chunks.push(e.data);
+        };
+
+        this.mediaRecorder.start(1000);
+        this.isActive = true;
+        this.startTimestamp = Date.now();
+        this._startTimer();
+
+        var border = document.getElementById('rec-frame-border');
+        var recBtn = document.getElementById('rc-rec');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('recording');
+        recBtn.classList.add('rec-active');
+        recBtn.textContent = '⏹';
+        recBtn.title = 'Stop';
+        pauseBtn.style.display = 'inline-flex';
+    };
+
+    // ── Stop Recording ──
+    rec.stop = function() {
+        return new Promise(function(resolve) {
+            if (!rec.mediaRecorder || rec.mediaRecorder.state === 'inactive') {
+                resolve(null); return;
+            }
+            if (rec.mediaRecorder.state === 'paused') {
+                rec.mediaRecorder.resume();
+            }
+            rec.mediaRecorder.onstop = function() {
+                var blob = new Blob(rec.chunks, { type: rec.mediaRecorder.mimeType });
+                rec.isActive = false;
+                rec.isPaused = false;
+                rec._stopTimer();
+                rec.lastBlob = blob;
+                rec._domCache = null;
+                rec._domCaptureActive = false;
+
+                var border = document.getElementById('rec-frame-border');
+                var recBtn = document.getElementById('rc-rec');
+                var pauseBtn = document.getElementById('rc-pause');
+                border.classList.remove('recording', 'paused');
+                recBtn.classList.remove('rec-active');
+                recBtn.textContent = '⏺';
+                recBtn.title = 'Record';
+                pauseBtn.style.display = 'none';
+                pauseBtn.classList.remove('paused-active');
+                pauseBtn.textContent = '⏸';
+
+                rec._showDownloadDialog(blob);
+                resolve(blob);
+            };
+            rec.mediaRecorder.stop();
+        });
+    };
+
+    // ── Pause ──
+    rec.pause = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+        this.mediaRecorder.pause();
+        this.isPaused = true;
+        this.pausedElapsed += Date.now() - this.startTimestamp;
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('paused');
+        pauseBtn.classList.add('paused-active');
+        pauseBtn.textContent = '▶';
+        pauseBtn.title = 'Resume';
+    };
+
+    // ── Resume ──
+    rec.resume = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+        this.mediaRecorder.resume();
+        this.isPaused = false;
+        this.startTimestamp = Date.now();
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.remove('paused');
+        pauseBtn.classList.remove('paused-active');
+        pauseBtn.textContent = '⏸';
+        pauseBtn.title = 'Pause';
+    };
+
+    // ── Screenshot ──
+    rec.screenshot = async function(options) {
+        var opts = options || {};
+        var w = opts.width || this.resolution.w;
+        var h = opts.height || this.resolution.h;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        var offscreen = document.createElement('canvas');
+        offscreen.width = w;
+        offscreen.height = h;
+        var ctx = offscreen.getContext('2d');
+
+        this.compositeOnto(ctx, w, h, region);
+
+        if (typeof html2canvas !== 'undefined') {
+            var scaleX = w / f.w;
+            var scaleY = h / f.h;
+            var dlgs = document.querySelectorAll('.dialogue, .glass-panel');
+            for (var i = 0; i < dlgs.length; i++) {
+                var dlg = dlgs[i];
+                if (dlg.style.display === 'none') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+                try {
+                    var rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+                    ctx.drawImage(rendered, (rect.left - f.x) * scaleX, (rect.top - f.y) * scaleY, rect.width * scaleX, rect.height * scaleY);
+                } catch(e) {}
+            }
+        }
+
+        return offscreen.toDataURL(opts.format || 'image/png', opts.quality || 0.95);
+    };
+
+    // ── Download helpers ──
+    rec.downloadBlob = function(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    };
+
+    rec.downloadDataURL = function(dataURL, filename) {
+        var a = document.createElement('a');
+        a.href = dataURL; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+
+    // ── Timer ──
+    rec._startTimer = function() {
+        var el = document.getElementById('rc-timer');
+        this.timerInterval = setInterval(function() {
+            var elapsed;
+            if (rec.isPaused) {
+                elapsed = Math.floor(rec.pausedElapsed / 1000);
+            } else {
+                elapsed = Math.floor((rec.pausedElapsed + Date.now() - rec.startTimestamp) / 1000);
+            }
+            var min = Math.floor(elapsed / 60);
+            var sec = String(elapsed % 60).padStart(2, '0');
+            el.textContent = min + ':' + sec;
+        }, 250);
+    };
+
+    rec._stopTimer = function() {
+        clearInterval(this.timerInterval);
+        document.getElementById('rc-timer').textContent = '0:00';
+    };
+
+    // ── Download Dialog ──
+    rec._showDownloadDialog = function(blob) {
+        var overlay = document.getElementById('rec-download-overlay');
+        var input = document.getElementById('rec-filename');
+        var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        input.value = 'physital-' + REC_SIM_NAME + '-' + ts;
+        overlay.style.display = 'flex';
+        input.focus(); input.select();
+        overlay._pendingBlob = blob;
+    };
+
+    rec._hideDownloadDialog = function() {
+        document.getElementById('rec-download-overlay').style.display = 'none';
+    };
+
+    // ── Sync frame from DOM ──
+    rec.syncFrameFromDOM = function() {
+        var border = document.getElementById('rec-frame-border');
+        this.frame.x = parseInt(border.style.left) || 0;
+        this.frame.y = parseInt(border.style.top) || 0;
+        this.frame.w = parseInt(border.style.width) || window.innerWidth;
+        this.frame.h = parseInt(border.style.height) || window.innerHeight;
+        document.getElementById('rec-frame-dims').textContent = this.frame.w + ' \u00d7 ' + this.frame.h;
+    };
+
+    // ── Position controls below frame ──
+    rec.positionControls = function() {
+        var border = document.getElementById('rec-frame-border');
+        var controls = document.getElementById('rec-controls');
+        var bLeft = parseInt(border.style.left) || 0;
+        var bWidth = parseInt(border.style.width) || 0;
+        var bTop = parseInt(border.style.top) || 0;
+        var bHeight = parseInt(border.style.height) || 0;
+        controls.style.left = (bLeft + bWidth / 2) + 'px';
+        controls.style.transform = 'translateX(-50%)';
+        controls.style.top = (bTop + bHeight + 12) + 'px';
+        controls.style.bottom = 'auto';
+    };
+
+    // ── Toggle Recording Frame ──
+    function toggleRecFrame() {
+        var frame = document.getElementById('rec-frame');
+        var isVisible = frame.classList.contains('active');
+
+        // Close context menu if present
+        var ctxMenu = document.getElementById('ctx-menu') || document.getElementById('context-menu');
+        if (ctxMenu) ctxMenu.style.display = 'none';
+
+        if (isVisible) {
+            if (rec.isActive) return; // don't close while recording
+            frame.classList.remove('active');
+        } else {
+            frame.classList.add('active');
+            var border = document.getElementById('rec-frame-border');
+            var pad = 60;
+            var maxW = window.innerWidth - pad * 2;
+            var maxH = window.innerHeight - pad * 2 - 60;
+            var ar = rec.aspectRatio;
+            var fw, fh;
+            if (ar) {
+                if (maxW / maxH > ar) { fh = maxH; fw = Math.round(fh * ar); }
+                else { fw = maxW; fh = Math.round(fw / ar); }
+            } else { fw = maxW; fh = maxH; }
+            var offsetX = pad + Math.round((maxW - fw) / 2);
+            var offsetY = pad + Math.round((maxH - fh) / 2);
+            border.style.left = offsetX + 'px';
+            border.style.top = offsetY + 'px';
+            border.style.width = fw + 'px';
+            border.style.height = fh + 'px';
+            rec.syncFrameFromDOM();
+            rec.positionControls();
+        }
+    }
+
+    // Expose for context menu integration
+    window._recToggle = toggleRecFrame;
+
+    // ── Bind events after DOM ready ──
+    function bindRecEvents() {
+        // Record / Stop
+        document.getElementById('rc-rec').addEventListener('click', function() {
+            if (rec.isActive) { rec.stop(); } else { rec.start(); }
+        });
+
+        // Pause / Resume
+        document.getElementById('rc-pause').addEventListener('click', function() {
+            if (rec.isPaused) { rec.resume(); } else { rec.pause(); }
+        });
+
+        // Screenshot
+        document.getElementById('rc-screenshot').addEventListener('click', async function() {
+            var dataURL = await rec.screenshot();
+            var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            rec.downloadDataURL(dataURL, 'physital-' + REC_SIM_NAME + '-' + ts + '.png');
+        });
+
+        // Aspect ratio
+        document.getElementById('rc-aspect').addEventListener('change', function(e) {
+            rec.aspectRatio = rec.parseAspect(e.target.value);
+            rec.enforceAspect();
+        });
+
+        // Resolution
+        document.getElementById('rc-resolution').addEventListener('change', function(e) {
+            var parts = e.target.value.split('x').map(Number);
+            rec.resolution = { w: parts[0], h: parts[1] };
+        });
+
+        // FPS
+        document.getElementById('rc-fps').addEventListener('change', function(e) {
+            rec.fps = parseInt(e.target.value);
+        });
+
+        // Close
+        document.getElementById('rc-close').addEventListener('click', function() {
+            if (rec.isActive) return;
+            toggleRecFrame();
+        });
+
+        // Download confirm
+        document.getElementById('dl-confirm').addEventListener('click', function() {
+            var overlay = document.getElementById('rec-download-overlay');
+            var filename = document.getElementById('rec-filename').value.trim() || 'recording';
+            var blob = overlay._pendingBlob;
+            if (blob) rec.downloadBlob(blob, filename + '.webm');
+            rec._hideDownloadDialog();
+        });
+
+        // Download cancel
+        document.getElementById('dl-cancel').addEventListener('click', function() {
+            rec._hideDownloadDialog();
+        });
+
+        // Download Enter/Escape
+        document.getElementById('rec-filename').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('dl-confirm').click();
+            if (e.key === 'Escape') rec._hideDownloadDialog();
+        });
+
+        // Frame drag
+        document.getElementById('rec-frame-border').addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('rec-handle')) return;
+            e.preventDefault();
+            var border = document.getElementById('rec-frame-border');
+            var startX = e.clientX - (parseInt(border.style.left) || 0);
+            var startY = e.clientY - (parseInt(border.style.top) || 0);
+            function onMove(ev) {
+                border.style.left = (ev.clientX - startX) + 'px';
+                border.style.top = (ev.clientY - startY) + 'px';
+                rec.syncFrameFromDOM();
+                rec.positionControls();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        // Frame resize handles
+        document.querySelectorAll('.rec-handle').forEach(function(handle) {
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var dir = handle.dataset.dir;
+                var border = document.getElementById('rec-frame-border');
+                var startMouseX = e.clientX;
+                var startMouseY = e.clientY;
+                var startLeft = parseInt(border.style.left) || 0;
+                var startTop = parseInt(border.style.top) || 0;
+                var startW = parseInt(border.style.width) || 0;
+                var startH = parseInt(border.style.height) || 0;
+                var MIN = 100;
+                function onMove(ev) {
+                    var dx = ev.clientX - startMouseX;
+                    var dy = ev.clientY - startMouseY;
+                    var l = startLeft, t = startTop, w = startW, h = startH;
+                    var ar = rec.aspectRatio;
+                    if (dir.includes('e')) { w = Math.max(MIN, startW + dx); }
+                    if (dir.includes('w')) { w = Math.max(MIN, startW - dx); l = startLeft + (startW - w); }
+                    if (dir.includes('s')) { h = Math.max(MIN, startH + dy); }
+                    if (dir.includes('n')) { h = Math.max(MIN, startH - dy); t = startTop + (startH - h); }
+                    if (ar) {
+                        if (dir === 'e' || dir === 'w') { h = Math.round(w / ar); }
+                        else if (dir === 'n' || dir === 's') { w = Math.round(h * ar); }
+                        else {
+                            if (Math.abs(w - startW) >= Math.abs(h - startH)) { h = Math.round(w / ar); }
+                            else { w = Math.round(h * ar); }
+                        }
+                        if (w < MIN) { w = MIN; h = Math.round(w / ar); }
+                        if (h < MIN) { h = MIN; w = Math.round(h * ar); }
+                        if (dir.includes('n')) { t = startTop + startH - h; }
+                        if (dir.includes('w')) { l = startLeft + startW - w; }
+                    }
+                    border.style.left = l + 'px';
+                    border.style.top = t + 'px';
+                    border.style.width = w + 'px';
+                    border.style.height = h + 'px';
+                    rec.syncFrameFromDOM();
+                    rec.positionControls();
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+
+        // Keyboard shortcut: R to toggle recording frame
+        document.addEventListener('keydown', function(e) {
+            // Skip if typing in an input/textarea/select
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.key === 'r' || e.key === 'R') {
+                if (e.ctrlKey || e.altKey || e.metaKey) return;
+                toggleRecFrame();
+            }
+        });
+
+        // Show hint briefly on load
+        var hint = document.getElementById('rec-hint');
+        if (hint) {
+            setTimeout(function() { hint.classList.add('show'); }, 1500);
+            setTimeout(function() { hint.classList.remove('show'); }, 5000);
+        }
+    }
+
+    // ── Self-sustaining recording render loop ──
+    function recLoop() {
+        if (rec.isActive) { rec.updateFrame(); }
+        requestAnimationFrame(recLoop);
+    }
+
+    // ── Init ──
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { bindRecEvents(); requestAnimationFrame(recLoop); });
+    } else {
+        bindRecEvents();
+        requestAnimationFrame(recLoop);
+    }
+})();
+
+</script>
+</body>
+</html>

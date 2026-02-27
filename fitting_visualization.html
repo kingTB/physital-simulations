@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Least Squares Orbit Fitting — התאמת מסלול</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    direction: rtl;
+}
+
+h1 {
+    text-align: center;
+    padding: 18px 10px 10px 10px;
+    font-size: 1.7em;
+    color: #f0f0f0;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+h1 span.en {
+    direction: ltr;
+    unicode-bidi: embed;
+    font-size: 0.75em;
+    color: #8ecae6;
+    margin-right: 12px;
+}
+
+.grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 14px;
+    padding: 10px 18px 18px 18px;
+    flex: 1;
+    min-height: 0;
+}
+
+.panel {
+    background: #16213e;
+    border-radius: 12px;
+    border: 1px solid #2a3a5c;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.panel-title {
+    padding: 8px 14px;
+    font-size: 1.0em;
+    font-weight: 600;
+    color: #8ecae6;
+    background: #0f1a30;
+    border-bottom: 1px solid #2a3a5c;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.panel-title .en-label {
+    direction: ltr;
+    unicode-bidi: embed;
+    color: #aaa;
+    font-size: 0.85em;
+    margin-right: 8px;
+}
+
+.canvas-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+}
+
+.canvas-wrap canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0d1117;
+    border-radius: 0 0 12px 12px;
+}
+
+/* Bottom right: controls panel */
+.controls-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 10px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    font-family: inherit;
+    direction: rtl;
+}
+.btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+
+.btn-multi { background: #219ebc; color: #fff; }
+.btn-best  { background: #2a9d8f; color: #fff; }
+.btn-rand  { background: #e76f51; color: #fff; }
+
+.param-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px 12px;
+    direction: ltr;
+    text-align: center;
+}
+
+.param-item {
+    background: #0d1117;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.88em;
+}
+
+.param-label {
+    color: #8ecae6;
+    font-weight: 600;
+    font-size: 0.82em;
+}
+
+.param-value {
+    color: #f0f0f0;
+    font-size: 1.05em;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    direction: ltr;
+}
+
+.stat-box {
+    background: #0d1117;
+    border-radius: 6px;
+    padding: 6px 14px;
+    text-align: center;
+}
+
+.stat-label { color: #aaa; font-size: 0.8em; }
+.stat-value { color: #f0f0f0; font-size: 1.1em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-value.good { color: #2a9d8f; }
+.stat-value.bad  { color: #e76f51; }
+
+.progress-bar-wrap {
+    width: 100%;
+    height: 6px;
+    background: #0d1117;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.progress-bar-fill {
+    height: 100%;
+    background: #219ebc;
+    width: 0%;
+    transition: width 0.3s;
+    border-radius: 3px;
+}
+
+.status-text {
+    text-align: center;
+    font-size: 0.9em;
+    color: #ccc;
+    min-height: 1.3em;
+}
+
+
+
+/* ═══ PhysiTal Recording Module ═══ */
+#rec-frame { position:fixed; inset:0; z-index:400; display:none; pointer-events:none; }
+#rec-frame.active { display:block; }
+#rec-frame-border { position:absolute; border:2px solid #60a5fa; box-shadow:0 0 0 9999px rgba(0,0,0,0.35); pointer-events:auto; cursor:move; transition:border-color 0.3s; }
+#rec-frame-border.recording { border-color:#dc2626; box-shadow:0 0 0 9999px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(220,38,38,0.3); }
+#rec-frame-border.paused { border-color:#f59e0b; animation:pulse-border-rec 1.2s ease-in-out infinite; }
+.rec-handle { position:absolute; width:12px; height:12px; background:#60a5fa; border-radius:2px; pointer-events:auto; z-index:2; }
+.rec-handle-nw { top:-6px; left:-6px; cursor:nw-resize; }
+.rec-handle-ne { top:-6px; right:-6px; cursor:ne-resize; }
+.rec-handle-sw { bottom:-6px; left:-6px; cursor:sw-resize; }
+.rec-handle-se { bottom:-6px; right:-6px; cursor:se-resize; }
+.rec-handle-n  { top:-6px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rec-handle-s  { bottom:-6px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rec-handle-e  { right:-6px; top:50%; transform:translateY(-50%); cursor:e-resize; }
+.rec-handle-w  { left:-6px; top:50%; transform:translateY(-50%); cursor:w-resize; }
+#rec-frame-dims { position:absolute; top:-28px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); padding:2px 10px; border-radius:4px; font-size:0.75rem; color:#8b949e; white-space:nowrap; font-variant-numeric:tabular-nums; pointer-events:none; }
+#rec-controls { position:fixed; display:flex; align-items:center; gap:8px; background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 14px; pointer-events:auto; white-space:nowrap; z-index:401; }
+#rec-controls select { padding:4px 6px; font-size:0.78rem; border-radius:6px; background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.1); }
+.rc-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; border:none; cursor:pointer; font-size:1rem; transition:all 0.2s; color:white; background:rgba(255,255,255,0.1); }
+.rc-btn:hover { background:rgba(255,255,255,0.2); }
+.rc-btn.rec-active { background:#dc2626; animation:pulse-rec-btn 1.5s ease-in-out infinite; }
+.rc-btn.paused-active { background:#f59e0b; }
+#rc-timer { font-size:0.82rem; font-variant-numeric:tabular-nums; color:#8b949e; min-width:42px; text-align:center; }
+.rc-sep { width:1px; height:20px; background:rgba(255,255,255,0.1); }
+#rc-close { opacity:0.5; transition:opacity 0.2s; background:none; border:none; color:#8b949e; cursor:pointer; font-size:1rem; }
+#rc-close:hover { opacity:1; }
+@keyframes pulse-rec-btn { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+@keyframes pulse-border-rec { 0%,100%{border-color:#f59e0b;} 50%{border-color:rgba(245,158,11,0.4);} }
+#rec-download-overlay { position:fixed; inset:0; z-index:800; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); }
+#rec-download-dialog { background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:24px; min-width:340px; box-shadow:0 20px 50px rgba(0,0,0,0.6); }
+#rec-download-dialog h3 { font-size:1rem; font-weight:500; margin-bottom:14px; color:#e2e8f0; }
+#rec-filename { width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-family:inherit; font-size:0.9rem; direction:ltr; margin-bottom:14px; }
+#rec-filename:focus { outline:none; border-color:#60a5fa; }
+#rec-download-dialog .dl-btns { display:flex; gap:10px; justify-content:flex-end; }
+.dl-btn { padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:white; transition:background 0.2s; }
+.dl-btn-primary { background:#60a5fa; }
+.dl-btn-primary:hover { background:#3b82f6; }
+.dl-btn-secondary { background:rgba(255,255,255,0.1); }
+.dl-btn-secondary:hover { background:rgba(255,255,255,0.2); }
+#rec-hint { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 16px; font-size:0.75rem; color:#8b949e; z-index:50; pointer-events:none; opacity:0; transition:opacity 1s; }
+#rec-hint.show { opacity:1; }
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+<h1>התאמת מסלול <span class="en">— Least Squares Fitting</span></h1>
+
+<div class="grid-container">
+    <!-- Top Left: Sky View -->
+    <div class="panel" style="grid-column:2; grid-row:1;">
+        <div class="panel-title">מפת שמיים — תצפיות ומודל <span class="en-label">RA / Dec Sky View</span></div>
+        <div class="canvas-wrap"><canvas id="cvSky"></canvas></div>
+    </div>
+
+    <!-- Top Right: Cost Chart -->
+    <div class="panel" style="grid-column:1; grid-row:1;">
+        <div class="panel-title">פונקציית עלות — Multi-start <span class="en-label">Cost Function</span></div>
+        <div class="canvas-wrap"><canvas id="cvCost"></canvas></div>
+    </div>
+
+    <!-- Bottom Left: Residuals -->
+    <div class="panel" style="grid-column:2; grid-row:2;">
+        <div class="panel-title">שאריות (Residuals)</div>
+        <div class="canvas-wrap"><canvas id="cvResid"></canvas></div>
+    </div>
+
+    <!-- Bottom Right: Controls -->
+    <div class="panel" style="grid-column:1; grid-row:2;">
+        <div class="panel-title">פרמטרים ובקרה</div>
+        <div class="controls-panel">
+            <div class="btn-row">
+                <button class="btn btn-multi" id="btnMulti">הרצת Multi-start</button>
+                <button class="btn btn-best" id="btnBest">הצג פתרון מיטבי</button>
+                <button class="btn btn-rand" id="btnRand">ניחוש אקראי</button>
+            </div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progBar"></div></div>
+            <div class="status-text" id="statusText">לחצו על כפתור להתחלה</div>
+            <div class="param-grid" id="paramGrid">
+                <div class="param-item"><div class="param-label">a [AU]</div><div class="param-value" id="pA">—</div></div>
+                <div class="param-item"><div class="param-label">e</div><div class="param-value" id="pE">—</div></div>
+                <div class="param-item"><div class="param-label">i [deg]</div><div class="param-value" id="pI">—</div></div>
+                <div class="param-item"><div class="param-label">&Omega; [deg]</div><div class="param-value" id="pOm">—</div></div>
+                <div class="param-item"><div class="param-label">&omega; [deg]</div><div class="param-value" id="pom">—</div></div>
+                <div class="param-item"><div class="param-label">M&#8320; [deg]</div><div class="param-value" id="pM0">—</div></div>
+            </div>
+            <div class="stats-row">
+                <div class="stat-box"><div class="stat-label">RMS [arcsec]</div><div class="stat-value" id="sRMS">—</div></div>
+                <div class="stat-box"><div class="stat-label">Cost</div><div class="stat-value" id="sCost">—</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// =========================================================================
+//  DATA
+// =========================================================================
+const obsRA  = [51.797,51.724,51.660,51.596,51.384,51.376,51.382,51.479,51.534,51.644,51.706,51.779,52.227,52.451,52.572,52.697,52.830,53.261,53.744];
+const obsDec = [15.629,15.685,15.742,15.799,16.176,16.381,16.451,16.528,16.642,16.976,17.055,17.135,17.549,17.720,17.806,17.893,17.983,18.250,18.523];
+const tObs   = [0.36,1.36,2.36,3.36,9.36,12.36,13.36,17.36,20.36,21.36,22.36,27.36,29.36,30.36,31.36,34.36,37.36,40.36,41.0];
+const N = obsRA.length;
+
+const multiStartResults = [
+    { a:3.0,   e:0.2,  i:10.0, Om:120.0, om:40.0,  M0:90.0,   cost:24615425, rms:5000 },
+    { a:2.65,  e:0.15, i:12.0, Om:75.0,  om:50.0,  M0:-60.0,  cost:2724,     rms:15.2 },
+    { a:3.2,   e:0.35, i:5.0,  Om:200.0, om:150.0, M0:30.0,   cost:24613787, rms:4800 },
+    { a:2.9,   e:0.4,  i:20.0, Om:300.0, om:100.0, M0:-90.0,  cost:25267,    rms:35.0 },
+    { a:2.70,  e:0.12, i:11.5, Om:78.0,  om:55.0,  M0:-62.0,  cost:2724,     rms:15.1 },
+    { a:3.1,   e:0.5,  i:30.0, Om:45.0,  om:250.0, M0:120.0,  cost:24615426, rms:5100 },
+    { a:2.5,   e:0.3,  i:8.0,  Om:150.0, om:300.0, M0:0.0,    cost:24613787, rms:4900 },
+    { a:2.72,  e:0.10, i:10.8, Om:80.0,  om:60.0,  M0:-64.0,  cost:2724,     rms:15.0 },
+    { a:2.786, e:0.091,i:10.6, Om:81.0,  om:63.7,  M0:-66.0,  cost:194,      rms:3.19 },
+    { a:3.3,   e:0.55, i:40.0, Om:10.0,  om:180.0, M0:-150.0, cost:24615426, rms:5200 },
+];
+
+const bestIdx = 8; // index with cost=194
+
+// =========================================================================
+//  CONSTANTS & MATH
+// =========================================================================
+const DEG = Math.PI / 180;
+const k_gauss = 0.01720209895;
+const obliquity = 23.4393 * DEG;
+
+function mod360(x) { return ((x % 360) + 360) % 360; }
+
+function solveKepler(M_rad, e, tol) {
+    tol = tol || 1e-10;
+    let E = M_rad;
+    for (let iter = 0; iter < 100; iter++) {
+        let dE = (E - e * Math.sin(E) - M_rad) / (1 - e * Math.cos(E));
+        E -= dE;
+        if (Math.abs(dE) < tol) break;
+    }
+    return E;
+}
+
+// Predict geocentric RA/Dec for each observation time given orbital elements
+function predictRADec(params) {
+    const { a, e, i, Om, om, M0 } = params;
+    const iRad  = i  * DEG;
+    const OmRad = Om * DEG;
+    const omRad = om * DEG;
+    const M0Rad = M0 * DEG;
+
+    // Mean motion (rad/day)
+    const n = k_gauss / (a * Math.sqrt(a)); // k / a^{3/2}
+
+    const cosOm = Math.cos(OmRad), sinOm = Math.sin(OmRad);
+    const cosom = Math.cos(omRad), sinom = Math.sin(omRad);
+    const cosI  = Math.cos(iRad),  sinI  = Math.sin(iRad);
+    const cosObl = Math.cos(obliquity), sinObl = Math.sin(obliquity);
+
+    // Rotation matrix elements (heliocentric ecliptic -> heliocentric ecliptic XYZ)
+    // P and Q vectors (in ecliptic coords)
+    const Px = cosOm * cosom - sinOm * sinom * cosI;
+    const Py = sinOm * cosom + cosOm * sinom * cosI;
+    const Pz = sinom * sinI;
+
+    const Qx = -cosOm * sinom - sinOm * cosom * cosI;
+    const Qy = -sinOm * sinom + cosOm * cosom * cosI;
+    const Qz = cosom * sinI;
+
+    const raArr = [], decArr = [];
+
+    for (let idx = 0; idx < N; idx++) {
+        const t = tObs[idx];
+
+        // Mean anomaly at time t
+        const M = M0Rad + n * t;
+
+        // Solve Kepler
+        const E = solveKepler(M, e);
+
+        // Heliocentric distance and true anomaly components
+        const cosE = Math.cos(E), sinE = Math.sin(E);
+        const x_orb = a * (cosE - e);
+        const y_orb = a * Math.sqrt(1 - e * e) * sinE;
+
+        // Heliocentric ecliptic XYZ
+        const xEcl = Px * x_orb + Qx * y_orb;
+        const yEcl = Py * x_orb + Qy * y_orb;
+        const zEcl = Pz * x_orb + Qz * y_orb;
+
+        // Earth position (ecliptic)
+        const lambdaE = (280.0 + 360.0 / 365.25 * t) * DEG;
+        const R_E = 0.983;
+        const xE = R_E * Math.cos(lambdaE);
+        const yE = R_E * Math.sin(lambdaE);
+        const zE = 0;
+
+        // Geocentric ecliptic
+        const dx = xEcl - xE;
+        const dy = yEcl - yE;
+        const dz = zEcl - zE;
+
+        // Ecliptic -> Equatorial
+        const xEq = dx;
+        const yEq = dy * cosObl - dz * sinObl;
+        const zEq = dy * sinObl + dz * cosObl;
+
+        // RA / Dec
+        const rr = Math.sqrt(xEq * xEq + yEq * yEq + zEq * zEq);
+        const dec = Math.asin(zEq / rr);
+        let ra = Math.atan2(yEq, xEq);
+        if (ra < 0) ra += 2 * Math.PI;
+
+        raArr.push(ra / DEG);
+        decArr.push(dec / DEG);
+    }
+    return { ra: raArr, dec: decArr };
+}
+
+// Compute residuals in arcsec
+function computeResiduals(params) {
+    const pred = predictRADec(params);
+    const dAlphaCos = [], dDelta = [];
+    for (let k = 0; k < N; k++) {
+        const cosDec = Math.cos(obsDec[k] * DEG);
+        dAlphaCos.push((pred.ra[k] - obsRA[k]) * cosDec * 3600);
+        dDelta.push((pred.dec[k] - obsDec[k]) * 3600);
+    }
+    return { dAlphaCos, dDelta };
+}
+
+function computeRMS(params) {
+    const r = computeResiduals(params);
+    let s = 0;
+    for (let k = 0; k < N; k++) {
+        s += r.dAlphaCos[k] ** 2 + r.dDelta[k] ** 2;
+    }
+    return Math.sqrt(s / (2 * N));
+}
+
+function computeCost(params) {
+    const r = computeResiduals(params);
+    let s = 0;
+    for (let k = 0; k < N; k++) {
+        s += r.dAlphaCos[k] ** 2 + r.dDelta[k] ** 2;
+    }
+    return Math.round(s);
+}
+
+// =========================================================================
+//  CANVAS SETUP
+// =========================================================================
+const cvSky   = document.getElementById('cvSky');
+const cvCost  = document.getElementById('cvCost');
+const cvResid = document.getElementById('cvResid');
+
+function sizeCanvas(cv) {
+    const r = cv.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    cv.width  = r.width * dpr;
+    cv.height = r.height * dpr;
+    cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+    cv._w = r.width;
+    cv._h = r.height;
+}
+
+function sizeAll() {
+    sizeCanvas(cvSky);
+    sizeCanvas(cvCost);
+    sizeCanvas(cvResid);
+    drawAll();
+}
+window.addEventListener('resize', sizeAll);
+
+// =========================================================================
+//  STATE
+// =========================================================================
+let currentParams = null;
+let currentResiduals = null;
+let currentPred = null;
+let currentRMS = null;
+let currentCost = null;
+let highlightBar = -1;   // which bar to highlight in cost chart (-1 = none, -2 = show all with best)
+let shownBars = 10;      // how many bars to show
+let animRunning = false;
+
+// =========================================================================
+//  DRAWING: SKY VIEW
+// =========================================================================
+function drawSky() {
+    const cv = cvSky;
+    const ctx = cv.getContext('2d');
+    const W = cv._w, H = cv._h;
+    ctx.clearRect(0, 0, W, H);
+
+    const pad = { l: 56, r: 20, t: 20, b: 38 };
+    const pw = W - pad.l - pad.r;
+    const ph = H - pad.t - pad.b;
+
+    // Data range (with margin)
+    const raMin = 51.0, raMax = 54.2;
+    const decMin = 15.3, decMax = 18.9;
+
+    function toX(ra)  { return pad.l + pw * (1 - (ra - raMin) / (raMax - raMin)); } // inverted
+    function toY(dec) { return pad.t + ph * (1 - (dec - decMin) / (decMax - decMin)); }
+
+    // Grid
+    ctx.strokeStyle = '#1e2d45';
+    ctx.lineWidth = 1;
+    for (let ra = 51; ra <= 54.5; ra += 0.5) {
+        const x = toX(ra);
+        ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, H - pad.b); ctx.stroke();
+    }
+    for (let dec = 15; dec <= 19; dec += 0.5) {
+        const y = toY(dec);
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = '#3a5070';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b);
+    ctx.stroke();
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '11px Segoe UI';
+    ctx.textAlign = 'center';
+    for (let ra = 51; ra <= 54; ra += 0.5) {
+        ctx.fillText(ra.toFixed(1), toX(ra), H - pad.b + 14);
+    }
+    ctx.textAlign = 'center';
+    ctx.fillText('RA [deg]  \u2190', W / 2, H - pad.b + 30);
+
+    ctx.textAlign = 'right';
+    for (let dec = 15.5; dec <= 18.5; dec += 0.5) {
+        ctx.fillText(dec.toFixed(1), pad.l - 6, toY(dec) + 4);
+    }
+    ctx.save();
+    ctx.translate(14, H / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('Dec [deg]', 0, 0);
+    ctx.restore();
+
+    // Model curve
+    if (currentPred) {
+        ctx.strokeStyle = '#f4a261';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Sort by time (already sorted)
+        for (let k = 0; k < N; k++) {
+            const x = toX(currentPred.ra[k]);
+            const y = toY(currentPred.dec[k]);
+            if (k === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Model points
+        ctx.fillStyle = '#f4a261';
+        for (let k = 0; k < N; k++) {
+            ctx.beginPath();
+            ctx.arc(toX(currentPred.ra[k]), toY(currentPred.dec[k]), 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Observed data
+    ctx.fillStyle = '#5dade2';
+    for (let k = 0; k < N; k++) {
+        ctx.beginPath();
+        ctx.arc(toX(obsRA[k]), toY(obsDec[k]), 4.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Legend
+    const lx = pad.l + 10, ly = pad.t + 12;
+    ctx.fillStyle = '#5dade2';
+    ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ccc'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'left';
+    ctx.fillText('Piazzi observations', lx + 10, ly + 4);
+
+    if (currentPred) {
+        ctx.fillStyle = '#f4a261';
+        ctx.beginPath(); ctx.arc(lx, ly + 18, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ccc';
+        ctx.fillText('Model prediction', lx + 10, ly + 22);
+    }
+
+    // RMS
+    if (currentRMS !== null) {
+        const rmsStr = currentRMS > 999 ? currentRMS.toFixed(0) : currentRMS.toFixed(2);
+        ctx.fillStyle = currentRMS < 20 ? '#2a9d8f' : '#e76f51';
+        ctx.font = 'bold 13px Segoe UI';
+        ctx.textAlign = 'left';
+        ctx.fillText('RMS = ' + rmsStr + '"', pad.l + 10, H - pad.b - 10);
+    }
+}
+
+// =========================================================================
+//  DRAWING: COST BAR CHART
+// =========================================================================
+function drawCost() {
+    const cv = cvCost;
+    const ctx = cv.getContext('2d');
+    const W = cv._w, H = cv._h;
+    ctx.clearRect(0, 0, W, H);
+
+    const pad = { l: 60, r: 20, t: 20, b: 44 };
+    const pw = W - pad.l - pad.r;
+    const ph = H - pad.t - pad.b;
+
+    const costs = multiStartResults.map(r => r.cost);
+    const logMin = 1;  // log10(10)=1
+    const logMax = 8;  // log10(10^8)=8
+
+    function toY(cost) {
+        let lc = Math.log10(Math.max(cost, 10));
+        let frac = (lc - logMin) / (logMax - logMin);
+        return pad.t + ph * (1 - frac);
+    }
+
+    // Grid
+    ctx.strokeStyle = '#1e2d45';
+    ctx.lineWidth = 1;
+    for (let p = 1; p <= 8; p++) {
+        const y = toY(Math.pow(10, p));
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = '#3a5070';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b);
+    ctx.stroke();
+
+    // Y labels
+    ctx.fillStyle = '#aaa'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'right';
+    for (let p = 2; p <= 8; p += 1) {
+        ctx.fillText('10^' + p, pad.l - 6, toY(Math.pow(10, p)) + 4);
+    }
+    ctx.save();
+    ctx.translate(12, H / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('Cost (log scale)', 0, 0);
+    ctx.restore();
+
+    // Bars
+    const nBars = shownBars;
+    const barGap = 4;
+    const barW = (pw - barGap * (nBars + 1)) / nBars;
+
+    for (let k = 0; k < nBars; k++) {
+        const x = pad.l + barGap + k * (barW + barGap);
+        const y = toY(costs[k]);
+        const bh = (H - pad.b) - y;
+
+        let color;
+        if (highlightBar === -2) {
+            // Show all, best=green
+            color = k === bestIdx ? '#2a9d8f' : '#e76f51';
+        } else if (highlightBar >= 0) {
+            if (k === highlightBar) {
+                color = k === bestIdx ? '#2a9d8f' : '#f4a261';
+            } else if (k < highlightBar) {
+                color = '#555';
+            } else {
+                color = '#333';
+            }
+        } else {
+            color = '#555';
+        }
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, barW, bh);
+
+        // Border
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, barW, bh);
+
+        // Label
+        ctx.fillStyle = '#aaa';
+        ctx.font = '9px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.fillText(k.toString(), x + barW / 2, H - pad.b + 12);
+    }
+
+    ctx.fillStyle = '#aaa'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText('Start #', (pad.l + W - pad.r) / 2, H - pad.b + 28);
+
+    // Title annotation
+    if (highlightBar === -2) {
+        ctx.fillStyle = '#2a9d8f';
+        ctx.font = 'bold 12px Segoe UI';
+        ctx.textAlign = 'left';
+        ctx.fillText('Best: start ' + bestIdx + ' (cost=' + costs[bestIdx] + ')', pad.l + 6, pad.t + 14);
+    } else if (highlightBar >= 0) {
+        ctx.fillStyle = '#f4a261';
+        ctx.font = 'bold 12px Segoe UI';
+        ctx.textAlign = 'left';
+        ctx.fillText('Current: start ' + highlightBar + ' (cost=' + costs[highlightBar].toLocaleString() + ')', pad.l + 6, pad.t + 14);
+    }
+}
+
+// =========================================================================
+//  DRAWING: RESIDUALS
+// =========================================================================
+function drawResid() {
+    const cv = cvResid;
+    const ctx = cv.getContext('2d');
+    const W = cv._w, H = cv._h;
+    ctx.clearRect(0, 0, W, H);
+
+    const pad = { l: 58, r: 20, t: 20, b: 38 };
+    const pw = W - pad.l - pad.r;
+    const ph = H - pad.t - pad.b;
+
+    // Dynamic range
+    let ymax = 30;
+    if (currentResiduals) {
+        for (let k = 0; k < N; k++) {
+            ymax = Math.max(ymax, Math.abs(currentResiduals.dAlphaCos[k]), Math.abs(currentResiduals.dDelta[k]));
+        }
+        ymax = Math.ceil(ymax / 10) * 10;
+        if (ymax > 5000) ymax = Math.ceil(ymax / 1000) * 1000;
+        ymax *= 1.15;
+    }
+
+    function toX(idx) { return pad.l + pw * ((idx + 0.5) / N); }
+    function toY(v)   { return pad.t + ph / 2 - (v / ymax) * (ph / 2); }
+
+    // Grid
+    ctx.strokeStyle = '#1e2d45';
+    ctx.lineWidth = 1;
+    let step = ymax <= 50 ? 10 : ymax <= 500 ? 50 : ymax <= 5000 ? 1000 : 2000;
+    for (let v = -ymax; v <= ymax; v += step) {
+        const y = toY(v);
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    }
+
+    // Zero line
+    ctx.strokeStyle = '#5a7a9a';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, toY(0));
+    ctx.lineTo(W - pad.r, toY(0));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Axes
+    ctx.strokeStyle = '#3a5070';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b);
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = '#aaa'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'right';
+    for (let v = -ymax; v <= ymax; v += step) {
+        if (Math.abs(v) < step * 0.1 && v !== 0) continue;
+        const label = v >= 1000 || v <= -1000 ? (v / 1000).toFixed(0) + 'k' : v.toFixed(0);
+        ctx.fillText(label, pad.l - 5, toY(v) + 4);
+    }
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#aaa'; ctx.font = '11px Segoe UI';
+    for (let k = 0; k < N; k += 3) {
+        ctx.fillText((k + 1).toString(), toX(k), H - pad.b + 14);
+    }
+    ctx.fillText('Observation index', (pad.l + W - pad.r) / 2, H - pad.b + 30);
+
+    ctx.save();
+    ctx.translate(12, H / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('Residual [arcsec]', 0, 0);
+    ctx.restore();
+
+    // Data
+    if (currentResiduals) {
+        // dAlpha*cos(dec) — circles
+        ctx.fillStyle = '#5dade2';
+        ctx.strokeStyle = '#5dade2';
+        ctx.lineWidth = 1;
+        for (let k = 0; k < N; k++) {
+            const x = toX(k), y = toY(currentResiduals.dAlphaCos[k]);
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // dDelta — squares
+        ctx.fillStyle = '#e9c46a';
+        for (let k = 0; k < N; k++) {
+            const x = toX(k), y = toY(currentResiduals.dDelta[k]);
+            ctx.fillRect(x - 3.5, y - 3.5, 7, 7);
+        }
+
+        // Legend
+        const lx = W - pad.r - 160, ly = pad.t + 10;
+        ctx.fillStyle = '#5dade2';
+        ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ccc'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'left';
+        ctx.fillText('\u0394\u03b1\u00b7cos(\u03b4)', lx + 10, ly + 4);
+
+        ctx.fillStyle = '#e9c46a';
+        ctx.fillRect(lx - 3.5, ly + 15 - 3.5, 7, 7);
+        ctx.fillStyle = '#ccc';
+        ctx.fillText('\u0394\u03b4', lx + 10, ly + 19);
+    }
+}
+
+// =========================================================================
+//  UPDATE UI
+// =========================================================================
+function updateParams(params, rms, cost) {
+    document.getElementById('pA').textContent  = params.a.toFixed(3);
+    document.getElementById('pE').textContent  = params.e.toFixed(3);
+    document.getElementById('pI').textContent  = params.i.toFixed(1);
+    document.getElementById('pOm').textContent = params.Om.toFixed(1);
+    document.getElementById('pom').textContent = params.om.toFixed(1);
+    document.getElementById('pM0').textContent = params.M0.toFixed(1);
+
+    const rmsEl = document.getElementById('sRMS');
+    const costEl = document.getElementById('sCost');
+    rmsEl.textContent = rms > 999 ? rms.toFixed(0) : rms.toFixed(2);
+    costEl.textContent = cost.toLocaleString();
+    rmsEl.className = 'stat-value ' + (rms < 20 ? 'good' : 'bad');
+    costEl.className = 'stat-value ' + (cost < 5000 ? 'good' : 'bad');
+}
+
+function showSolution(params, rmsOverride, costOverride) {
+    currentParams = params;
+    currentPred = predictRADec(params);
+    currentResiduals = computeResiduals(params);
+    currentRMS = rmsOverride !== undefined ? rmsOverride : computeRMS(params);
+    currentCost = costOverride !== undefined ? costOverride : computeCost(params);
+    updateParams(params, currentRMS, currentCost);
+    drawAll();
+}
+
+function drawAll() {
+    drawSky();
+    drawCost();
+    drawResid();
+}
+
+// =========================================================================
+//  BUTTON HANDLERS
+// =========================================================================
+const btnMulti = document.getElementById('btnMulti');
+const btnBest  = document.getElementById('btnBest');
+const btnRand  = document.getElementById('btnRand');
+const progBar  = document.getElementById('progBar');
+const statusText = document.getElementById('statusText');
+
+function setButtons(enabled) {
+    btnMulti.disabled = !enabled;
+    btnBest.disabled  = !enabled;
+    btnRand.disabled  = !enabled;
+    btnMulti.style.opacity = enabled ? '1' : '0.5';
+    btnBest.style.opacity  = enabled ? '1' : '0.5';
+    btnRand.style.opacity  = enabled ? '1' : '0.5';
+}
+
+// Multi-start animation
+btnMulti.addEventListener('click', () => {
+    if (animRunning) return;
+    animRunning = true;
+    setButtons(false);
+    let step = 0;
+    shownBars = 10;
+
+    function doStep() {
+        const r = multiStartResults[step];
+        highlightBar = step;
+        showSolution(r, r.rms, r.cost);
+        progBar.style.width = ((step + 1) / 10 * 100) + '%';
+        statusText.textContent = `Start ${step}: cost = ${r.cost.toLocaleString()}, RMS = ${r.rms > 999 ? r.rms.toFixed(0) : r.rms.toFixed(2)}"`;
+
+        step++;
+        if (step < 10) {
+            setTimeout(doStep, 1100);
+        } else {
+            // Finish: highlight best
+            setTimeout(() => {
+                highlightBar = -2;
+                const best = multiStartResults[bestIdx];
+                showSolution(best, best.rms, best.cost);
+                progBar.style.width = '100%';
+                statusText.textContent = `הסתיים! הפתרון המיטבי: start ${bestIdx}, cost = ${best.cost}, RMS = ${best.rms}"`;
+                animRunning = false;
+                setButtons(true);
+            }, 1200);
+        }
+    }
+
+    doStep();
+});
+
+// Best solution
+btnBest.addEventListener('click', () => {
+    if (animRunning) return;
+    shownBars = 10;
+    highlightBar = -2;
+    const best = multiStartResults[bestIdx];
+    showSolution(best, best.rms, best.cost);
+    progBar.style.width = '100%';
+    statusText.textContent = `פתרון מיטבי: start ${bestIdx}, cost = ${best.cost}, RMS = ${best.rms}"`;
+});
+
+// Random guess
+btnRand.addEventListener('click', () => {
+    if (animRunning) return;
+    const params = {
+        a:  1.5 + Math.random() * 3.5,
+        e:  Math.random() * 0.6,
+        i:  Math.random() * 50,
+        Om: Math.random() * 360,
+        om: Math.random() * 360,
+        M0: -180 + Math.random() * 360,
+    };
+    highlightBar = -1;
+    showSolution(params);
+    statusText.textContent = 'ניחוש אקראי — שימו לב כמה ההתאמה רחוקה!';
+    progBar.style.width = '0%';
+});
+
+// =========================================================================
+//  INIT
+// =========================================================================
+function init() {
+    sizeAll();
+    drawAll();
+}
+
+// Run after page load
+if (document.readyState === 'complete') init();
+else window.addEventListener('load', init);
+
+</script>
+
+<!-- ═══ PhysiTal Recording Module ═══ -->
+<div id="rec-frame">
+    <div id="rec-frame-border">
+        <div class="rec-handle rec-handle-nw" data-dir="nw"></div>
+        <div class="rec-handle rec-handle-n"  data-dir="n"></div>
+        <div class="rec-handle rec-handle-ne" data-dir="ne"></div>
+        <div class="rec-handle rec-handle-e"  data-dir="e"></div>
+        <div class="rec-handle rec-handle-se" data-dir="se"></div>
+        <div class="rec-handle rec-handle-s"  data-dir="s"></div>
+        <div class="rec-handle rec-handle-sw" data-dir="sw"></div>
+        <div class="rec-handle rec-handle-w"  data-dir="w"></div>
+        <div id="rec-frame-dims">1920 × 1080</div>
+    </div>
+    <div id="rec-controls">
+        <button class="rc-btn" id="rc-rec" title="Record / Stop">⏺</button>
+        <button class="rc-btn" id="rc-pause" title="Pause" style="display:none;">⏸</button>
+        <span id="rc-timer">0:00</span>
+        <div class="rc-sep"></div>
+        <button class="rc-btn" id="rc-screenshot" title="Screenshot">📷</button>
+        <div class="rc-sep"></div>
+        <select id="rc-aspect">
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="21:9">21:9</option>
+            <option value="free">Free</option>
+        </select>
+        <select id="rc-resolution">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="3840x2160">4K</option>
+        </select>
+        <select id="rc-fps">
+            <option value="30" selected>30fps</option>
+            <option value="24">24fps</option>
+            <option value="60">60fps</option>
+        </select>
+        <div class="rc-sep"></div>
+        <button id="rc-close" title="Close">✕</button>
+    </div>
+</div>
+<div id="rec-download-overlay">
+    <div id="rec-download-dialog">
+        <h3 data-he="שמירת הקלטה" data-en="Save Recording">שמירת הקלטה</h3>
+        <input type="text" id="rec-filename" placeholder="filename" dir="ltr">
+        <div class="dl-btns">
+            <button class="dl-btn dl-btn-secondary" id="dl-cancel" data-he="ביטול" data-en="Cancel">ביטול</button>
+            <button class="dl-btn dl-btn-primary" id="dl-confirm" data-he="הורדה" data-en="Download">הורדה</button>
+        </div>
+    </div>
+</div>
+<div id="rec-hint">Press <b>R</b> to open recording frame</div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════
+// PhysiTal Recording Module (auto-injected)
+// ═══════════════════════════════════════════════════════════
+(function() {
+    var REC_SIM_NAME = 'fitting-visualization';
+
+    // ── State ──
+    var rec = window._rec = {
+        isActive: false,
+        isPaused: false,
+        mediaRecorder: null,
+        chunks: [],
+        offscreenCanvas: null,
+        offscreenCtx: null,
+        stream: null,
+        startTimestamp: 0,
+        pausedElapsed: 0,
+        timerInterval: null,
+        lastBlob: null,
+        resolution: { w: 1920, h: 1080 },
+        fps: 30,
+        frame: { x: 0, y: 0, w: 0, h: 0 },
+        aspectRatio: 16 / 9,
+        _domCache: null,
+        _domCaptureActive: false,
+        _lastDomCapture: 0,
+        _domCaptureInterval: 120
+    };
+
+    // ── Aspect Ratio ──
+    rec.parseAspect = function(val) {
+        if (val === 'free') return null;
+        var parts = val.split(':').map(Number);
+        return parts[0] / parts[1];
+    };
+
+    rec.enforceAspect = function() {
+        if (!this.aspectRatio) return;
+        var border = document.getElementById('rec-frame-border');
+        var w = parseInt(border.style.width) || 0;
+        var newH = Math.round(w / this.aspectRatio);
+        border.style.height = newH + 'px';
+        this.syncFrameFromDOM();
+        this.positionControls();
+    };
+
+    // ── Offscreen Canvas ──
+    rec.setupOffscreen = function() {
+        if (!this.offscreenCanvas) {
+            this.offscreenCanvas = document.createElement('canvas');
+            this.offscreenCanvas.id = '_rec_offscreen';
+        }
+        this.offscreenCanvas.width = this.resolution.w;
+        this.offscreenCanvas.height = this.resolution.h;
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    };
+
+    // ── Universal compositeOnto — draws all visible canvases ──
+    rec.compositeOnto = function(targetCtx, targetW, targetH, region) {
+        var r = region || { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+        var sx = targetW / r.w;
+        var sy = targetH / r.h;
+
+        // Fill background
+        var bgColor = getComputedStyle(document.body).backgroundColor;
+        targetCtx.fillStyle = (bgColor && bgColor !== 'rgba(0, 0, 0, 0)') ? bgColor : '#0a0a14';
+        targetCtx.fillRect(0, 0, targetW, targetH);
+
+        // Draw all visible canvases at correct positions
+        var canvases = document.querySelectorAll('canvas');
+        for (var i = 0; i < canvases.length; i++) {
+            var cvs = canvases[i];
+            if (cvs.id === '_rec_offscreen') continue;
+            if (cvs.offsetWidth === 0 && cvs.offsetHeight === 0) continue;
+
+            var rect = cvs.getBoundingClientRect();
+            // Check overlap with recording frame
+            if (rect.right <= r.x || rect.left >= r.x + r.w) continue;
+            if (rect.bottom <= r.y || rect.top >= r.y + r.h) continue;
+
+            var dx = (rect.left - r.x) * sx;
+            var dy = (rect.top - r.y) * sy;
+            var dw = rect.width * sx;
+            var dh = rect.height * sy;
+
+            try { targetCtx.drawImage(cvs, dx, dy, dw, dh); } catch(e) {}
+        }
+    };
+
+    // ── Update recording frame (called each animation frame) ──
+    rec.updateFrame = function() {
+        if (!this.offscreenCtx) return;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        // Draw canvases (fast, every frame)
+        this.compositeOnto(this.offscreenCtx, this.resolution.w, this.resolution.h, region);
+
+        // Draw cached DOM overlay
+        if (this._domCache) {
+            this.offscreenCtx.drawImage(this._domCache, 0, 0);
+        }
+
+        // Trigger async DOM capture (throttled)
+        var now = performance.now();
+        if (!this._domCaptureActive && now - this._lastDomCapture >= this._domCaptureInterval) {
+            this._lastDomCapture = now;
+            this._captureDomOverlay();
+        }
+    };
+
+    // ── Async DOM overlay capture via html2canvas ──
+    rec._captureDomOverlay = async function() {
+        if (typeof html2canvas === 'undefined') return;
+        this._domCaptureActive = true;
+
+        try {
+            var f = this.frame;
+            var scaleX = this.resolution.w / f.w;
+            var scaleY = this.resolution.h / f.h;
+
+            var tempCanvas = document.createElement('canvas');
+            tempCanvas.width = this.resolution.w;
+            tempCanvas.height = this.resolution.h;
+            var tempCtx = tempCanvas.getContext('2d');
+
+            // Find visible dialogues / overlay panels
+            var selectors = '.dialogue, .glass-panel, [class*="dialog"], [class*="panel"]:not(#rec-controls)';
+            var elements = document.querySelectorAll(selectors);
+            var anyRendered = false;
+
+            for (var j = 0; j < elements.length; j++) {
+                var dlg = elements[j];
+                if (dlg.style.display === 'none' || dlg.offsetParent === null) continue;
+                if (dlg.id === 'rec-frame' || dlg.id === 'rec-download-overlay' || dlg.id === 'rec-controls') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+
+                var rendered = await html2canvas(dlg, {
+                    backgroundColor: null, logging: false, useCORS: true
+                });
+                var ddx = (rect.left - f.x) * scaleX;
+                var ddy = (rect.top - f.y) * scaleY;
+                var ddw = rect.width * scaleX;
+                var ddh = rect.height * scaleY;
+                tempCtx.drawImage(rendered, ddx, ddy, ddw, ddh);
+                anyRendered = true;
+            }
+
+            this._domCache = anyRendered ? tempCanvas : null;
+        } catch (e) {
+            console.warn('DOM overlay capture failed:', e);
+        }
+
+        this._domCaptureActive = false;
+    };
+
+    // ── Start Recording ──
+    rec.start = function(options) {
+        var opts = options || {};
+        if (opts.width) this.resolution.w = opts.width;
+        if (opts.height) this.resolution.h = opts.height;
+        if (opts.fps) this.fps = opts.fps;
+
+        this.setupOffscreen();
+        this.chunks = [];
+        this.isPaused = false;
+        this.pausedElapsed = 0;
+
+        this.stream = this.offscreenCanvas.captureStream(this.fps);
+
+        var mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        var mimeType = '';
+        for (var i = 0; i < mimeTypes.length; i++) {
+            if (MediaRecorder.isTypeSupported(mimeTypes[i])) { mimeType = mimeTypes[i]; break; }
+        }
+
+        this.mediaRecorder = new MediaRecorder(this.stream, {
+            mimeType: mimeType,
+            videoBitsPerSecond: this.resolution.w >= 3840 ? 20000000 :
+                               this.resolution.w >= 1920 ? 10000000 : 5000000
+        });
+
+        this.mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size > 0) rec.chunks.push(e.data);
+        };
+
+        this.mediaRecorder.start(1000);
+        this.isActive = true;
+        this.startTimestamp = Date.now();
+        this._startTimer();
+
+        var border = document.getElementById('rec-frame-border');
+        var recBtn = document.getElementById('rc-rec');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('recording');
+        recBtn.classList.add('rec-active');
+        recBtn.textContent = '⏹';
+        recBtn.title = 'Stop';
+        pauseBtn.style.display = 'inline-flex';
+    };
+
+    // ── Stop Recording ──
+    rec.stop = function() {
+        return new Promise(function(resolve) {
+            if (!rec.mediaRecorder || rec.mediaRecorder.state === 'inactive') {
+                resolve(null); return;
+            }
+            if (rec.mediaRecorder.state === 'paused') {
+                rec.mediaRecorder.resume();
+            }
+            rec.mediaRecorder.onstop = function() {
+                var blob = new Blob(rec.chunks, { type: rec.mediaRecorder.mimeType });
+                rec.isActive = false;
+                rec.isPaused = false;
+                rec._stopTimer();
+                rec.lastBlob = blob;
+                rec._domCache = null;
+                rec._domCaptureActive = false;
+
+                var border = document.getElementById('rec-frame-border');
+                var recBtn = document.getElementById('rc-rec');
+                var pauseBtn = document.getElementById('rc-pause');
+                border.classList.remove('recording', 'paused');
+                recBtn.classList.remove('rec-active');
+                recBtn.textContent = '⏺';
+                recBtn.title = 'Record';
+                pauseBtn.style.display = 'none';
+                pauseBtn.classList.remove('paused-active');
+                pauseBtn.textContent = '⏸';
+
+                rec._showDownloadDialog(blob);
+                resolve(blob);
+            };
+            rec.mediaRecorder.stop();
+        });
+    };
+
+    // ── Pause ──
+    rec.pause = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+        this.mediaRecorder.pause();
+        this.isPaused = true;
+        this.pausedElapsed += Date.now() - this.startTimestamp;
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('paused');
+        pauseBtn.classList.add('paused-active');
+        pauseBtn.textContent = '▶';
+        pauseBtn.title = 'Resume';
+    };
+
+    // ── Resume ──
+    rec.resume = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+        this.mediaRecorder.resume();
+        this.isPaused = false;
+        this.startTimestamp = Date.now();
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.remove('paused');
+        pauseBtn.classList.remove('paused-active');
+        pauseBtn.textContent = '⏸';
+        pauseBtn.title = 'Pause';
+    };
+
+    // ── Screenshot ──
+    rec.screenshot = async function(options) {
+        var opts = options || {};
+        var w = opts.width || this.resolution.w;
+        var h = opts.height || this.resolution.h;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        var offscreen = document.createElement('canvas');
+        offscreen.width = w;
+        offscreen.height = h;
+        var ctx = offscreen.getContext('2d');
+
+        this.compositeOnto(ctx, w, h, region);
+
+        if (typeof html2canvas !== 'undefined') {
+            var scaleX = w / f.w;
+            var scaleY = h / f.h;
+            var dlgs = document.querySelectorAll('.dialogue, .glass-panel');
+            for (var i = 0; i < dlgs.length; i++) {
+                var dlg = dlgs[i];
+                if (dlg.style.display === 'none') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+                try {
+                    var rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+                    ctx.drawImage(rendered, (rect.left - f.x) * scaleX, (rect.top - f.y) * scaleY, rect.width * scaleX, rect.height * scaleY);
+                } catch(e) {}
+            }
+        }
+
+        return offscreen.toDataURL(opts.format || 'image/png', opts.quality || 0.95);
+    };
+
+    // ── Download helpers ──
+    rec.downloadBlob = function(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    };
+
+    rec.downloadDataURL = function(dataURL, filename) {
+        var a = document.createElement('a');
+        a.href = dataURL; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+
+    // ── Timer ──
+    rec._startTimer = function() {
+        var el = document.getElementById('rc-timer');
+        this.timerInterval = setInterval(function() {
+            var elapsed;
+            if (rec.isPaused) {
+                elapsed = Math.floor(rec.pausedElapsed / 1000);
+            } else {
+                elapsed = Math.floor((rec.pausedElapsed + Date.now() - rec.startTimestamp) / 1000);
+            }
+            var min = Math.floor(elapsed / 60);
+            var sec = String(elapsed % 60).padStart(2, '0');
+            el.textContent = min + ':' + sec;
+        }, 250);
+    };
+
+    rec._stopTimer = function() {
+        clearInterval(this.timerInterval);
+        document.getElementById('rc-timer').textContent = '0:00';
+    };
+
+    // ── Download Dialog ──
+    rec._showDownloadDialog = function(blob) {
+        var overlay = document.getElementById('rec-download-overlay');
+        var input = document.getElementById('rec-filename');
+        var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        input.value = 'physital-' + REC_SIM_NAME + '-' + ts;
+        overlay.style.display = 'flex';
+        input.focus(); input.select();
+        overlay._pendingBlob = blob;
+    };
+
+    rec._hideDownloadDialog = function() {
+        document.getElementById('rec-download-overlay').style.display = 'none';
+    };
+
+    // ── Sync frame from DOM ──
+    rec.syncFrameFromDOM = function() {
+        var border = document.getElementById('rec-frame-border');
+        this.frame.x = parseInt(border.style.left) || 0;
+        this.frame.y = parseInt(border.style.top) || 0;
+        this.frame.w = parseInt(border.style.width) || window.innerWidth;
+        this.frame.h = parseInt(border.style.height) || window.innerHeight;
+        document.getElementById('rec-frame-dims').textContent = this.frame.w + ' \u00d7 ' + this.frame.h;
+    };
+
+    // ── Position controls below frame ──
+    rec.positionControls = function() {
+        var border = document.getElementById('rec-frame-border');
+        var controls = document.getElementById('rec-controls');
+        var bLeft = parseInt(border.style.left) || 0;
+        var bWidth = parseInt(border.style.width) || 0;
+        var bTop = parseInt(border.style.top) || 0;
+        var bHeight = parseInt(border.style.height) || 0;
+        controls.style.left = (bLeft + bWidth / 2) + 'px';
+        controls.style.transform = 'translateX(-50%)';
+        controls.style.top = (bTop + bHeight + 12) + 'px';
+        controls.style.bottom = 'auto';
+    };
+
+    // ── Toggle Recording Frame ──
+    function toggleRecFrame() {
+        var frame = document.getElementById('rec-frame');
+        var isVisible = frame.classList.contains('active');
+
+        // Close context menu if present
+        var ctxMenu = document.getElementById('ctx-menu') || document.getElementById('context-menu');
+        if (ctxMenu) ctxMenu.style.display = 'none';
+
+        if (isVisible) {
+            if (rec.isActive) return; // don't close while recording
+            frame.classList.remove('active');
+        } else {
+            frame.classList.add('active');
+            var border = document.getElementById('rec-frame-border');
+            var pad = 60;
+            var maxW = window.innerWidth - pad * 2;
+            var maxH = window.innerHeight - pad * 2 - 60;
+            var ar = rec.aspectRatio;
+            var fw, fh;
+            if (ar) {
+                if (maxW / maxH > ar) { fh = maxH; fw = Math.round(fh * ar); }
+                else { fw = maxW; fh = Math.round(fw / ar); }
+            } else { fw = maxW; fh = maxH; }
+            var offsetX = pad + Math.round((maxW - fw) / 2);
+            var offsetY = pad + Math.round((maxH - fh) / 2);
+            border.style.left = offsetX + 'px';
+            border.style.top = offsetY + 'px';
+            border.style.width = fw + 'px';
+            border.style.height = fh + 'px';
+            rec.syncFrameFromDOM();
+            rec.positionControls();
+        }
+    }
+
+    // Expose for context menu integration
+    window._recToggle = toggleRecFrame;
+
+    // ── Bind events after DOM ready ──
+    function bindRecEvents() {
+        // Record / Stop
+        document.getElementById('rc-rec').addEventListener('click', function() {
+            if (rec.isActive) { rec.stop(); } else { rec.start(); }
+        });
+
+        // Pause / Resume
+        document.getElementById('rc-pause').addEventListener('click', function() {
+            if (rec.isPaused) { rec.resume(); } else { rec.pause(); }
+        });
+
+        // Screenshot
+        document.getElementById('rc-screenshot').addEventListener('click', async function() {
+            var dataURL = await rec.screenshot();
+            var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            rec.downloadDataURL(dataURL, 'physital-' + REC_SIM_NAME + '-' + ts + '.png');
+        });
+
+        // Aspect ratio
+        document.getElementById('rc-aspect').addEventListener('change', function(e) {
+            rec.aspectRatio = rec.parseAspect(e.target.value);
+            rec.enforceAspect();
+        });
+
+        // Resolution
+        document.getElementById('rc-resolution').addEventListener('change', function(e) {
+            var parts = e.target.value.split('x').map(Number);
+            rec.resolution = { w: parts[0], h: parts[1] };
+        });
+
+        // FPS
+        document.getElementById('rc-fps').addEventListener('change', function(e) {
+            rec.fps = parseInt(e.target.value);
+        });
+
+        // Close
+        document.getElementById('rc-close').addEventListener('click', function() {
+            if (rec.isActive) return;
+            toggleRecFrame();
+        });
+
+        // Download confirm
+        document.getElementById('dl-confirm').addEventListener('click', function() {
+            var overlay = document.getElementById('rec-download-overlay');
+            var filename = document.getElementById('rec-filename').value.trim() || 'recording';
+            var blob = overlay._pendingBlob;
+            if (blob) rec.downloadBlob(blob, filename + '.webm');
+            rec._hideDownloadDialog();
+        });
+
+        // Download cancel
+        document.getElementById('dl-cancel').addEventListener('click', function() {
+            rec._hideDownloadDialog();
+        });
+
+        // Download Enter/Escape
+        document.getElementById('rec-filename').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('dl-confirm').click();
+            if (e.key === 'Escape') rec._hideDownloadDialog();
+        });
+
+        // Frame drag
+        document.getElementById('rec-frame-border').addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('rec-handle')) return;
+            e.preventDefault();
+            var border = document.getElementById('rec-frame-border');
+            var startX = e.clientX - (parseInt(border.style.left) || 0);
+            var startY = e.clientY - (parseInt(border.style.top) || 0);
+            function onMove(ev) {
+                border.style.left = (ev.clientX - startX) + 'px';
+                border.style.top = (ev.clientY - startY) + 'px';
+                rec.syncFrameFromDOM();
+                rec.positionControls();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        // Frame resize handles
+        document.querySelectorAll('.rec-handle').forEach(function(handle) {
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var dir = handle.dataset.dir;
+                var border = document.getElementById('rec-frame-border');
+                var startMouseX = e.clientX;
+                var startMouseY = e.clientY;
+                var startLeft = parseInt(border.style.left) || 0;
+                var startTop = parseInt(border.style.top) || 0;
+                var startW = parseInt(border.style.width) || 0;
+                var startH = parseInt(border.style.height) || 0;
+                var MIN = 100;
+                function onMove(ev) {
+                    var dx = ev.clientX - startMouseX;
+                    var dy = ev.clientY - startMouseY;
+                    var l = startLeft, t = startTop, w = startW, h = startH;
+                    var ar = rec.aspectRatio;
+                    if (dir.includes('e')) { w = Math.max(MIN, startW + dx); }
+                    if (dir.includes('w')) { w = Math.max(MIN, startW - dx); l = startLeft + (startW - w); }
+                    if (dir.includes('s')) { h = Math.max(MIN, startH + dy); }
+                    if (dir.includes('n')) { h = Math.max(MIN, startH - dy); t = startTop + (startH - h); }
+                    if (ar) {
+                        if (dir === 'e' || dir === 'w') { h = Math.round(w / ar); }
+                        else if (dir === 'n' || dir === 's') { w = Math.round(h * ar); }
+                        else {
+                            if (Math.abs(w - startW) >= Math.abs(h - startH)) { h = Math.round(w / ar); }
+                            else { w = Math.round(h * ar); }
+                        }
+                        if (w < MIN) { w = MIN; h = Math.round(w / ar); }
+                        if (h < MIN) { h = MIN; w = Math.round(h * ar); }
+                        if (dir.includes('n')) { t = startTop + startH - h; }
+                        if (dir.includes('w')) { l = startLeft + startW - w; }
+                    }
+                    border.style.left = l + 'px';
+                    border.style.top = t + 'px';
+                    border.style.width = w + 'px';
+                    border.style.height = h + 'px';
+                    rec.syncFrameFromDOM();
+                    rec.positionControls();
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+
+        // Keyboard shortcut: R to toggle recording frame
+        document.addEventListener('keydown', function(e) {
+            // Skip if typing in an input/textarea/select
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.key === 'r' || e.key === 'R') {
+                if (e.ctrlKey || e.altKey || e.metaKey) return;
+                toggleRecFrame();
+            }
+        });
+
+        // Show hint briefly on load
+        var hint = document.getElementById('rec-hint');
+        if (hint) {
+            setTimeout(function() { hint.classList.add('show'); }, 1500);
+            setTimeout(function() { hint.classList.remove('show'); }, 5000);
+        }
+    }
+
+    // ── Self-sustaining recording render loop ──
+    function recLoop() {
+        if (rec.isActive) { rec.updateFrame(); }
+        requestAnimationFrame(recLoop);
+    }
+
+    // ── Init ──
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { bindRecEvents(); requestAnimationFrame(recLoop); });
+    } else {
+        bindRecEvents();
+        requestAnimationFrame(recLoop);
+    }
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>משוואת קפלר — שלוש אנומליות</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        background: #1a1a2e;
+        color: #e0e0e0;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+        direction: rtl;
+        overflow-x: hidden;
+    }
+
+    h1 {
+        text-align: center;
+        padding: 18px 10px 6px;
+        font-size: 1.7em;
+        color: #ffffff;
+        letter-spacing: 1px;
+    }
+
+    h1 span.subtitle {
+        display: block;
+        font-size: 0.5em;
+        color: #8888bb;
+        font-weight: normal;
+        margin-top: 2px;
+        direction: ltr;
+    }
+
+    .main-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        padding: 0 10px;
+    }
+
+    .panels {
+        display: flex;
+        flex-direction: row-reverse;
+        justify-content: center;
+        gap: 18px;
+        width: 100%;
+        max-width: 1400px;
+        margin-top: 8px;
+    }
+
+    .panel {
+        background: #16213e;
+        border-radius: 12px;
+        border: 1px solid #2a2a5a;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .panel-left {
+        flex: 1.15;
+        min-width: 0;
+    }
+
+    .panel-right {
+        flex: 0.85;
+        min-width: 0;
+    }
+
+    .panel-title {
+        font-size: 1.1em;
+        margin-bottom: 8px;
+        color: #ccccff;
+        text-align: center;
+    }
+
+    canvas {
+        border-radius: 8px;
+        display: block;
+    }
+
+    .values-display {
+        display: flex;
+        gap: 28px;
+        justify-content: center;
+        margin-top: 8px;
+        font-size: 1.05em;
+        flex-wrap: wrap;
+    }
+
+    .val-m { color: #4da6ff; }
+    .val-e { color: #ff5555; }
+    .val-nu { color: #44dd66; }
+
+    .controls {
+        background: #16213e;
+        border-radius: 12px;
+        border: 1px solid #2a2a5a;
+        padding: 16px 24px;
+        margin-top: 12px;
+        width: 100%;
+        max-width: 1400px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px 36px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .control-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .control-group label {
+        font-size: 1em;
+        white-space: nowrap;
+        min-width: 60px;
+        text-align: left;
+    }
+
+    input[type="range"] {
+        width: 180px;
+        accent-color: #6c63ff;
+        cursor: pointer;
+    }
+
+    .slider-val {
+        font-size: 0.95em;
+        color: #aaaadd;
+        min-width: 50px;
+        text-align: center;
+        direction: ltr;
+    }
+
+    .btn-anim {
+        background: #2a2a5a;
+        color: #e0e0e0;
+        border: 1px solid #4a4a8a;
+        border-radius: 8px;
+        padding: 7px 18px;
+        font-size: 1em;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.2s;
+    }
+
+    .btn-anim:hover { background: #3a3a7a; }
+    .btn-anim.active { background: #44aa66; border-color: #44aa66; color: #fff; }
+
+    .equation-box {
+        margin-top: 6px;
+        text-align: center;
+        font-size: 0.95em;
+        color: #aaaacc;
+        direction: ltr;
+    }
+
+    .convergence-info {
+        margin-top: 6px;
+        text-align: center;
+        font-size: 0.92em;
+        color: #88cc88;
+        direction: ltr;
+        min-height: 1.4em;
+    }
+
+    .nr-formula {
+        margin-top: 4px;
+        text-align: center;
+        font-size: 0.88em;
+        color: #aaaacc;
+        direction: ltr;
+    }
+
+    .footer-note {
+        text-align: center;
+        font-size: 0.8em;
+        color: #555577;
+        margin-top: 12px;
+        padding-bottom: 12px;
+    }
+
+
+/* ═══ PhysiTal Recording Module ═══ */
+#rec-frame { position:fixed; inset:0; z-index:400; display:none; pointer-events:none; }
+#rec-frame.active { display:block; }
+#rec-frame-border { position:absolute; border:2px solid #60a5fa; box-shadow:0 0 0 9999px rgba(0,0,0,0.35); pointer-events:auto; cursor:move; transition:border-color 0.3s; }
+#rec-frame-border.recording { border-color:#dc2626; box-shadow:0 0 0 9999px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(220,38,38,0.3); }
+#rec-frame-border.paused { border-color:#f59e0b; animation:pulse-border-rec 1.2s ease-in-out infinite; }
+.rec-handle { position:absolute; width:12px; height:12px; background:#60a5fa; border-radius:2px; pointer-events:auto; z-index:2; }
+.rec-handle-nw { top:-6px; left:-6px; cursor:nw-resize; }
+.rec-handle-ne { top:-6px; right:-6px; cursor:ne-resize; }
+.rec-handle-sw { bottom:-6px; left:-6px; cursor:sw-resize; }
+.rec-handle-se { bottom:-6px; right:-6px; cursor:se-resize; }
+.rec-handle-n  { top:-6px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rec-handle-s  { bottom:-6px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rec-handle-e  { right:-6px; top:50%; transform:translateY(-50%); cursor:e-resize; }
+.rec-handle-w  { left:-6px; top:50%; transform:translateY(-50%); cursor:w-resize; }
+#rec-frame-dims { position:absolute; top:-28px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); padding:2px 10px; border-radius:4px; font-size:0.75rem; color:#8b949e; white-space:nowrap; font-variant-numeric:tabular-nums; pointer-events:none; }
+#rec-controls { position:fixed; display:flex; align-items:center; gap:8px; background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 14px; pointer-events:auto; white-space:nowrap; z-index:401; }
+#rec-controls select { padding:4px 6px; font-size:0.78rem; border-radius:6px; background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.1); }
+.rc-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; border:none; cursor:pointer; font-size:1rem; transition:all 0.2s; color:white; background:rgba(255,255,255,0.1); }
+.rc-btn:hover { background:rgba(255,255,255,0.2); }
+.rc-btn.rec-active { background:#dc2626; animation:pulse-rec-btn 1.5s ease-in-out infinite; }
+.rc-btn.paused-active { background:#f59e0b; }
+#rc-timer { font-size:0.82rem; font-variant-numeric:tabular-nums; color:#8b949e; min-width:42px; text-align:center; }
+.rc-sep { width:1px; height:20px; background:rgba(255,255,255,0.1); }
+#rc-close { opacity:0.5; transition:opacity 0.2s; background:none; border:none; color:#8b949e; cursor:pointer; font-size:1rem; }
+#rc-close:hover { opacity:1; }
+@keyframes pulse-rec-btn { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+@keyframes pulse-border-rec { 0%,100%{border-color:#f59e0b;} 50%{border-color:rgba(245,158,11,0.4);} }
+#rec-download-overlay { position:fixed; inset:0; z-index:800; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); }
+#rec-download-dialog { background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:24px; min-width:340px; box-shadow:0 20px 50px rgba(0,0,0,0.6); }
+#rec-download-dialog h3 { font-size:1rem; font-weight:500; margin-bottom:14px; color:#e2e8f0; }
+#rec-filename { width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-family:inherit; font-size:0.9rem; direction:ltr; margin-bottom:14px; }
+#rec-filename:focus { outline:none; border-color:#60a5fa; }
+#rec-download-dialog .dl-btns { display:flex; gap:10px; justify-content:flex-end; }
+.dl-btn { padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:white; transition:background 0.2s; }
+.dl-btn-primary { background:#60a5fa; }
+.dl-btn-primary:hover { background:#3b82f6; }
+.dl-btn-secondary { background:rgba(255,255,255,0.1); }
+.dl-btn-secondary:hover { background:rgba(255,255,255,0.2); }
+#rec-hint { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 16px; font-size:0.75rem; color:#8b949e; z-index:50; pointer-events:none; opacity:0; transition:opacity 1s; }
+#rec-hint.show { opacity:1; }
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+<h1>
+    משוואת קפלר &mdash; שלוש אנומליות
+    <span class="subtitle">Kepler's Equation &mdash; Three Anomalies</span>
+</h1>
+
+<div class="main-container">
+    <div class="panels">
+        <!-- Left panel: Ellipse (appears on the left because of row-reverse) -->
+        <div class="panel panel-left">
+            <div class="panel-title">מסלול אליפטי &mdash; אנומליות גיאומטריות</div>
+            <canvas id="ellipseCanvas" width="560" height="520"></canvas>
+            <div class="equation-box" id="keplerEq">M = E &minus; e &middot; sin(E)</div>
+            <div class="values-display">
+                <span class="val-m" id="dispM">M = 60.0&deg;</span>
+                <span class="val-e" id="dispE">E = 73.2&deg;</span>
+                <span class="val-nu" id="dispNu">&nu; = 88.1&deg;</span>
+            </div>
+        </div>
+
+        <!-- Right panel: Newton-Raphson -->
+        <div class="panel panel-right">
+            <div class="panel-title">התכנסות ניוטון-רפסון</div>
+            <canvas id="nrCanvas" width="460" height="520"></canvas>
+            <div class="nr-formula">E<sub>n+1</sub> = E<sub>n</sub> &minus; (E<sub>n</sub> &minus; e&middot;sin(E<sub>n</sub>) &minus; M) / (1 &minus; e&middot;cos(E<sub>n</sub>))</div>
+            <div class="convergence-info" id="convInfo">Converged in 4 iterations to E = 1.27800 rad</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="sliderE">תצפית e:</label>
+            <input type="range" id="sliderE" min="0" max="0.95" step="0.01" value="0.3">
+            <span class="slider-val" id="valE">0.30</span>
+        </div>
+        <div class="control-group">
+            <label for="sliderM">M [&deg;]:</label>
+            <input type="range" id="sliderM" min="0" max="360" step="1" value="60">
+            <span class="slider-val" id="valM">60&deg;</span>
+        </div>
+        <div class="control-group">
+            <button class="btn-anim" id="btnAnim">&#9654; הפעל אנימציה</button>
+        </div>
+        <div class="control-group">
+            <label for="sliderSpeed">מהירות:</label>
+            <input type="range" id="sliderSpeed" min="0.1" max="5" step="0.1" value="1">
+            <span class="slider-val" id="valSpeed">1.0x</span>
+        </div>
+    </div>
+</div>
+
+<div class="footer-note">סימולציה אינטראקטיבית &mdash; קורס אסטרופיזיקה חישובית &mdash; כיתה י"ב</div>
+
+<script>
+// ===== Physics =====
+function solveKepler(M, e) {
+    let E = M;
+    let history = [E];
+    for (let i = 0; i < 50; i++) {
+        let f = E - e * Math.sin(E) - M;
+        let fp = 1 - e * Math.cos(E);
+        let dE = -f / fp;
+        E += dE;
+        history.push(E);
+        if (Math.abs(dE) < 1e-12) break;
+    }
+    return { E: E, history: history };
+}
+
+function eccentricToTrue(E, e) {
+    return 2 * Math.atan2(
+        Math.sqrt(1 + e) * Math.sin(E / 2),
+        Math.sqrt(1 - e) * Math.cos(E / 2)
+    );
+}
+
+function toDeg(rad) { return rad * 180 / Math.PI; }
+function toRad(deg) { return deg * Math.PI / 180; }
+
+// ===== State =====
+let ecc = 0.3;
+let M_deg = 60;
+let animating = false;
+let animSpeed = 1.0;
+let lastTime = null;
+
+// ===== DOM =====
+const sliderEcc = document.getElementById('sliderE');
+const sliderM = document.getElementById('sliderM');
+const sliderSpeed = document.getElementById('sliderSpeed');
+const btnAnim = document.getElementById('btnAnim');
+const valEDisp = document.getElementById('valE');
+const valMDisp = document.getElementById('valM');
+const valSpeedDisp = document.getElementById('valSpeed');
+const dispM = document.getElementById('dispM');
+const dispE = document.getElementById('dispE');
+const dispNu = document.getElementById('dispNu');
+const convInfo = document.getElementById('convInfo');
+const keplerEq = document.getElementById('keplerEq');
+
+const ellipseCanvas = document.getElementById('ellipseCanvas');
+const nrCanvas = document.getElementById('nrCanvas');
+const ctxE = ellipseCanvas.getContext('2d');
+const ctxN = nrCanvas.getContext('2d');
+
+// ===== Events =====
+sliderEcc.addEventListener('input', () => {
+    ecc = parseFloat(sliderEcc.value);
+    valEDisp.textContent = ecc.toFixed(2);
+    update();
+});
+
+sliderM.addEventListener('input', () => {
+    M_deg = parseFloat(sliderM.value);
+    valMDisp.innerHTML = M_deg + '&deg;';
+    update();
+});
+
+sliderSpeed.addEventListener('input', () => {
+    animSpeed = parseFloat(sliderSpeed.value);
+    valSpeedDisp.textContent = animSpeed.toFixed(1) + 'x';
+});
+
+btnAnim.addEventListener('click', () => {
+    animating = !animating;
+    if (animating) {
+        btnAnim.classList.add('active');
+        btnAnim.innerHTML = '&#9724; עצור אנימציה';
+        lastTime = performance.now();
+    } else {
+        btnAnim.classList.remove('active');
+        btnAnim.innerHTML = '&#9654; הפעל אנימציה';
+        lastTime = null;
+    }
+});
+
+// ===== Drawing helpers =====
+function drawArrowArc(ctx, cx, cy, radius, startAngle, endAngle, color, lineWidth, labelText, labelOffset) {
+    // Draws an arc from startAngle to endAngle with an arrowhead at the end
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth || 2;
+    ctx.beginPath();
+
+    let diff = endAngle - startAngle;
+    // Normalize diff to [-PI, PI] for shortest path but we want positive sweep
+    // Actually, we always draw counterclockwise (positive direction)
+    if (diff < 0) diff += 2 * Math.PI;
+    if (diff > 2 * Math.PI) diff -= 2 * Math.PI;
+
+    const steps = Math.max(30, Math.floor(Math.abs(diff) * 30));
+    for (let i = 0; i <= steps; i++) {
+        const t = startAngle + (diff) * (i / steps);
+        const x = cx + radius * Math.cos(t);
+        const y = cy - radius * Math.sin(t);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Arrowhead at the end
+    const tipAngle = startAngle + diff;
+    const tipX = cx + radius * Math.cos(tipAngle);
+    const tipY = cy - radius * Math.sin(tipAngle);
+    // Tangent direction (counterclockwise)
+    const tangentAngle = tipAngle + Math.PI / 2;
+    const arrowLen = 8;
+    const arrowSpread = 0.45;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(
+        tipX + arrowLen * Math.cos(Math.PI - tangentAngle + arrowSpread),
+        tipY + arrowLen * Math.sin(Math.PI - tangentAngle + arrowSpread)
+    );
+    ctx.lineTo(
+        tipX + arrowLen * Math.cos(Math.PI - tangentAngle - arrowSpread),
+        tipY + arrowLen * Math.sin(Math.PI - tangentAngle - arrowSpread)
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    // Label
+    if (labelText) {
+        const midAngle = startAngle + diff * 0.5;
+        const lr = radius + (labelOffset || 14);
+        const lx = cx + lr * Math.cos(midAngle);
+        const ly = cy - lr * Math.sin(midAngle);
+        ctx.fillStyle = color;
+        ctx.font = 'bold 16px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, lx, ly);
+    }
+    ctx.restore();
+}
+
+// ===== Draw Ellipse Panel =====
+function drawEllipsePanel(M_rad, e, E_val, nu_val) {
+    const W = ellipseCanvas.width;
+    const H = ellipseCanvas.height;
+    const ctx = ctxE;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = '#0f0f23';
+    ctx.fillRect(0, 0, W, H);
+
+    const a = 1; // semi-major axis (normalized)
+    const b = a * Math.sqrt(1 - e * e);
+    const scale = Math.min(W, H) * 0.34; // pixel scale
+    const cx = W * 0.5;
+    const cy = H * 0.48;
+
+    // Focus position (Sun)
+    const focusX = cx - a * e * scale;
+    const focusY = cy;
+
+    // === Draw circumscribed circle (dashed) ===
+    ctx.save();
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = 'rgba(150,150,200,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, a * scale, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // === Draw ellipse ===
+    ctx.strokeStyle = 'rgba(200,200,220,0.55)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    for (let i = 0; i <= 360; i++) {
+        const theta = toRad(i);
+        const x = cx + a * Math.cos(theta) * scale;
+        const y = cy - b * Math.sin(theta) * scale;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+
+    // Fill ellipse lightly
+    ctx.fillStyle = 'rgba(100,100,160,0.07)';
+    ctx.fill();
+
+    // === Semi-major axis line ===
+    ctx.strokeStyle = 'rgba(150,150,180,0.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - a * scale, cy);
+    ctx.lineTo(cx + a * scale, cy);
+    ctx.stroke();
+
+    // === Center dot ===
+    ctx.fillStyle = '#888899';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '12px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Center', cx, cy - 10);
+
+    // === Sun at focus ===
+    // Glow
+    const sunGrad = ctx.createRadialGradient(focusX, focusY, 0, focusX, focusY, 14);
+    sunGrad.addColorStop(0, 'rgba(255,220,50,0.7)');
+    sunGrad.addColorStop(1, 'rgba(255,220,50,0)');
+    ctx.fillStyle = sunGrad;
+    ctx.beginPath();
+    ctx.arc(focusX, focusY, 14, 0, 2 * Math.PI);
+    ctx.fill();
+    // Core
+    ctx.fillStyle = '#ffdd33';
+    ctx.beginPath();
+    ctx.arc(focusX, focusY, 5, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = '#ffdd33';
+    ctx.font = '12px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Sun', focusX, focusY + 18);
+
+    // === Body position on ellipse ===
+    const Px = cx + (a * Math.cos(E_val) - a * e) * scale;  // note: shifted by -ae from center
+    const Py = cy - (b * Math.sin(E_val)) * scale;
+
+    // === Point Q on circumscribed circle ===
+    const Qx = cx + a * Math.cos(E_val) * scale;
+    const Qy = cy - a * Math.sin(E_val) * scale;
+
+    // === Vertical dashed line from Q to P ===
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(180,180,220,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(Qx, Qy);
+    ctx.lineTo(Px, Py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Small label for Q
+    ctx.fillStyle = 'rgba(180,180,220,0.6)';
+    ctx.font = '11px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Q', Qx + 10, Qy - 6);
+
+    // === Angle arcs ===
+    // Reference line for angles from center: positive x-axis
+    // M arc (blue) from center
+    const arcRadM = 38;
+    if (M_rad > 0.02) {
+        drawArrowArc(ctx, cx, cy, arcRadM, 0, M_rad, '#4da6ff', 2.2, 'M', 14);
+    }
+
+    // E arc (red) from center
+    const arcRadE = 55;
+    let E_draw = E_val % (2 * Math.PI);
+    if (E_draw < 0) E_draw += 2 * Math.PI;
+    if (E_draw > 0.02) {
+        drawArrowArc(ctx, cx, cy, arcRadE, 0, E_draw, '#ff5555', 2.2, 'E', 14);
+    }
+
+    // nu arc (green) from focus
+    const arcRadNu = 42;
+    let nu_draw = nu_val;
+    if (nu_draw < 0) nu_draw += 2 * Math.PI;
+    if (nu_draw > 0.02) {
+        drawArrowArc(ctx, focusX, focusY, arcRadNu, 0, nu_draw, '#44dd66', 2.2, '\u03BD', 14);
+    }
+
+    // === Line from center to Q (for E angle visual) ===
+    ctx.strokeStyle = 'rgba(255,85,85,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(Qx, Qy);
+    ctx.stroke();
+
+    // === Line from focus to P (for nu angle visual) ===
+    ctx.strokeStyle = 'rgba(68,221,102,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(focusX, focusY);
+    ctx.lineTo(Px, Py);
+    ctx.stroke();
+
+    // === Line from center along M direction (mean anomaly visual) ===
+    const Mx_end = cx + arcRadM * 1.8 * Math.cos(M_rad);
+    const My_end = cy - arcRadM * 1.8 * Math.sin(M_rad);
+    ctx.strokeStyle = 'rgba(77,166,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(Mx_end, My_end);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Mean anomaly point on circle
+    const Mmx = cx + a * Math.cos(M_rad) * scale;
+    const Mmy = cy - a * Math.sin(M_rad) * scale;
+    ctx.fillStyle = 'rgba(77,166,255,0.4)';
+    ctx.beginPath();
+    ctx.arc(Mmx, Mmy, 3.5, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // === Body dot (green) ===
+    ctx.fillStyle = '#44dd66';
+    ctx.shadowColor = '#44dd66';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(Px, Py, 6, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Label for body
+    ctx.fillStyle = '#44dd66';
+    ctx.font = 'bold 12px Segoe UI, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Body (P)', Px + 10, Py - 8);
+
+    // === Reference line along positive x from center ===
+    ctx.strokeStyle = 'rgba(150,150,180,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + a * scale + 10, cy);
+    ctx.stroke();
+
+    // Reference line along positive x from focus
+    ctx.strokeStyle = 'rgba(150,150,180,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(focusX, focusY);
+    ctx.lineTo(focusX + a * scale + 10, focusY);
+    ctx.stroke();
+
+    // === Legend ===
+    const legendX = 14;
+    let legendY = H - 80;
+    ctx.font = '13px Segoe UI, sans-serif';
+    ctx.textAlign = 'left';
+
+    ctx.fillStyle = '#4da6ff';
+    ctx.fillText('M = Mean Anomaly = ' + toDeg(M_rad).toFixed(1) + '\u00B0', legendX, legendY);
+    legendY += 20;
+    ctx.fillStyle = '#ff5555';
+    ctx.fillText('E = Eccentric Anomaly = ' + toDeg(E_val).toFixed(1) + '\u00B0', legendX, legendY);
+    legendY += 20;
+    ctx.fillStyle = '#44dd66';
+    ctx.fillText('\u03BD = True Anomaly = ' + toDeg(nu_val < 0 ? nu_val + 2 * Math.PI : nu_val).toFixed(1) + '\u00B0', legendX, legendY);
+
+    // Perihelion label
+    ctx.fillStyle = 'rgba(200,200,220,0.4)';
+    ctx.font = '11px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Perihelion', cx + a * scale + 2, cy + 14);
+}
+
+// ===== Draw Newton-Raphson Panel =====
+function drawNRPanel(M_rad, e, history) {
+    const W = nrCanvas.width;
+    const H = nrCanvas.height;
+    const ctx = ctxN;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0f0f23';
+    ctx.fillRect(0, 0, W, H);
+
+    const n = history.length;
+    if (n < 2) {
+        ctx.fillStyle = '#888';
+        ctx.font = '14px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No iterations needed', W / 2, H / 2);
+        return;
+    }
+
+    // Compute residuals
+    const residuals = history.map(E_i => Math.abs(E_i - e * Math.sin(E_i) - M_rad));
+
+    // === Top half: E_n vs iteration ===
+    const topH = H * 0.46;
+    const topY0 = 40;
+    const plotLeft = 65;
+    const plotRight = W - 25;
+    const plotW = plotRight - plotLeft;
+
+    // E range
+    const eMin = Math.min(...history) - 0.1;
+    const eMax = Math.max(...history) + 0.1;
+    const eRange = Math.max(eMax - eMin, 0.2);
+
+    // Title
+    ctx.fillStyle = '#ccccff';
+    ctx.font = '13px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('E\u2099 vs Iteration', (plotLeft + plotRight) / 2, topY0 - 14);
+
+    // Axes
+    ctx.strokeStyle = 'rgba(150,150,200,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(plotLeft, topY0);
+    ctx.lineTo(plotLeft, topY0 + topH);
+    ctx.lineTo(plotRight, topY0 + topH);
+    ctx.stroke();
+
+    // Y-axis labels for E
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '10px Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    const nTicksY = 5;
+    for (let i = 0; i <= nTicksY; i++) {
+        const val = eMin + eRange * (1 - i / nTicksY);
+        const yy = topY0 + topH * (i / nTicksY);
+        ctx.fillText(val.toFixed(2), plotLeft - 5, yy + 3);
+        ctx.strokeStyle = 'rgba(150,150,200,0.1)';
+        ctx.beginPath();
+        ctx.moveTo(plotLeft, yy);
+        ctx.lineTo(plotRight, yy);
+        ctx.stroke();
+    }
+
+    // X-axis labels
+    ctx.textAlign = 'center';
+    const maxIter = Math.max(n - 1, 1);
+    for (let i = 0; i < n; i++) {
+        const xx = plotLeft + plotW * (i / maxIter);
+        ctx.fillStyle = '#aaaacc';
+        ctx.fillText(i.toString(), xx, topY0 + topH + 14);
+    }
+    ctx.fillText('Iteration', (plotLeft + plotRight) / 2, topY0 + topH + 28);
+
+    // Plot E_n values
+    ctx.strokeStyle = '#ff8855';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const xx = plotLeft + plotW * (i / maxIter);
+        const yy = topY0 + topH * (1 - (history[i] - eMin) / eRange);
+        if (i === 0) ctx.moveTo(xx, yy);
+        else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+
+    // Dots
+    for (let i = 0; i < n; i++) {
+        const xx = plotLeft + plotW * (i / maxIter);
+        const yy = topY0 + topH * (1 - (history[i] - eMin) / eRange);
+        ctx.fillStyle = i === n - 1 ? '#44dd66' : '#ff8855';
+        ctx.beginPath();
+        ctx.arc(xx, yy, i === n - 1 ? 5 : 3.5, 0, 2 * Math.PI);
+        ctx.fill();
+    }
+
+    // Converged line
+    const convY = topY0 + topH * (1 - (history[n - 1] - eMin) / eRange);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(68,221,102,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(plotLeft, convY);
+    ctx.lineTo(plotRight, convY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label converged value
+    ctx.fillStyle = '#44dd66';
+    ctx.font = '10px Segoe UI, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('E = ' + history[n - 1].toFixed(5), plotRight - 90, convY - 6);
+
+    // Y label
+    ctx.save();
+    ctx.translate(15, topY0 + topH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = '#ff8855';
+    ctx.font = '12px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('E\u2099 (rad)', 0, 0);
+    ctx.restore();
+
+    // === Bottom half: |f(E_n)| on log scale ===
+    const botY0 = topY0 + topH + 55;
+    const botH = H - botY0 - 30;
+
+    ctx.fillStyle = '#ccccff';
+    ctx.font = '13px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('|f(E\u2099)| = |E\u2099 \u2212 e\u00B7sin(E\u2099) \u2212 M|  (log scale)', (plotLeft + plotRight) / 2, botY0 - 14);
+
+    // Axes
+    ctx.strokeStyle = 'rgba(150,150,200,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(plotLeft, botY0);
+    ctx.lineTo(plotLeft, botY0 + botH);
+    ctx.lineTo(plotRight, botY0 + botH);
+    ctx.stroke();
+
+    // Filter out zero residuals for log scale
+    const logRes = residuals.map(r => r > 0 ? Math.log10(r) : -15);
+    const logMin = Math.min(...logRes) - 0.5;
+    const logMax = Math.max(logRes[0], 1) + 0.5;
+    const logRange = Math.max(logMax - logMin, 1);
+
+    // Y ticks
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '10px Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    const logLow = Math.floor(logMin);
+    const logHigh = Math.ceil(logMax);
+    for (let p = logHigh; p >= logLow; p--) {
+        const yy = botY0 + botH * (1 - (p - logMin) / logRange);
+        if (yy >= botY0 && yy <= botY0 + botH) {
+            ctx.fillText('10^' + p, plotLeft - 5, yy + 3);
+            ctx.strokeStyle = 'rgba(150,150,200,0.1)';
+            ctx.beginPath();
+            ctx.moveTo(plotLeft, yy);
+            ctx.lineTo(plotRight, yy);
+            ctx.stroke();
+        }
+    }
+
+    // X labels
+    ctx.textAlign = 'center';
+    for (let i = 0; i < n; i++) {
+        const xx = plotLeft + plotW * (i / maxIter);
+        ctx.fillStyle = '#aaaacc';
+        ctx.fillText(i.toString(), xx, botY0 + botH + 14);
+    }
+    ctx.fillText('Iteration', (plotLeft + plotRight) / 2, botY0 + botH + 28);
+
+    // Plot residuals
+    ctx.strokeStyle = '#dd77ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < n; i++) {
+        const xx = plotLeft + plotW * (i / maxIter);
+        const lv = logRes[i];
+        const yy = botY0 + botH * (1 - (lv - logMin) / logRange);
+        const yyClamped = Math.max(botY0, Math.min(botY0 + botH, yy));
+        if (!started) { ctx.moveTo(xx, yyClamped); started = true; }
+        else ctx.lineTo(xx, yyClamped);
+    }
+    ctx.stroke();
+
+    // Dots
+    for (let i = 0; i < n; i++) {
+        const xx = plotLeft + plotW * (i / maxIter);
+        const lv = logRes[i];
+        const yy = botY0 + botH * (1 - (lv - logMin) / logRange);
+        const yyClamped = Math.max(botY0, Math.min(botY0 + botH, yy));
+        ctx.fillStyle = '#dd77ff';
+        ctx.beginPath();
+        ctx.arc(xx, yyClamped, 3.5, 0, 2 * Math.PI);
+        ctx.fill();
+    }
+
+    // Y label
+    ctx.save();
+    ctx.translate(15, botY0 + botH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = '#dd77ff';
+    ctx.font = '12px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('|f(E\u2099)|', 0, 0);
+    ctx.restore();
+}
+
+// ===== Main update =====
+function update() {
+    const M_rad = toRad(M_deg);
+    const result = solveKepler(M_rad, ecc);
+    const E_val = result.E;
+    let nu_val = eccentricToTrue(E_val, ecc);
+
+    drawEllipsePanel(M_rad, ecc, E_val, nu_val);
+    drawNRPanel(M_rad, ecc, result.history);
+
+    // Update displays
+    const nu_display = nu_val < 0 ? nu_val + 2 * Math.PI : nu_val;
+    dispM.innerHTML = 'M = ' + M_deg.toFixed(1) + '\u00B0';
+    dispE.innerHTML = 'E = ' + toDeg(E_val).toFixed(1) + '\u00B0';
+    dispNu.innerHTML = '\u03BD = ' + toDeg(nu_display).toFixed(1) + '\u00B0';
+
+    const iterations = result.history.length - 1;
+    convInfo.textContent = 'Converged in ' + iterations + ' iteration' + (iterations !== 1 ? 's' : '') +
+        ' to E = ' + E_val.toFixed(5) + ' rad (' + toDeg(E_val).toFixed(2) + '\u00B0)';
+}
+
+// ===== Animation loop =====
+function animate(timestamp) {
+    if (animating) {
+        if (lastTime === null) lastTime = timestamp;
+        const dt = (timestamp - lastTime) / 1000; // seconds
+        lastTime = timestamp;
+
+        M_deg += animSpeed * 40 * dt; // degrees per second
+        if (M_deg >= 360) M_deg -= 360;
+        if (M_deg < 0) M_deg += 360;
+
+        sliderM.value = Math.round(M_deg);
+        valMDisp.innerHTML = Math.round(M_deg) + '\u00B0';
+
+        update();
+    }
+    requestAnimationFrame(animate);
+}
+
+// ===== Responsive canvas sizing =====
+function resizeCanvases() {
+    const panelLeft = document.querySelector('.panel-left');
+    const panelRight = document.querySelector('.panel-right');
+
+    const availW_left = panelLeft.clientWidth - 24;
+    const availW_right = panelRight.clientWidth - 24;
+
+    const maxDim = 580;
+
+    const leftW = Math.min(availW_left, maxDim);
+    const leftH = Math.min(leftW * 0.93, maxDim);
+    ellipseCanvas.width = leftW;
+    ellipseCanvas.height = leftH;
+
+    const rightW = Math.min(availW_right, maxDim);
+    const rightH = Math.min(rightW * 1.13, maxDim);
+    nrCanvas.width = rightW;
+    nrCanvas.height = rightH;
+
+    update();
+}
+
+// Initial
+window.addEventListener('resize', resizeCanvases);
+window.addEventListener('load', () => {
+    resizeCanvases();
+    update();
+    requestAnimationFrame(animate);
+});
+</script>
+
+<!-- ═══ PhysiTal Recording Module ═══ -->
+<div id="rec-frame">
+    <div id="rec-frame-border">
+        <div class="rec-handle rec-handle-nw" data-dir="nw"></div>
+        <div class="rec-handle rec-handle-n"  data-dir="n"></div>
+        <div class="rec-handle rec-handle-ne" data-dir="ne"></div>
+        <div class="rec-handle rec-handle-e"  data-dir="e"></div>
+        <div class="rec-handle rec-handle-se" data-dir="se"></div>
+        <div class="rec-handle rec-handle-s"  data-dir="s"></div>
+        <div class="rec-handle rec-handle-sw" data-dir="sw"></div>
+        <div class="rec-handle rec-handle-w"  data-dir="w"></div>
+        <div id="rec-frame-dims">1920 × 1080</div>
+    </div>
+    <div id="rec-controls">
+        <button class="rc-btn" id="rc-rec" title="Record / Stop">⏺</button>
+        <button class="rc-btn" id="rc-pause" title="Pause" style="display:none;">⏸</button>
+        <span id="rc-timer">0:00</span>
+        <div class="rc-sep"></div>
+        <button class="rc-btn" id="rc-screenshot" title="Screenshot">📷</button>
+        <div class="rc-sep"></div>
+        <select id="rc-aspect">
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="21:9">21:9</option>
+            <option value="free">Free</option>
+        </select>
+        <select id="rc-resolution">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="3840x2160">4K</option>
+        </select>
+        <select id="rc-fps">
+            <option value="30" selected>30fps</option>
+            <option value="24">24fps</option>
+            <option value="60">60fps</option>
+        </select>
+        <div class="rc-sep"></div>
+        <button id="rc-close" title="Close">✕</button>
+    </div>
+</div>
+<div id="rec-download-overlay">
+    <div id="rec-download-dialog">
+        <h3 data-he="שמירת הקלטה" data-en="Save Recording">שמירת הקלטה</h3>
+        <input type="text" id="rec-filename" placeholder="filename" dir="ltr">
+        <div class="dl-btns">
+            <button class="dl-btn dl-btn-secondary" id="dl-cancel" data-he="ביטול" data-en="Cancel">ביטול</button>
+            <button class="dl-btn dl-btn-primary" id="dl-confirm" data-he="הורדה" data-en="Download">הורדה</button>
+        </div>
+    </div>
+</div>
+<div id="rec-hint">Press <b>R</b> to open recording frame</div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════
+// PhysiTal Recording Module (auto-injected)
+// ═══════════════════════════════════════════════════════════
+(function() {
+    var REC_SIM_NAME = 'kepler-equation';
+
+    // ── State ──
+    var rec = window._rec = {
+        isActive: false,
+        isPaused: false,
+        mediaRecorder: null,
+        chunks: [],
+        offscreenCanvas: null,
+        offscreenCtx: null,
+        stream: null,
+        startTimestamp: 0,
+        pausedElapsed: 0,
+        timerInterval: null,
+        lastBlob: null,
+        resolution: { w: 1920, h: 1080 },
+        fps: 30,
+        frame: { x: 0, y: 0, w: 0, h: 0 },
+        aspectRatio: 16 / 9,
+        _domCache: null,
+        _domCaptureActive: false,
+        _lastDomCapture: 0,
+        _domCaptureInterval: 120
+    };
+
+    // ── Aspect Ratio ──
+    rec.parseAspect = function(val) {
+        if (val === 'free') return null;
+        var parts = val.split(':').map(Number);
+        return parts[0] / parts[1];
+    };
+
+    rec.enforceAspect = function() {
+        if (!this.aspectRatio) return;
+        var border = document.getElementById('rec-frame-border');
+        var w = parseInt(border.style.width) || 0;
+        var newH = Math.round(w / this.aspectRatio);
+        border.style.height = newH + 'px';
+        this.syncFrameFromDOM();
+        this.positionControls();
+    };
+
+    // ── Offscreen Canvas ──
+    rec.setupOffscreen = function() {
+        if (!this.offscreenCanvas) {
+            this.offscreenCanvas = document.createElement('canvas');
+            this.offscreenCanvas.id = '_rec_offscreen';
+        }
+        this.offscreenCanvas.width = this.resolution.w;
+        this.offscreenCanvas.height = this.resolution.h;
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    };
+
+    // ── Universal compositeOnto — draws all visible canvases ──
+    rec.compositeOnto = function(targetCtx, targetW, targetH, region) {
+        var r = region || { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+        var sx = targetW / r.w;
+        var sy = targetH / r.h;
+
+        // Fill background
+        var bgColor = getComputedStyle(document.body).backgroundColor;
+        targetCtx.fillStyle = (bgColor && bgColor !== 'rgba(0, 0, 0, 0)') ? bgColor : '#0a0a14';
+        targetCtx.fillRect(0, 0, targetW, targetH);
+
+        // Draw all visible canvases at correct positions
+        var canvases = document.querySelectorAll('canvas');
+        for (var i = 0; i < canvases.length; i++) {
+            var cvs = canvases[i];
+            if (cvs.id === '_rec_offscreen') continue;
+            if (cvs.offsetWidth === 0 && cvs.offsetHeight === 0) continue;
+
+            var rect = cvs.getBoundingClientRect();
+            // Check overlap with recording frame
+            if (rect.right <= r.x || rect.left >= r.x + r.w) continue;
+            if (rect.bottom <= r.y || rect.top >= r.y + r.h) continue;
+
+            var dx = (rect.left - r.x) * sx;
+            var dy = (rect.top - r.y) * sy;
+            var dw = rect.width * sx;
+            var dh = rect.height * sy;
+
+            try { targetCtx.drawImage(cvs, dx, dy, dw, dh); } catch(e) {}
+        }
+    };
+
+    // ── Update recording frame (called each animation frame) ──
+    rec.updateFrame = function() {
+        if (!this.offscreenCtx) return;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        // Draw canvases (fast, every frame)
+        this.compositeOnto(this.offscreenCtx, this.resolution.w, this.resolution.h, region);
+
+        // Draw cached DOM overlay
+        if (this._domCache) {
+            this.offscreenCtx.drawImage(this._domCache, 0, 0);
+        }
+
+        // Trigger async DOM capture (throttled)
+        var now = performance.now();
+        if (!this._domCaptureActive && now - this._lastDomCapture >= this._domCaptureInterval) {
+            this._lastDomCapture = now;
+            this._captureDomOverlay();
+        }
+    };
+
+    // ── Async DOM overlay capture via html2canvas ──
+    rec._captureDomOverlay = async function() {
+        if (typeof html2canvas === 'undefined') return;
+        this._domCaptureActive = true;
+
+        try {
+            var f = this.frame;
+            var scaleX = this.resolution.w / f.w;
+            var scaleY = this.resolution.h / f.h;
+
+            var tempCanvas = document.createElement('canvas');
+            tempCanvas.width = this.resolution.w;
+            tempCanvas.height = this.resolution.h;
+            var tempCtx = tempCanvas.getContext('2d');
+
+            // Find visible dialogues / overlay panels
+            var selectors = '.dialogue, .glass-panel, [class*="dialog"], [class*="panel"]:not(#rec-controls)';
+            var elements = document.querySelectorAll(selectors);
+            var anyRendered = false;
+
+            for (var j = 0; j < elements.length; j++) {
+                var dlg = elements[j];
+                if (dlg.style.display === 'none' || dlg.offsetParent === null) continue;
+                if (dlg.id === 'rec-frame' || dlg.id === 'rec-download-overlay' || dlg.id === 'rec-controls') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+
+                var rendered = await html2canvas(dlg, {
+                    backgroundColor: null, logging: false, useCORS: true
+                });
+                var ddx = (rect.left - f.x) * scaleX;
+                var ddy = (rect.top - f.y) * scaleY;
+                var ddw = rect.width * scaleX;
+                var ddh = rect.height * scaleY;
+                tempCtx.drawImage(rendered, ddx, ddy, ddw, ddh);
+                anyRendered = true;
+            }
+
+            this._domCache = anyRendered ? tempCanvas : null;
+        } catch (e) {
+            console.warn('DOM overlay capture failed:', e);
+        }
+
+        this._domCaptureActive = false;
+    };
+
+    // ── Start Recording ──
+    rec.start = function(options) {
+        var opts = options || {};
+        if (opts.width) this.resolution.w = opts.width;
+        if (opts.height) this.resolution.h = opts.height;
+        if (opts.fps) this.fps = opts.fps;
+
+        this.setupOffscreen();
+        this.chunks = [];
+        this.isPaused = false;
+        this.pausedElapsed = 0;
+
+        this.stream = this.offscreenCanvas.captureStream(this.fps);
+
+        var mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        var mimeType = '';
+        for (var i = 0; i < mimeTypes.length; i++) {
+            if (MediaRecorder.isTypeSupported(mimeTypes[i])) { mimeType = mimeTypes[i]; break; }
+        }
+
+        this.mediaRecorder = new MediaRecorder(this.stream, {
+            mimeType: mimeType,
+            videoBitsPerSecond: this.resolution.w >= 3840 ? 20000000 :
+                               this.resolution.w >= 1920 ? 10000000 : 5000000
+        });
+
+        this.mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size > 0) rec.chunks.push(e.data);
+        };
+
+        this.mediaRecorder.start(1000);
+        this.isActive = true;
+        this.startTimestamp = Date.now();
+        this._startTimer();
+
+        var border = document.getElementById('rec-frame-border');
+        var recBtn = document.getElementById('rc-rec');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('recording');
+        recBtn.classList.add('rec-active');
+        recBtn.textContent = '⏹';
+        recBtn.title = 'Stop';
+        pauseBtn.style.display = 'inline-flex';
+    };
+
+    // ── Stop Recording ──
+    rec.stop = function() {
+        return new Promise(function(resolve) {
+            if (!rec.mediaRecorder || rec.mediaRecorder.state === 'inactive') {
+                resolve(null); return;
+            }
+            if (rec.mediaRecorder.state === 'paused') {
+                rec.mediaRecorder.resume();
+            }
+            rec.mediaRecorder.onstop = function() {
+                var blob = new Blob(rec.chunks, { type: rec.mediaRecorder.mimeType });
+                rec.isActive = false;
+                rec.isPaused = false;
+                rec._stopTimer();
+                rec.lastBlob = blob;
+                rec._domCache = null;
+                rec._domCaptureActive = false;
+
+                var border = document.getElementById('rec-frame-border');
+                var recBtn = document.getElementById('rc-rec');
+                var pauseBtn = document.getElementById('rc-pause');
+                border.classList.remove('recording', 'paused');
+                recBtn.classList.remove('rec-active');
+                recBtn.textContent = '⏺';
+                recBtn.title = 'Record';
+                pauseBtn.style.display = 'none';
+                pauseBtn.classList.remove('paused-active');
+                pauseBtn.textContent = '⏸';
+
+                rec._showDownloadDialog(blob);
+                resolve(blob);
+            };
+            rec.mediaRecorder.stop();
+        });
+    };
+
+    // ── Pause ──
+    rec.pause = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+        this.mediaRecorder.pause();
+        this.isPaused = true;
+        this.pausedElapsed += Date.now() - this.startTimestamp;
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('paused');
+        pauseBtn.classList.add('paused-active');
+        pauseBtn.textContent = '▶';
+        pauseBtn.title = 'Resume';
+    };
+
+    // ── Resume ──
+    rec.resume = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+        this.mediaRecorder.resume();
+        this.isPaused = false;
+        this.startTimestamp = Date.now();
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.remove('paused');
+        pauseBtn.classList.remove('paused-active');
+        pauseBtn.textContent = '⏸';
+        pauseBtn.title = 'Pause';
+    };
+
+    // ── Screenshot ──
+    rec.screenshot = async function(options) {
+        var opts = options || {};
+        var w = opts.width || this.resolution.w;
+        var h = opts.height || this.resolution.h;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        var offscreen = document.createElement('canvas');
+        offscreen.width = w;
+        offscreen.height = h;
+        var ctx = offscreen.getContext('2d');
+
+        this.compositeOnto(ctx, w, h, region);
+
+        if (typeof html2canvas !== 'undefined') {
+            var scaleX = w / f.w;
+            var scaleY = h / f.h;
+            var dlgs = document.querySelectorAll('.dialogue, .glass-panel');
+            for (var i = 0; i < dlgs.length; i++) {
+                var dlg = dlgs[i];
+                if (dlg.style.display === 'none') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+                try {
+                    var rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+                    ctx.drawImage(rendered, (rect.left - f.x) * scaleX, (rect.top - f.y) * scaleY, rect.width * scaleX, rect.height * scaleY);
+                } catch(e) {}
+            }
+        }
+
+        return offscreen.toDataURL(opts.format || 'image/png', opts.quality || 0.95);
+    };
+
+    // ── Download helpers ──
+    rec.downloadBlob = function(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    };
+
+    rec.downloadDataURL = function(dataURL, filename) {
+        var a = document.createElement('a');
+        a.href = dataURL; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+
+    // ── Timer ──
+    rec._startTimer = function() {
+        var el = document.getElementById('rc-timer');
+        this.timerInterval = setInterval(function() {
+            var elapsed;
+            if (rec.isPaused) {
+                elapsed = Math.floor(rec.pausedElapsed / 1000);
+            } else {
+                elapsed = Math.floor((rec.pausedElapsed + Date.now() - rec.startTimestamp) / 1000);
+            }
+            var min = Math.floor(elapsed / 60);
+            var sec = String(elapsed % 60).padStart(2, '0');
+            el.textContent = min + ':' + sec;
+        }, 250);
+    };
+
+    rec._stopTimer = function() {
+        clearInterval(this.timerInterval);
+        document.getElementById('rc-timer').textContent = '0:00';
+    };
+
+    // ── Download Dialog ──
+    rec._showDownloadDialog = function(blob) {
+        var overlay = document.getElementById('rec-download-overlay');
+        var input = document.getElementById('rec-filename');
+        var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        input.value = 'physital-' + REC_SIM_NAME + '-' + ts;
+        overlay.style.display = 'flex';
+        input.focus(); input.select();
+        overlay._pendingBlob = blob;
+    };
+
+    rec._hideDownloadDialog = function() {
+        document.getElementById('rec-download-overlay').style.display = 'none';
+    };
+
+    // ── Sync frame from DOM ──
+    rec.syncFrameFromDOM = function() {
+        var border = document.getElementById('rec-frame-border');
+        this.frame.x = parseInt(border.style.left) || 0;
+        this.frame.y = parseInt(border.style.top) || 0;
+        this.frame.w = parseInt(border.style.width) || window.innerWidth;
+        this.frame.h = parseInt(border.style.height) || window.innerHeight;
+        document.getElementById('rec-frame-dims').textContent = this.frame.w + ' \u00d7 ' + this.frame.h;
+    };
+
+    // ── Position controls below frame ──
+    rec.positionControls = function() {
+        var border = document.getElementById('rec-frame-border');
+        var controls = document.getElementById('rec-controls');
+        var bLeft = parseInt(border.style.left) || 0;
+        var bWidth = parseInt(border.style.width) || 0;
+        var bTop = parseInt(border.style.top) || 0;
+        var bHeight = parseInt(border.style.height) || 0;
+        controls.style.left = (bLeft + bWidth / 2) + 'px';
+        controls.style.transform = 'translateX(-50%)';
+        controls.style.top = (bTop + bHeight + 12) + 'px';
+        controls.style.bottom = 'auto';
+    };
+
+    // ── Toggle Recording Frame ──
+    function toggleRecFrame() {
+        var frame = document.getElementById('rec-frame');
+        var isVisible = frame.classList.contains('active');
+
+        // Close context menu if present
+        var ctxMenu = document.getElementById('ctx-menu') || document.getElementById('context-menu');
+        if (ctxMenu) ctxMenu.style.display = 'none';
+
+        if (isVisible) {
+            if (rec.isActive) return; // don't close while recording
+            frame.classList.remove('active');
+        } else {
+            frame.classList.add('active');
+            var border = document.getElementById('rec-frame-border');
+            var pad = 60;
+            var maxW = window.innerWidth - pad * 2;
+            var maxH = window.innerHeight - pad * 2 - 60;
+            var ar = rec.aspectRatio;
+            var fw, fh;
+            if (ar) {
+                if (maxW / maxH > ar) { fh = maxH; fw = Math.round(fh * ar); }
+                else { fw = maxW; fh = Math.round(fw / ar); }
+            } else { fw = maxW; fh = maxH; }
+            var offsetX = pad + Math.round((maxW - fw) / 2);
+            var offsetY = pad + Math.round((maxH - fh) / 2);
+            border.style.left = offsetX + 'px';
+            border.style.top = offsetY + 'px';
+            border.style.width = fw + 'px';
+            border.style.height = fh + 'px';
+            rec.syncFrameFromDOM();
+            rec.positionControls();
+        }
+    }
+
+    // Expose for context menu integration
+    window._recToggle = toggleRecFrame;
+
+    // ── Bind events after DOM ready ──
+    function bindRecEvents() {
+        // Record / Stop
+        document.getElementById('rc-rec').addEventListener('click', function() {
+            if (rec.isActive) { rec.stop(); } else { rec.start(); }
+        });
+
+        // Pause / Resume
+        document.getElementById('rc-pause').addEventListener('click', function() {
+            if (rec.isPaused) { rec.resume(); } else { rec.pause(); }
+        });
+
+        // Screenshot
+        document.getElementById('rc-screenshot').addEventListener('click', async function() {
+            var dataURL = await rec.screenshot();
+            var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            rec.downloadDataURL(dataURL, 'physital-' + REC_SIM_NAME + '-' + ts + '.png');
+        });
+
+        // Aspect ratio
+        document.getElementById('rc-aspect').addEventListener('change', function(e) {
+            rec.aspectRatio = rec.parseAspect(e.target.value);
+            rec.enforceAspect();
+        });
+
+        // Resolution
+        document.getElementById('rc-resolution').addEventListener('change', function(e) {
+            var parts = e.target.value.split('x').map(Number);
+            rec.resolution = { w: parts[0], h: parts[1] };
+        });
+
+        // FPS
+        document.getElementById('rc-fps').addEventListener('change', function(e) {
+            rec.fps = parseInt(e.target.value);
+        });
+
+        // Close
+        document.getElementById('rc-close').addEventListener('click', function() {
+            if (rec.isActive) return;
+            toggleRecFrame();
+        });
+
+        // Download confirm
+        document.getElementById('dl-confirm').addEventListener('click', function() {
+            var overlay = document.getElementById('rec-download-overlay');
+            var filename = document.getElementById('rec-filename').value.trim() || 'recording';
+            var blob = overlay._pendingBlob;
+            if (blob) rec.downloadBlob(blob, filename + '.webm');
+            rec._hideDownloadDialog();
+        });
+
+        // Download cancel
+        document.getElementById('dl-cancel').addEventListener('click', function() {
+            rec._hideDownloadDialog();
+        });
+
+        // Download Enter/Escape
+        document.getElementById('rec-filename').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('dl-confirm').click();
+            if (e.key === 'Escape') rec._hideDownloadDialog();
+        });
+
+        // Frame drag
+        document.getElementById('rec-frame-border').addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('rec-handle')) return;
+            e.preventDefault();
+            var border = document.getElementById('rec-frame-border');
+            var startX = e.clientX - (parseInt(border.style.left) || 0);
+            var startY = e.clientY - (parseInt(border.style.top) || 0);
+            function onMove(ev) {
+                border.style.left = (ev.clientX - startX) + 'px';
+                border.style.top = (ev.clientY - startY) + 'px';
+                rec.syncFrameFromDOM();
+                rec.positionControls();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        // Frame resize handles
+        document.querySelectorAll('.rec-handle').forEach(function(handle) {
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var dir = handle.dataset.dir;
+                var border = document.getElementById('rec-frame-border');
+                var startMouseX = e.clientX;
+                var startMouseY = e.clientY;
+                var startLeft = parseInt(border.style.left) || 0;
+                var startTop = parseInt(border.style.top) || 0;
+                var startW = parseInt(border.style.width) || 0;
+                var startH = parseInt(border.style.height) || 0;
+                var MIN = 100;
+                function onMove(ev) {
+                    var dx = ev.clientX - startMouseX;
+                    var dy = ev.clientY - startMouseY;
+                    var l = startLeft, t = startTop, w = startW, h = startH;
+                    var ar = rec.aspectRatio;
+                    if (dir.includes('e')) { w = Math.max(MIN, startW + dx); }
+                    if (dir.includes('w')) { w = Math.max(MIN, startW - dx); l = startLeft + (startW - w); }
+                    if (dir.includes('s')) { h = Math.max(MIN, startH + dy); }
+                    if (dir.includes('n')) { h = Math.max(MIN, startH - dy); t = startTop + (startH - h); }
+                    if (ar) {
+                        if (dir === 'e' || dir === 'w') { h = Math.round(w / ar); }
+                        else if (dir === 'n' || dir === 's') { w = Math.round(h * ar); }
+                        else {
+                            if (Math.abs(w - startW) >= Math.abs(h - startH)) { h = Math.round(w / ar); }
+                            else { w = Math.round(h * ar); }
+                        }
+                        if (w < MIN) { w = MIN; h = Math.round(w / ar); }
+                        if (h < MIN) { h = MIN; w = Math.round(h * ar); }
+                        if (dir.includes('n')) { t = startTop + startH - h; }
+                        if (dir.includes('w')) { l = startLeft + startW - w; }
+                    }
+                    border.style.left = l + 'px';
+                    border.style.top = t + 'px';
+                    border.style.width = w + 'px';
+                    border.style.height = h + 'px';
+                    rec.syncFrameFromDOM();
+                    rec.positionControls();
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+
+        // Keyboard shortcut: R to toggle recording frame
+        document.addEventListener('keydown', function(e) {
+            // Skip if typing in an input/textarea/select
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.key === 'r' || e.key === 'R') {
+                if (e.ctrlKey || e.altKey || e.metaKey) return;
+                toggleRecFrame();
+            }
+        });
+
+        // Show hint briefly on load
+        var hint = document.getElementById('rec-hint');
+        if (hint) {
+            setTimeout(function() { hint.classList.add('show'); }, 1500);
+            setTimeout(function() { hint.classList.remove('show'); }, 5000);
+        }
+    }
+
+    // ── Self-sustaining recording render loop ──
+    function recLoop() {
+        if (rec.isActive) { rec.updateFrame(); }
+        requestAnimationFrame(recLoop);
+    }
+
+    // ── Init ──
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { bindRecEvents(); requestAnimationFrame(recLoop); });
+    } else {
+        bindRecEvents();
+        requestAnimationFrame(recLoop);
+    }
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,3483 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhysiTal Solar Vis - Equinox Fixed</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600&family=Rubik:wght@300;400;500&display=swap" rel="stylesheet">
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <style>
+        /* PhysiTal 2.0 Base Styling */
+        :root {
+            --glass-bg: rgba(18, 18, 24, 0.90);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent: #60a5fa;
+            --text-main: #e2e8f0;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Rubik', sans-serif;
+            color: var(--text-main);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Split Screen Layout */
+        #container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            transition: all 0.3s ease;
+        }
+
+        #sky-view-container, #orbit-view-container {
+            position: relative;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+            transition: width 0.3s ease;
+        }
+
+        #sky-view-container {
+            border-left: 1px solid #333;
+            background: #080810;
+            cursor: grab;
+        }
+        
+        #sky-view-container:active {
+            cursor: grabbing;
+        }
+
+        canvas {
+            display: block;
+            outline: none;
+        }
+
+        /* View Mode Toggles */
+        #view-controls {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 99px;
+            padding: 4px;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        .view-btn {
+            padding: 6px 16px;
+            border-radius: 99px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: #888;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .view-btn.active {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .view-btn:hover:not(.active) {
+            color: #ccc;
+            background: rgba(255,255,255,0.05);
+        }
+
+        /* Labels overlay */
+        .view-label {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            z-index: 10;
+            border: 1px solid rgba(255,255,255,0.1);
+            opacity: 0.8;
+        }
+
+        /* Context Menu */
+        #context-menu {
+            position: absolute;
+            display: none;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 8px 0;
+            min-width: 200px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            z-index: 1000;
+            flex-direction: column;
+        }
+
+        .menu-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            font-size: 0.95rem;
+        }
+
+        .menu-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .menu-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 4px 0;
+        }
+
+        /* Dialogues */
+        .dialogue {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 360px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            display: none;
+            flex-direction: column;
+            z-index: 500;
+            overflow: hidden;
+            transition: opacity 0.2s;
+        }
+
+        .dialogue.wide {
+            width: 480px;
+        }
+
+        .dialogue-header {
+            padding: 16px;
+            background: rgba(255,255,255,0.05);
+            cursor: grab;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 500;
+        }
+
+        .dialogue-header:active {
+            cursor: grabbing;
+        }
+
+        .close-btn {
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        .close-btn:hover { opacity: 1; }
+
+        .dialogue-content {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            padding: 4px;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border-radius: 6px;
+            color: #888;
+            transition: 0.2s;
+        }
+        .tab.active {
+            background: var(--accent);
+            color: #000;
+            font-weight: 600;
+        }
+
+        /* Controls */
+        .control-group {
+            margin-bottom: 16px;
+        }
+        
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+
+        .control-value {
+            color: var(--accent);
+            font-family: monospace;
+        }
+
+        input[type=text], input[type=number] {
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+            font-family: inherit;
+        }
+
+        input[type=color] {
+            width: 100%;
+            height: 40px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        
+        input[type=range]:disabled::-webkit-slider-thumb {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background: var(--accent);
+            color: #000;
+            font-weight: 600;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 20px;
+        }
+        .btn-primary:hover {
+            filter: brightness(1.1);
+        }
+
+        .btn-small {
+            background: rgba(255,255,255,0.1);
+            color: #ccc;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 4px;
+        }
+        .btn-small:hover { background: rgba(255,255,255,0.2); }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        select {
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .file-upload {
+            border: 1px dashed rgba(255,255,255,0.3);
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .file-upload:hover {
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .editor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .span-2 {
+            grid-column: span 2;
+        }
+        .hidden-section { display: none; }
+        
+        .sub-settings {
+            margin-right: 12px;
+            padding-right: 12px;
+            border-right: 2px solid rgba(255,255,255,0.1);
+            margin-bottom: 10px;
+        }
+    
+
+/* ═══ PhysiTal Recording Module ═══ */
+#rec-frame { position:fixed; inset:0; z-index:400; display:none; pointer-events:none; }
+#rec-frame.active { display:block; }
+#rec-frame-border { position:absolute; border:2px solid #60a5fa; box-shadow:0 0 0 9999px rgba(0,0,0,0.35); pointer-events:auto; cursor:move; transition:border-color 0.3s; }
+#rec-frame-border.recording { border-color:#dc2626; box-shadow:0 0 0 9999px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(220,38,38,0.3); }
+#rec-frame-border.paused { border-color:#f59e0b; animation:pulse-border-rec 1.2s ease-in-out infinite; }
+.rec-handle { position:absolute; width:12px; height:12px; background:#60a5fa; border-radius:2px; pointer-events:auto; z-index:2; }
+.rec-handle-nw { top:-6px; left:-6px; cursor:nw-resize; }
+.rec-handle-ne { top:-6px; right:-6px; cursor:ne-resize; }
+.rec-handle-sw { bottom:-6px; left:-6px; cursor:sw-resize; }
+.rec-handle-se { bottom:-6px; right:-6px; cursor:se-resize; }
+.rec-handle-n  { top:-6px; left:50%; transform:translateX(-50%); cursor:n-resize; }
+.rec-handle-s  { bottom:-6px; left:50%; transform:translateX(-50%); cursor:s-resize; }
+.rec-handle-e  { right:-6px; top:50%; transform:translateY(-50%); cursor:e-resize; }
+.rec-handle-w  { left:-6px; top:50%; transform:translateY(-50%); cursor:w-resize; }
+#rec-frame-dims { position:absolute; top:-28px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); padding:2px 10px; border-radius:4px; font-size:0.75rem; color:#8b949e; white-space:nowrap; font-variant-numeric:tabular-nums; pointer-events:none; }
+#rec-controls { position:fixed; display:flex; align-items:center; gap:8px; background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 14px; pointer-events:auto; white-space:nowrap; z-index:401; }
+#rec-controls select { padding:4px 6px; font-size:0.78rem; border-radius:6px; background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.1); }
+.rc-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; border:none; cursor:pointer; font-size:1rem; transition:all 0.2s; color:white; background:rgba(255,255,255,0.1); }
+.rc-btn:hover { background:rgba(255,255,255,0.2); }
+.rc-btn.rec-active { background:#dc2626; animation:pulse-rec-btn 1.5s ease-in-out infinite; }
+.rc-btn.paused-active { background:#f59e0b; }
+#rc-timer { font-size:0.82rem; font-variant-numeric:tabular-nums; color:#8b949e; min-width:42px; text-align:center; }
+.rc-sep { width:1px; height:20px; background:rgba(255,255,255,0.1); }
+#rc-close { opacity:0.5; transition:opacity 0.2s; background:none; border:none; color:#8b949e; cursor:pointer; font-size:1rem; }
+#rc-close:hover { opacity:1; }
+@keyframes pulse-rec-btn { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+@keyframes pulse-border-rec { 0%,100%{border-color:#f59e0b;} 50%{border-color:rgba(245,158,11,0.4);} }
+#rec-download-overlay { position:fixed; inset:0; z-index:800; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); }
+#rec-download-dialog { background:rgba(18,18,24,0.90); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:24px; min-width:340px; box-shadow:0 20px 50px rgba(0,0,0,0.6); }
+#rec-download-dialog h3 { font-size:1rem; font-weight:500; margin-bottom:14px; color:#e2e8f0; }
+#rec-filename { width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-family:inherit; font-size:0.9rem; direction:ltr; margin-bottom:14px; }
+#rec-filename:focus { outline:none; border-color:#60a5fa; }
+#rec-download-dialog .dl-btns { display:flex; gap:10px; justify-content:flex-end; }
+.dl-btn { padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:white; transition:background 0.2s; }
+.dl-btn-primary { background:#60a5fa; }
+.dl-btn-primary:hover { background:#3b82f6; }
+.dl-btn-secondary { background:rgba(255,255,255,0.1); }
+.dl-btn-secondary:hover { background:rgba(255,255,255,0.2); }
+#rec-hint { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 16px; font-size:0.75rem; color:#8b949e; z-index:50; pointer-events:none; opacity:0; transition:opacity 1s; }
+#rec-hint.show { opacity:1; }
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+    <!-- View Mode Toggles -->
+    <div id="view-controls">
+        <div class="view-btn" onclick="app.ui.setViewMode('sky')">מפה בלבד</div>
+        <div class="view-btn active" onclick="app.ui.setViewMode('split')">משולב</div>
+        <div class="view-btn" onclick="app.ui.setViewMode('orbit')">תלת מימד</div>
+    </div>
+
+    <div id="container">
+        <!-- Left: RA/DEC View -->
+        <div id="sky-view-container">
+            <div class="view-label">מפת שמיים (RA/DEC)</div>
+            <canvas id="skyCanvas"></canvas>
+        </div>
+
+        <!-- Right: 3D Orbit View -->
+        <div id="orbit-view-container">
+            <div class="view-label">מבט על (3D)</div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="context-menu">
+        <div class="menu-item" onclick="app.ui.toggleDialogue('instructions')">הוראות</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('simulation')">⚙️ זמן וסימולציה</div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('lighting')">☀️ תאורה וצללים</div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('view-general')">👁️ תצוגה ורשתות</div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('visibility')">🔦 נראות גופים</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('lines')">📏 קווי ראייה</div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('camera')">🎥 מצלמה וצופה</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('moon-settings')">🌙 הגדרות ירח</div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('add-body')">➕ הוספת גוף</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="app.ui.toggleDialogue('docs')">תיעוד</div>
+    </div>
+
+    <!-- Dialogues -->
+
+    <!-- Instructions -->
+    <div id="dialogue-instructions" class="dialogue">
+        <div class="dialogue-header">
+            <span>הוראות שימוש</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('instructions')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <p class="mb-4 text-sm leading-relaxed">
+                ברוכים הבאים לסימולטור מערכת השמש המשודרג.
+            </p>
+            <ul class="list-disc list-inside text-sm space-y-2 text-gray-300">
+                <li><strong class="text-white">תיקון שוויון:</strong> השמש עולה כעת לצפון (מעל קו המשווה) לאחר נקודת השוויון האביבית (RA 0).</li>
+                <li><strong class="text-white">תאורה:</strong> סימולציית מופעים בתפריט תאורה.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Lighting & Shadows -->
+    <div id="dialogue-lighting" class="dialogue">
+        <div class="dialogue-header">
+            <span>תאורה וצללים</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('lighting')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <div class="toggle-row">
+                <span class="text-sm font-bold text-yellow-300">הצג מופעים במפה (2D)</span>
+                <input type="checkbox" onchange="app.params.showPhases = this.checked">
+            </div>
+            <p class="text-xs text-gray-400 mb-4">
+                מציג את מופעי הפלנטות והירח (סהר, מלא וכו') כפי שהם נראים מהצופה ביחס לשמש.
+            </p>
+            
+            <div class="menu-divider my-4"></div>
+            
+            <div class="control-group">
+                <span class="control-label">עוצמת אור סביבתי (3D) <span id="ambientVal" class="control-value">20%</span></span>
+                <input type="range" id="ambientSlider" min="0" max="1" step="0.05" value="0.2" oninput="app.ui.updateAmbient(this.value)">
+                <div class="text-xs text-gray-500 mt-1">0% = צל מוחלט בחלל, 100% = הכל מואר.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulation Controls -->
+    <div id="dialogue-simulation" class="dialogue">
+        <div class="dialogue-header">
+            <span>זמן וסימולציה</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('simulation')">✕</span>
+        </div>
+        <div class="dialogue-content">
+             <div class="control-group">
+                <span class="control-label font-bold text-accent">מודל סימולציה</span>
+                <select id="modelModeSelect" onchange="app.params.modelMode = this.value">
+                    <option value="toy" selected>מודל צעצוע (ירח מורחק)</option>
+                    <option value="realistic">מציאותי (קנה מידה 1:1)</option>
+                </select>
+                <div class="text-xs text-gray-500 mt-1">במודל מציאותי הפלנטות קטנות מאוד ביחס למרחקים.</div>
+            </div>
+            
+            <div class="menu-divider my-4"></div>
+
+            <div class="control-group">
+                <span class="control-label">מהירות זמן</span>
+                <input type="range" id="timeSpeed" min="0" max="50" step="0.1" value="5">
+            </div>
+            <div class="control-group">
+                <span class="control-label">קנה מידה (גודל פלנטות)</span>
+                <input type="range" id="planetScale" min="1" max="50" step="1" value="10">
+                <div class="text-xs text-gray-500 mt-1">משפיע בעיקר במודל צעצוע.</div>
+            </div>
+            
+            <div class="control-group">
+                <span class="control-label">טעינת מסלול (CSV)</span>
+                <div class="file-upload" onclick="document.getElementById('csvInput').click()">
+                    לחץ לבחירת קובץ
+                    <div class="text-xs text-gray-400 mt-1">פורמט: t, x, y, z</div>
+                </div>
+                <input type="file" id="csvInput" accept=".csv" style="display: none">
+            </div>
+            <div id="upload-status" class="text-xs text-green-400 mt-2 hidden">קובץ נטען בהצלחה!</div>
+        </div>
+    </div>
+
+    <!-- View General -->
+    <div id="dialogue-view-general" class="dialogue">
+        <div class="dialogue-header">
+            <span>תצוגה ורשתות</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('view-general')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <!-- 2D Settings -->
+            <div class="toggle-row">
+                <span class="text-sm">הצג רשת שמיים (RA/DEC)</span>
+                <input type="checkbox" checked onchange="app.params.showGrid = this.checked">
+            </div>
+            <div class="toggle-row">
+                <span class="text-sm">הצג מישור משווה שמיימי (2D)</span>
+                <input type="checkbox" checked onchange="app.params.showEquator = this.checked">
+            </div>
+            <div class="toggle-row">
+                <span class="text-sm">הצג מישור המילקה (2D)</span>
+                <input type="checkbox" onchange="app.params.showSkyEcliptic = this.checked">
+            </div>
+            
+            <div class="menu-divider my-2"></div>
+            
+            <!-- 3D Settings -->
+            <div class="toggle-row">
+                <span class="text-sm">הצג ספירת שמיים (3D)</span>
+                <input type="checkbox" onchange="app.ui.toggleCelestialSphere(this.checked)">
+            </div>
+            
+            <!-- NEW Sphere Size Control -->
+            <div class="control-group mt-2 border-t border-gray-700 pt-2">
+                <div class="toggle-row">
+                    <span class="text-sm">גודל ספירת שמיים</span>
+                    <span id="csSizeVal" class="text-xs text-blue-400">50</span>
+                </div>
+                <input type="range" id="csSize" min="10" max="500" step="5" value="50" oninput="app.params.celestialSphereSize = parseFloat(this.value); document.getElementById('csSizeVal').innerText = this.value;">
+            </div>
+
+            <div class="toggle-row">
+                <span class="text-sm">הצג מסלולים על הספירה (3D)</span>
+                <input type="checkbox" onchange="app.params.showSphereTrails = this.checked">
+            </div>
+
+             <div class="toggle-row">
+                <span class="text-sm">הצג הטלות על הספירה (3D)</span>
+                <input type="checkbox" onchange="app.params.showProjections = this.checked">
+            </div>
+            
+            <div class="control-group">
+                <span class="control-label text-xs">גודל הטלה (נקודות)</span>
+                <input type="range" min="0.1" max="2" step="0.1" value="0.5" oninput="app.params.projectionScale = parseFloat(this.value)">
+            </div>
+
+            <div class="toggle-row border-t border-gray-700 pt-2">
+                <span class="text-sm">הצג מישור המילקה (3D)</span>
+                <input type="checkbox" id="eclipticToggle" onchange="if(app.three.eclipticGrid) app.three.eclipticGrid.visible = this.checked">
+            </div>
+            <div class="toggle-row">
+                <span class="text-sm">הצג מישור המשווה (3D)</span>
+                <input type="checkbox" id="eqPlaneToggle" checked>
+            </div>
+            
+            <!-- New Axis Toggles -->
+            <div class="toggle-row">
+                <span class="text-sm text-cyan-300">ציר סיבוב כדור הארץ (3D)</span>
+                <input type="checkbox" onchange="app.params.showEarthAxis = this.checked">
+            </div>
+            <div class="toggle-row">
+                <span class="text-sm text-red-300">ציר נקודות השוויון (3D)</span>
+                <input type="checkbox" onchange="app.params.showEquinoxAxis = this.checked">
+            </div>
+
+            <!-- Equatorial Sliders -->
+            <div id="equatorial-controls" class="sub-settings">
+                <div class="control-group">
+                    <span class="control-label text-xs">נטייה (Tilt) <span id="eqTiltVal" class="control-value">23.4°</span></span>
+                    <input type="range" id="eqTilt" min="0" max="90" step="0.1" value="23.4">
+                </div>
+                <div class="control-group">
+                    <span class="control-label text-xs">סיבוב (Rotation) <span id="eqRotVal" class="control-value">0°</span></span>
+                    <input type="range" id="eqRot" min="0" max="360" step="1" value="0">
+                </div>
+            </div>
+            
+            <div class="control-group mt-1">
+                <span class="control-label text-xs">זום מפת שמיים</span>
+                <input type="range" id="skyZoomSlider" min="1" max="20" step="0.1" value="1">
+            </div>
+        </div>
+    </div>
+
+    <!-- Visibility (Trails) -->
+    <div id="dialogue-visibility" class="dialogue">
+        <div class="dialogue-header">
+            <span>נראות ומסלולים</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('visibility')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <div class="toggle-row">
+                <span class="text-sm font-bold text-accent">הצג גופים (3D)</span>
+                <input type="checkbox" checked onchange="app.params.showBodies = this.checked">
+            </div>
+            <div class="menu-divider my-2"></div>
+            <div class="toggle-row">
+                <span class="text-sm">הצג מסלולים (3D)</span>
+                <input type="checkbox" checked onchange="app.params.showTrails = this.checked">
+            </div>
+            <div class="toggle-row">
+                <span class="text-sm text-accent font-bold">מסלולים יחסיים לצופה (3D)</span>
+                <input type="checkbox" checked onchange="app.ui.toggleRelativeTrails(this.checked)">
+            </div>
+             <div class="toggle-row">
+                <span class="text-sm">הצג מסלולים בשמיים (2D)</span>
+                <input type="checkbox" checked onchange="app.params.showSkyTrails = this.checked">
+            </div>
+            
+            <div class="control-group mt-4 border-t border-gray-700 pt-2">
+                <div class="toggle-row">
+                    <span class="text-sm">אורך מסלול</span>
+                    <span id="trailLengthVal" class="text-xs text-blue-400">500</span>
+                </div>
+                <input type="range" id="trailLengthInput" min="100" max="5000" step="100" value="500">
+                
+                <div class="toggle-row mt-2">
+                    <span class="text-sm">מסלול אינסופי</span>
+                    <input type="checkbox" id="infiniteTrailInput">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lines of Sight -->
+    <div id="dialogue-lines" class="dialogue">
+        <div class="dialogue-header">
+            <span>קווי ראייה (מהצופה)</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('lines')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <div id="planet-toggles-container" class="space-y-2 max-h-60 overflow-y-auto">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Moon Settings -->
+    <div id="dialogue-moon-settings" class="dialogue">
+        <div class="dialogue-header">
+            <span>הגדרות ירח</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('moon-settings')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <div class="toggle-row mb-4">
+                <span class="text-sm font-bold text-accent">הצג ירח</span>
+                <input type="checkbox" id="moonToggleCheckbox" onchange="app.ui.toggleMoon(this.checked)">
+            </div>
+            <div class="border-t border-gray-700 mb-4"></div>
+            
+            <div class="control-group">
+                <span class="control-label">מרחק (a) <span id="moon_a_val" class="control-value"></span></span>
+                <input type="range" id="moon_a" min="0.001" max="0.01" step="0.0001" oninput="app.logic.updateMoonParams()">
+            </div>
+            <div class="control-group">
+                <span class="control-label">אקסנטריות (e) <span id="moon_e_val" class="control-value"></span></span>
+                <input type="range" id="moon_e" min="0" max="0.5" step="0.001" oninput="app.logic.updateMoonParams()">
+            </div>
+            <div class="control-group">
+                <span class="control-label">נטייה (i) <span id="moon_i_val" class="control-value"></span></span>
+                <input type="range" id="moon_i" min="0" max="90" step="0.1" oninput="app.logic.updateMoonParams()">
+            </div>
+            
+            <div class="btn-primary" onclick="app.logic.resetMoon()">
+                איפוס לערכים אמיתיים
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera / Observer -->
+    <div id="dialogue-camera" class="dialogue">
+        <div class="dialogue-header">
+            <span>מצלמה וצופה</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('camera')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <div class="control-group">
+                <span class="control-label">נקודת מבט (הצופה)</span>
+                <select id="observerSelect">
+                    <option value="earth">כדור הארץ (Earth)</option>
+                    <option value="sun">השמש (Sun)</option>
+                    <option value="moon">הירח (Moon)</option>
+                    <option value="mercury">כוכב חמה (Mercury)</option>
+                    <option value="venus">נוגה (Venus)</option>
+                    <option value="mars">מאדים (Mars)</option>
+                    <option value="jupiter">צדק (Jupiter)</option>
+                    <option value="custom">גוף מותאם (CSV)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <span class="control-label">מערכת קואורדינטות</span>
+                <select id="coordSysSelect">
+                    <option value="equatorial">משוונית (נטיית ציר כדור הארץ)</option>
+                    <option value="ecliptic">מישור המילקה (Ecliptic)</option>
+                </select>
+            </div>
+
+            <!-- New Camera Controls -->
+            <div class="control-group border-t border-gray-700 pt-4 mt-4">
+                <span class="control-label font-bold text-accent">בקרת מצלמה (3D)</span>
+                
+                <span class="control-label mt-2">מצב מצלמה</span>
+                <select id="camModeSelect">
+                    <option value="free">חופשי (Free Look)</option>
+                    <option value="follow" selected>עקוב (Follow)</option>
+                    <option value="track">התמקד (Track)</option>
+                </select>
+
+                <span class="control-label mt-2">אובייקט מטרה</span>
+                <select id="camTargetSelect">
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+
+            <!-- Sky Map Controls -->
+            <div class="control-group border-t border-gray-700 pt-4 mt-4">
+                <span class="control-label font-bold text-accent">בקרת מפת שמיים (2D)</span>
+                <span class="control-label mt-2">מוקד מפת שמיים</span>
+                <select id="skyTargetSelect">
+                    <option value="free">חופשי (גרירה/זום)</option>
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Body (Editor) -->
+    <div id="dialogue-add-body" class="dialogue wide">
+        <div class="dialogue-header">
+            <span>עורך גוף חדש</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('add-body')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="app.ui.setAddMode('orbit')" id="tab-orbit">מסלול</div>
+                <div class="tab" onclick="app.ui.setAddMode('fixed')" id="tab-fixed">נקודה</div>
+                <div class="tab" onclick="app.ui.setAddMode('shape')" id="tab-shape">צורת נקודות</div>
+            </div>
+
+            <div class="editor-grid">
+                <!-- Basic Info (Common) -->
+                <div class="control-group">
+                    <span class="control-label">שם/קבוצה</span>
+                    <input type="text" id="nb_name" value="אובייקט חדש">
+                </div>
+                <div class="control-group">
+                    <span class="control-label">צבע</span>
+                    <input type="color" id="nb_color" value="#00ff88" oninput="app.logic.updatePreview()">
+                </div>
+
+                <!-- ORBIT FIELDS -->
+                <div id="section-orbit" class="span-2 editor-grid" style="margin:0; padding:0; gap:20px;">
+                    <div class="control-group span-2">
+                        <span class="control-label">צורה גיאומטרית לגוף</span>
+                        <select id="nb_orb_shape" onchange="app.logic.updatePreview()">
+                            <option value="sphere">כדור</option>
+                            <option value="cube">קובייה</option>
+                            <option value="cone">חרוט</option>
+                        </select>
+                    </div>
+                    <div class="control-group span-2">
+                        <span class="control-label">מרחק (a) <span id="val_a" class="control-value">2.5 AU</span></span>
+                        <input type="range" id="nb_a" min="0.3" max="40" step="0.1" value="2.5" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group span-2">
+                        <span class="control-label">אקסנטריות (e) <span id="val_e" class="control-value">0.20</span></span>
+                        <input type="range" id="nb_e" min="0" max="0.95" step="0.01" value="0.2" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">נטייה (i) <span id="val_i" class="control-value">15°</span></span>
+                        <input type="range" id="nb_i" min="0" max="180" step="1" value="15" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">קו הקשרים (Ω)</span>
+                        <input type="range" id="nb_N" min="0" max="360" step="1" value="0" oninput="app.logic.updatePreview()">
+                    </div>
+                </div>
+
+                <!-- FIXED FIELDS -->
+                <div id="section-fixed" class="span-2 editor-grid hidden-section" style="margin:0; padding:0; gap:20px;">
+                    <div class="control-group span-2">
+                        <div class="btn-small w-full text-center mb-2" onclick="app.logic.captureCameraPos('nb_x', 'nb_y', 'nb_z')">
+                            📍 השתמש במיקום המצלמה
+                        </div>
+                    </div>
+                    <div class="control-group span-2">
+                        <span class="control-label">מיקום X</span>
+                        <input type="number" id="nb_x" value="10" step="0.1" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">מיקום Y</span>
+                        <input type="number" id="nb_y" value="0" step="0.1" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">מיקום Z</span>
+                        <input type="number" id="nb_z" value="0" step="0.1" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group span-2">
+                        <span class="control-label">גודל</span>
+                        <input type="range" id="nb_size" min="0.1" max="5" step="0.1" value="1" oninput="app.logic.updatePreview()">
+                    </div>
+                </div>
+
+                <!-- SHAPE GEN FIELDS -->
+                <div id="section-shape" class="span-2 editor-grid hidden-section" style="margin:0; padding:0; gap:20px;">
+                    <div class="control-group span-2">
+                        <span class="control-label">סוג צורה</span>
+                        <select id="gen_type" onchange="app.logic.updatePreview()">
+                            <option value="ring">טבעת (Ring)</option>
+                            <option value="grid">רשת (Grid)</option>
+                            <option value="line">קו (Line)</option>
+                            <option value="cube">קובייה (Cube Cloud)</option>
+                            <option value="sphere">כדור (Sphere Cloud)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group span-2">
+                        <div class="btn-small w-full text-center mb-2" onclick="app.logic.captureCameraPos('gen_x', 'gen_y', 'gen_z')">
+                            📍 מרכז הצורה (מצלמה)
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <span class="control-label">מרכז X</span><input type="number" id="gen_x" value="15" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">מרכז Y</span><input type="number" id="gen_y" value="0" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group span-2">
+                        <span class="control-label">מרכז Z</span><input type="number" id="gen_z" value="0" oninput="app.logic.updatePreview()">
+                    </div>
+
+                    <div class="control-group">
+                        <span class="control-label">רדיוס/גודל</span>
+                        <input type="number" id="gen_size" value="5" step="0.5" oninput="app.logic.updatePreview()">
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">כמות נקודות</span>
+                        <input type="number" id="gen_count" value="50" step="1" oninput="app.logic.updatePreview()">
+                    </div>
+                    
+                    <div class="control-group span-2">
+                        <span class="control-label">סיבוב (X, Y, Z מעלות)</span>
+                        <div class="flex gap-2">
+                            <input type="number" id="gen_rot_x" value="0" placeholder="X" oninput="app.logic.updatePreview()">
+                            <input type="number" id="gen_rot_y" value="0" placeholder="Y" oninput="app.logic.updatePreview()">
+                            <input type="number" id="gen_rot_z" value="0" placeholder="Z" oninput="app.logic.updatePreview()">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <div class="text-xs text-center text-gray-400 mt-2 italic">
+                תצוגה מקדימה פעילה
+            </div>
+            
+            <div class="btn-primary" onclick="app.logic.confirmAddBody()">הוסף למערכת</div>
+        </div>
+    </div>
+
+    <!-- Documentation -->
+    <div id="dialogue-docs" class="dialogue">
+        <div class="dialogue-header">
+            <span>תיעוד</span>
+            <span class="close-btn" onclick="app.ui.closeDialogue('docs')">✕</span>
+        </div>
+        <div class="dialogue-content">
+            <p class="text-xs text-gray-400 mb-2">
+                נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי.
+            </p>
+            <div class="border-t border-gray-700 my-2"></div>
+            <h4 class="text-sm font-bold mb-1">טכנולוגיות:</h4>
+            <p class="text-xs text-gray-400">
+                Vanilla JS, Three.js (WebGL), Canvas API, TailwindCSS.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * PhysiTal Solar System Visualization
+         * Core Logic
+         */
+
+        const AU = 50; // Simulation scale unit
+        
+        // --- DATA ---
+        // Hidden flag used to exclude shape points from dropdowns
+        const PLANETS = {
+            mercury: { type: 'orbit', shape: 'sphere', a: 0.39 * AU, e: 0.205, i: 7.0, N: 48.33, w: 29.12, M: 174.79, period: 0.24, color: 0xaaaaaa, name: "חמה", radius: 0.38 },
+            venus:   { type: 'orbit', shape: 'sphere', a: 0.72 * AU, e: 0.007, i: 3.4, N: 76.68, w: 54.88, M: 50.11,  period: 0.615, color: 0xffcc00, name: "נוגה", radius: 0.95 },
+            earth:   { type: 'orbit', shape: 'sphere', a: 1.00 * AU, e: 0.017, i: 0.0, N: 0.0,   w: 102.9, M: 358.6,  period: 1.0,   color: 0x2233ff, name: "כדור הארץ", radius: 1.0 },
+            mars:    { type: 'orbit', shape: 'sphere', a: 1.52 * AU, e: 0.094, i: 1.9, N: 49.57, w: 286.5, M: 19.41,  period: 1.88,  color: 0xff4422, name: "מאדים", radius: 0.53 },
+            jupiter: { type: 'orbit', shape: 'sphere', a: 5.20 * AU, e: 0.049, i: 1.3, N: 100.4, w: 273.8, M: 20.02,  period: 11.86, color: 0xdcae96, name: "צדק", radius: 11.2 },
+            saturn:  { type: 'orbit', shape: 'sphere', a: 9.58 * AU, e: 0.056, i: 2.5, N: 113.6, w: 339.3, M: 317.0,  period: 29.45, color: 0xeeddcc, name: "שבתאי", radius: 9.5 },
+            uranus:  { type: 'orbit', shape: 'sphere', a: 19.2 * AU, e: 0.044, i: 0.8, N: 74.0,  w: 96.99, M: 141.0,  period: 84.0,  color: 0xaaddff, name: "אורנוס", radius: 4.0 },
+            neptune: { type: 'orbit', shape: 'sphere', a: 30.05 * AU, e: 0.011, i: 1.8, N: 131.7, w: 273.2, M: 256.2, period: 164.8, color: 0x5555ff, name: "נפטון", radius: 3.9 },
+            // Moon - child of earth logically, but we calculate position specially
+            moon:    { type: 'orbit', shape: 'sphere', parent: 'earth', a: 0.00257 * AU, e: 0.055, i: 5.14, N: 125.08, w: 318.06, M: 115.37, period: 0.0748, color: 0xcccccc, name: "הירח", radius: 0.27 }
+        };
+
+        const MOON_DEFAULTS = { ...PLANETS.moon };
+
+        const app = {
+            params: {
+                time: 0,
+                speed: 0.5,
+                planetScale: 10,
+                showTrails: true,
+                showSkyTrails: true,
+                trailLength: 500,
+                infiniteTrail: false,
+                relativeTrails: true, // Default relative mode ON
+                showGrid: true,
+                showEquator: true,
+                showSkyEcliptic: false,
+                showCelestialSphere: false, // New sphere param
+                celestialSphereSize: 50, // Default sphere size
+                showProjections: false, // New proj param
+                showSphereTrails: false, // New sphere trails param
+                projectionScale: 0.5, // New projection scale param
+                showEarthAxis: false, // New
+                showEquinoxAxis: false, // New
+                observer: 'earth', 
+                coordSys: 'equatorial', 
+                customTraj: null,
+                targetedBodies: {},
+                addMode: 'orbit', // 'orbit', 'fixed', 'shape'
+                equatorialTilt: 23.4,
+                equatorialRotation: 0,
+                cameraMode: 'follow', 
+                cameraTarget: 'earth',
+                modelMode: 'toy', // 'toy' (scaled moon), 'realistic'
+                showMoon: false, // Default: moon hidden
+                showBodies: true, // Default: show 3D bodies
+                showPhases: false, // 2D Phase mode
+                ambientIntensity: 0.2 // 3D Ambient Light
+            },
+            objects: {}, 
+            trails: {},  
+            skyTrails: {}, 
+            connectorLines: {},
+            projectionMarkers: {}, 
+            projectionLines: {},   
+            customObject: null, 
+            
+            preview: {
+                active: false,
+                data: null,
+                mesh: null,
+                orbitLine: null,
+                pointsMesh: null 
+            },
+            
+            ray: {
+                active: false,
+                ra: null,
+                dec: null,
+                mesh: null,
+                isDragging: false
+            },
+            
+            sky: {
+                cvs: null,
+                ctx: null,
+                camera: { // Sky Map Camera State
+                    ra: Math.PI, // Center RA (12h)
+                    dec: 0,      // Center Dec
+                    zoom: 1,
+                    target: 'free' // 'free' or body key
+                }
+            },
+
+            three: {},
+            
+            ui: {},
+            physics: {},
+            logic: {}
+        };
+
+        // --- PHYSICS & MATH ---
+        app.physics.calculateOrbitalPosition = (data, t) => {
+            if (data.type === 'fixed') {
+                return new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z);
+            }
+
+            const M = data.M + (360 * t / data.period); 
+            const rad = Math.PI / 180;
+            let E = M * rad; 
+            for(let k=0; k<5; k++) {
+                E = M*rad + data.e * Math.sin(E);
+            }
+            const x_orb = data.a * (Math.cos(E) - data.e);
+            const y_orb = data.a * Math.sqrt(1 - data.e*data.e) * Math.sin(E);
+            const inc = data.i * rad;
+            const node = data.N * rad;
+            const peri = data.w * rad;
+            const cosN = Math.cos(node);
+            const sinN = Math.sin(node);
+            const cosI = Math.cos(inc);
+            const sinI = Math.sin(inc);
+            const cosW = Math.cos(peri);
+            const sinW = Math.sin(peri);
+            const P = x_orb * cosW - y_orb * sinW;
+            const Q = x_orb * sinW + y_orb * cosW;
+            const x = P * cosN - Q * sinN * cosI;
+            const z = P * sinN + Q * cosN * cosI; 
+            const y = Q * sinI;                   
+            // FIX: Negative Z to ensure Counter-Clockwise motion in standard view
+            return new THREE.Vector3(x, y, -z);
+        };
+
+        app.physics.getPlanetPosition = (planetKey, t) => {
+            const p = PLANETS[planetKey];
+            if (!p) return new THREE.Vector3(0,0,0);
+            
+            if (p.parent) {
+                const parentPos = app.physics.getPlanetPosition(p.parent, t);
+                const relPos = app.physics.calculateOrbitalPosition(p, t);
+                
+                // Toy Mode Scale Fix for Moon - push away in Toy mode
+                if (planetKey === 'moon' && app.params.modelMode === 'toy') {
+                    relPos.multiplyScalar(50); 
+                }
+
+                return parentPos.add(relPos);
+            }
+            
+            return app.physics.calculateOrbitalPosition(p, t);
+        };
+
+        app.physics.getCustomPosition = (t) => {
+            if (!app.params.customTraj || app.params.customTraj.length === 0) return null;
+            const data = app.params.customTraj;
+            let idx = -1;
+            for(let i=0; i<data.length-1; i++) {
+                if(t >= data[i].t && t <= data[i+1].t) {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx === -1) {
+                const duration = data[data.length-1].t - data[0].t;
+                if (duration <= 0) return new THREE.Vector3(data[0].x, data[0].y, data[0].z);
+                const loopedT = data[0].t + ((t - data[0].t) % duration);
+                 for(let i=0; i<data.length-1; i++) {
+                    if(loopedT >= data[i].t && loopedT <= data[i+1].t) {
+                        idx = i;
+                        break;
+                    }
+                }
+                if (idx === -1) return new THREE.Vector3(data[0].x, data[0].y, data[0].z).multiplyScalar(AU);
+                t = loopedT;
+            }
+            const p1 = data[idx];
+            const p2 = data[idx+1];
+            const alpha = (t - p1.t) / (p2.t - p1.t);
+            const x = THREE.MathUtils.lerp(p1.x, p2.x, alpha) * AU;
+            const y = THREE.MathUtils.lerp(p1.y, p2.y, alpha) * AU; 
+            const z = THREE.MathUtils.lerp(p1.z, p2.z, alpha) * AU;
+            // Note: Custom data structure is preserved as x,z,y but might need negation if Y was depth
+            return new THREE.Vector3(x, z, y); 
+        };
+
+        app.physics.rectToSpherical = (targetVec, observerVec) => {
+            const rel = new THREE.Vector3().subVectors(targetVec, observerVec);
+            
+            if (app.params.coordSys === 'equatorial') {
+                const tilt = app.params.equatorialTilt * (Math.PI / 180);
+                const rot = app.params.equatorialRotation * (Math.PI / 180);
+                
+                // Fix: Removed negative sign from tilt to ensure correct seasonal direction
+                rel.applyAxisAngle(new THREE.Vector3(1, 0, 0), tilt);
+                rel.applyAxisAngle(new THREE.Vector3(0, 1, 0), -rot);
+            }
+
+            const r = rel.length();
+            if (r < 0.001) return { ra: 0, dec: 0, r: 0 };
+            const dec = Math.asin(rel.y / r); 
+            // FIX: Use -z to ensure Counter-Clockwise motion increases RA (0->90 not 0->-90)
+            let ra = Math.atan2(-rel.z, rel.x); 
+            if (ra < 0) ra += 2 * Math.PI;
+            return { ra, dec, r };
+        };
+
+        app.physics.generateShapePoints = (type, center, size, count, rotation) => {
+            const points = [];
+            const rot = new THREE.Euler(
+                rotation.x * Math.PI/180, 
+                rotation.y * Math.PI/180, 
+                rotation.z * Math.PI/180
+            );
+            const matrix = new THREE.Matrix4().makeRotationFromEuler(rot);
+            const c = new THREE.Vector3(center.x, center.y, center.z);
+
+            for(let i=0; i<count; i++) {
+                let p = new THREE.Vector3();
+                
+                if (type === 'ring') {
+                    const angle = (i / count) * Math.PI * 2;
+                    p.set(Math.cos(angle) * size, 0, Math.sin(angle) * size);
+                } else if (type === 'line') {
+                    const t = count > 1 ? (i / (count-1)) - 0.5 : 0;
+                    p.set(t * size * 2, 0, 0); // width is roughly 2*size here
+                } else if (type === 'grid') {
+                    const side = Math.ceil(Math.sqrt(count));
+                    const u = side > 1 ? (i % side) / (side-1) - 0.5 : 0;
+                    const v = side > 1 ? Math.floor(i / side) / (side-1) - 0.5 : 0;
+                    p.set(u * size * 2, 0, v * size * 2);
+                } else if (type === 'cube') {
+                    // Random points inside cube
+                    p.set(
+                        (Math.random()-0.5) * size * 2,
+                        (Math.random()-0.5) * size * 2,
+                        (Math.random()-0.5) * size * 2
+                    );
+                } else if (type === 'sphere') {
+                    // Random points on sphere surface
+                    const u = Math.random();
+                    const v = Math.random();
+                    const theta = 2 * Math.PI * u;
+                    const phi = Math.acos(2 * v - 1);
+                    p.set(
+                        size * Math.sin(phi) * Math.cos(theta),
+                        size * Math.sin(phi) * Math.sin(theta),
+                        size * Math.cos(phi)
+                    );
+                }
+
+                p.applyMatrix4(matrix);
+                p.add(c);
+                points.push(p);
+            }
+            return points;
+        };
+
+        // --- THREE.JS SETUP ---
+        function initThree() {
+            const container = document.getElementById('orbit-view-container');
+            const scene = new THREE.Scene();
+            
+            // Stars
+            const starsGeo = new THREE.BufferGeometry();
+            const starsCount = 2000;
+            const posArray = new Float32Array(starsCount * 3);
+            for(let i=0; i<starsCount*3; i++) {
+                posArray[i] = (Math.random() - 0.5) * 2000; 
+            }
+            starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const starsMat = new THREE.PointsMaterial({size: 0.5, color: 0xffffff, transparent: true, opacity: 0.6});
+            const starField = new THREE.Points(starsGeo, starsMat);
+            scene.add(starField);
+
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10000);
+            camera.position.set(0, 80, 120);
+            
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true});
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Sun
+            const sunGeo = new THREE.SphereGeometry(3, 32, 32);
+            const sunMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+            const sun = new THREE.Mesh(sunGeo, sunMat);
+            scene.add(sun);
+            
+            // Register Sun Object and Trail
+            app.objects['sun'] = sun;
+            const sunTrailGeo = new THREE.BufferGeometry();
+            const sunTrailMat = new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.5 });
+            const sunTrailLine = new THREE.Line(sunTrailGeo, sunTrailMat);
+            scene.add(sunTrailLine);
+            app.trails['sun'] = { mesh: sunTrailLine, points: [] };
+            app.skyTrails['sun'] = [];
+            
+            const pointLight = new THREE.PointLight(0xffffff, 1.5, 1000);
+            scene.add(pointLight);
+            
+            const ambient = new THREE.AmbientLight(0x404040);
+            ambient.intensity = app.params.ambientIntensity;
+            scene.add(ambient);
+
+            // Ecliptic Grid (Default: Hidden)
+            const eclipticGrid = new THREE.PolarGridHelper(2000, 10, 8, 64, 0x666666, 0x222222);
+            scene.add(eclipticGrid);
+            eclipticGrid.visible = false; // Set initial visibility explicitly
+            app.three.eclipticGrid = eclipticGrid;
+
+            // Equatorial Grid (Default: Visible)
+            const equatorialGrid = new THREE.PolarGridHelper(2000, 10, 8, 64, 0x4444ff, 0x111133);
+            const tilt = 23.4 * (Math.PI / 180);
+            equatorialGrid.rotation.x = tilt; 
+            equatorialGrid.rotation.order = 'YXZ'; 
+            scene.add(equatorialGrid);
+            equatorialGrid.visible = true; // Set initial visibility explicitly
+            app.three.equatorialGrid = equatorialGrid;
+            
+            // Earth Axis Helper
+            const axisGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -20, 0), new THREE.Vector3(0, 20, 0)]);
+            const axisMat = new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 2 });
+            const earthAxisHelper = new THREE.Line(axisGeo, axisMat);
+            earthAxisHelper.visible = false;
+            earthAxisHelper.rotation.order = 'YXZ'; 
+            earthAxisHelper.rotation.x = tilt; // Initial tilt same as equator
+            scene.add(earthAxisHelper);
+            app.three.earthAxisHelper = earthAxisHelper;
+            
+            // Equinox Axis Helper (X-axis)
+            const eqGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-2000, 0, 0), new THREE.Vector3(2000, 0, 0)]);
+            const eqMat = new THREE.LineBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.5 });
+            const equinoxAxisHelper = new THREE.Line(eqGeo, eqMat);
+            equinoxAxisHelper.visible = false;
+            scene.add(equinoxAxisHelper);
+            app.three.equinoxAxisHelper = equinoxAxisHelper;
+
+            const customGeo = new THREE.ConeGeometry(0.8, 2, 8);
+            customGeo.rotateX(Math.PI/2);
+            const customMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+            app.customObject = new THREE.Mesh(customGeo, customMat);
+            app.customObject.visible = false;
+            scene.add(app.customObject);
+            
+            // Celestial Sphere
+            // FIX: Changed base radius from 1000 to 1 so scaling works correctly (1 * scale = radius)
+            const sphereGeo = new THREE.SphereGeometry(1, 48, 48); 
+            // Wireframe for the grid
+            const sphereEdges = new THREE.WireframeGeometry(sphereGeo);
+            const sphereMat = new THREE.LineBasicMaterial({ color: 0x4444ff, transparent: true, opacity: 0.15 });
+            const celestialSphere = new THREE.LineSegments(sphereEdges, sphereMat);
+            celestialSphere.visible = false;
+            celestialSphere.rotation.order = 'YXZ'; 
+            scene.add(celestialSphere);
+            app.three.celestialSphere = celestialSphere;
+            
+            // Group for projection markers and lines
+            const projectionGroup = new THREE.Group();
+            scene.add(projectionGroup);
+            app.three.projectionGroup = projectionGroup;
+
+            // Group for Sphere Trails
+            const sphereTrailGroup = new THREE.Group();
+            celestialSphere.add(sphereTrailGroup); // Attached to sphere so they rotate with it
+            app.three.sphereTrailGroup = sphereTrailGroup;
+            app.three.sphereTrails = {}; // Store references
+            
+            // Preview Ghost Objects
+            const previewGeo = new THREE.SphereGeometry(1, 16, 16);
+            const previewMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
+            const previewMesh = new THREE.Mesh(previewGeo, previewMat);
+            previewMesh.visible = false;
+            scene.add(previewMesh);
+            app.preview.mesh = previewMesh;
+
+            const previewOrbitGeo = new THREE.BufferGeometry();
+            const previewOrbitMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, dashSize: 1, gapSize: 0.5 });
+            const previewOrbitLine = new THREE.LineLoop(previewOrbitGeo, previewOrbitMat);
+            previewOrbitLine.visible = false;
+            scene.add(previewOrbitLine);
+            app.preview.orbitLine = previewOrbitLine;
+
+            const previewPointsGeo = new THREE.BufferGeometry();
+            const previewPointsMat = new THREE.PointsMaterial({ size: 1, color: 0xffffff });
+            const previewPoints = new THREE.Points(previewPointsGeo, previewPointsMat);
+            previewPoints.visible = false;
+            scene.add(previewPoints);
+            app.preview.pointsMesh = previewPoints;
+            
+            // Ray Arrow Helper
+            const rayDir = new THREE.Vector3(1, 0, 0);
+            const rayOrigin = new THREE.Vector3(0, 0, 0);
+            const rayArrow = new THREE.ArrowHelper(rayDir, rayOrigin, 100, 0xff00ff, 2, 1);
+            rayArrow.visible = false;
+            scene.add(rayArrow);
+            app.ray.mesh = rayArrow;
+
+            app.lineGroup = new THREE.Group();
+            scene.add(app.lineGroup);
+
+            app.three = { scene, camera, renderer, controls, eclipticGrid, equatorialGrid, celestialSphere, projectionGroup, sphereTrailGroup, sphereTrails: {}, earthAxisHelper, equinoxAxisHelper, ambient };
+
+            // Fill Initial Targets
+            app.logic.updateTargetOptions();
+
+            Object.keys(PLANETS).forEach(key => app.logic.initBody(key));
+            
+            // Set initial cam target value in UI
+            setTimeout(() => {
+                const camSelect = document.getElementById('camTargetSelect');
+                if(camSelect) camSelect.value = 'earth';
+                app.logic.resetMoon(); 
+            }, 100);
+        }
+
+        // --- SKY VIEW SETUP ---
+        function initSky() {
+            const cvs = document.getElementById('skyCanvas');
+            app.sky.cvs = cvs; // Store reference
+            const ctx = cvs.getContext('2d');
+            
+            function resize() {
+                const rect = cvs.parentElement.getBoundingClientRect();
+                cvs.width = rect.width;
+                cvs.height = rect.height;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+            
+            function handleRayInput(e) {
+                const rect = cvs.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                app.logic.castSkyRay(x, y, cvs.width, cvs.height);
+            }
+
+            // Wheel Zoom for Sky Canvas
+            cvs.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                let newZoom = app.sky.camera.zoom * delta;
+                newZoom = Math.min(Math.max(newZoom, 1), 20); 
+                app.sky.camera.zoom = newZoom;
+                document.getElementById('skyZoomSlider').value = newZoom;
+            });
+
+            let lastX = 0;
+            let lastY = 0;
+
+            cvs.addEventListener('mousedown', (e) => {
+                const rect = cvs.getBoundingClientRect();
+                lastX = e.clientX;
+                lastY = e.clientY;
+                app.ray.isDragging = true;
+            });
+
+            cvs.addEventListener('mousemove', (e) => {
+                if (app.ray.isDragging) {
+                    const dx = e.clientX - lastX;
+                    const dy = e.clientY - lastY;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+
+                    const sensitivity = 0.005 / app.sky.camera.zoom;
+                    
+                    if (app.sky.camera.target === 'free') {
+                        app.sky.camera.ra += dx * sensitivity * 2; 
+                        app.sky.camera.dec -= dy * sensitivity; 
+                        app.sky.camera.dec = Math.max(-Math.PI/2, Math.min(Math.PI/2, app.sky.camera.dec));
+                        if(app.sky.camera.ra < 0) app.sky.camera.ra += 2*Math.PI;
+                        if(app.sky.camera.ra > 2*Math.PI) app.sky.camera.ra -= 2*Math.PI;
+                    }
+                }
+            });
+
+            cvs.addEventListener('click', (e) => {
+                const rect = cvs.getBoundingClientRect();
+                app.logic.castSkyRay(e.clientX - rect.left, e.clientY - rect.top, cvs.width, cvs.height);
+            });
+
+            window.addEventListener('mouseup', () => {
+                app.ray.isDragging = false;
+            });
+
+            app.sky = { cvs, ctx, camera: app.sky.camera };
+        }
+
+        // Helper to draw Phase
+        function drawPhase(ctx, r, phase, angle, color) {
+            ctx.save();
+            ctx.rotate(angle);
+            
+            // 1. Draw full dark circle (Dark Side)
+            ctx.fillStyle = 'rgba(20,20,20,1)'; 
+            ctx.beginPath(); 
+            ctx.arc(0,0,r,0,Math.PI*2); 
+            ctx.fill();
+            
+            // 2. Draw lit semi-circle (facing sun, which we orient to Angle 0/Right)
+            ctx.fillStyle = "#" + color.toString(16).padStart(6, '0');
+            ctx.beginPath();
+            ctx.arc(0, 0, r, -Math.PI/2, Math.PI/2); // Right half
+            ctx.fill();
+            
+            // 3. Draw Ellipse for terminator
+            // width scales from -r (New) to r (Full)
+            // scaleX = (2 * phase - 1)
+            const scaleX = (phase - 0.5) * 2; 
+            
+            ctx.beginPath();
+            ctx.ellipse(0, 0, Math.abs(scaleX * r), r, 0, 0, Math.PI * 2);
+            
+            if (phase < 0.5) {
+                // Crescent: Cover inner part with dark
+                 ctx.fillStyle = 'rgba(20,20,20,1)';
+                 ctx.fill();
+            } else {
+                // Gibbous: Add extra lit part
+                ctx.fillStyle = "#" + color.toString(16).padStart(6, '0');
+                ctx.fill();
+            }
+            
+            // Optional: thin ring to show outline of dark side
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); 
+            ctx.arc(0,0,r,0,Math.PI*2); 
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawSky() {
+            const { ctx, cvs, camera } = app.sky;
+            const w = cvs.width;
+            const h = cvs.height;
+
+            // Clear
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, w, h);
+
+            // Calculate Viewport
+            const fovRA = (2 * Math.PI) / camera.zoom;
+            const fovDec = Math.PI / camera.zoom;
+            
+            // Helper to map RA/Dec to Screen X/Y taking into account Center and Zoom
+            const project = (ra, dec) => {
+                let diffRA = ra - camera.ra;
+                while (diffRA > Math.PI) diffRA -= 2*Math.PI;
+                while (diffRA < -Math.PI) diffRA += 2*Math.PI;
+                
+                const x = w/2 - (diffRA / fovRA) * w;
+                const diffDec = dec - camera.dec;
+                const y = h/2 - (diffDec / fovDec) * h;
+                return {x, y};
+            };
+
+            // Draw Grid
+            if (app.params.showGrid) {
+                ctx.strokeStyle = "#333";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                // Dec lines
+                for (let d = -80; d <= 80; d+=20) {
+                    const decRad = d * (Math.PI/180);
+                    const p = project(camera.ra, decRad); 
+                    if (p.y >= 0 && p.y <= h) {
+                        ctx.moveTo(0, p.y);
+                        ctx.lineTo(w, p.y);
+                        ctx.fillStyle = "#555";
+                        ctx.fillText(d+"°", 5, p.y-2);
+                    }
+                }
+                // RA lines
+                for (let hr = 0; hr <= 24; hr+=2) {
+                    const raRad = (hr/24) * 2 * Math.PI;
+                    const p = project(raRad, camera.dec); 
+                    if (p.x >= 0 && p.x <= w) {
+                        ctx.moveTo(p.x, 0);
+                        ctx.lineTo(p.x, h);
+                        ctx.fillStyle = "#555";
+                        if(hr < 24) ctx.fillText(hr+"h", p.x+2, h-10);
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // --- Draw Reference Planes (Sine Waves or Straight Lines) ---
+            
+            // 1. Equator
+            if (app.params.showEquator) {
+                ctx.strokeStyle = "#4444ff"; // Blue
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                if (app.params.coordSys === 'equatorial') {
+                    // Straight line at Dec=0
+                    const p = project(camera.ra, 0); 
+                    ctx.moveTo(0, p.y);
+                    ctx.lineTo(w, p.y);
+                } else {
+                    // Sine wave (Equator seen from Ecliptic)
+                    const tilt = -app.params.equatorialTilt * (Math.PI / 180);
+                    let started = false;
+                    for (let i = 0; i <= 100; i++) {
+                        const angle = (i / 100) * Math.PI * 2;
+                        const y = Math.sin(angle) * Math.sin(tilt); 
+                        const z = Math.sin(angle) * Math.cos(tilt);
+                        const x = Math.cos(angle);
+                        
+                        const r = Math.sqrt(x*x + y*y + z*z);
+                        const dec = Math.asin(y/r);
+                        let ra = Math.atan2(z, x); // z, x for wave, check consistency? z = sin -> ra increases
+                        if (ra < 0) ra += 2*Math.PI;
+                        
+                        const scr = project(ra, dec);
+                        if (!started) {
+                            ctx.moveTo(scr.x, scr.y);
+                            started = true;
+                        } else {
+                             if(Math.abs(scr.x - ctx.currentX) > w/2) { // Context doesn't store currentX easily, simplify
+                                 ctx.moveTo(scr.x, scr.y);
+                             } else {
+                                 ctx.lineTo(scr.x, scr.y);
+                             }
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // 2. Ecliptic
+            if (app.params.showSkyEcliptic) {
+                ctx.strokeStyle = "#ffff44"; // Yellow
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                if (app.params.coordSys === 'ecliptic') {
+                    // Straight line at Dec=0
+                    const p = project(camera.ra, 0); 
+                    ctx.moveTo(0, p.y);
+                    ctx.lineTo(w, p.y);
+                } else {
+                    // Sine wave (Ecliptic seen from Equatorial)
+                    const tilt = app.params.equatorialTilt * (Math.PI / 180);
+                    let started = false;
+                    for (let i = 0; i <= 100; i++) {
+                        const angle = (i / 100) * Math.PI * 2;
+                        const vec = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+                        const coords = app.physics.rectToSpherical(vec, new THREE.Vector3(0,0,0));
+                        const scr = project(coords.ra, coords.dec);
+                        
+                        if (!started) {
+                            ctx.moveTo(scr.x, scr.y);
+                            started = true;
+                        } else {
+                             ctx.lineTo(scr.x, scr.y);
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+            
+            // Draw Selected Ray Marker
+            if (app.ray.active) {
+                const p = project(app.ray.ra, app.ray.dec);
+                // Check bounds roughly
+                if (p.x > -20 && p.x < w+20 && p.y > -20 && p.y < h+20) {
+                    ctx.strokeStyle = "#ff00ff";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x-10, p.y);
+                    ctx.lineTo(p.x+10, p.y);
+                    ctx.moveTo(p.x, p.y-10);
+                    ctx.lineTo(p.x, p.y+10);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+                    ctx.stroke();
+                }
+            }
+
+            let obsPos = new THREE.Vector3(0,0,0);
+            if (app.params.observer === 'sun') {
+                obsPos.set(0,0,0);
+            } else if (app.params.observer === 'custom' && app.customObject.visible) {
+                obsPos.copy(app.customObject.position);
+            } else if (PLANETS[app.params.observer]) {
+                obsPos = app.physics.getPlanetPosition(app.params.observer, app.params.time);
+            }
+
+            // Calculate Sun Position for Phases (Need to project it even if not drawn)
+            // Sun is at 0,0,0
+            const sunPos3D = new THREE.Vector3(0,0,0);
+            const sunCoords = app.physics.rectToSpherical(sunPos3D, obsPos);
+            const sunScr = project(sunCoords.ra, sunCoords.dec);
+
+            // Define bodies including Sun if observer isn't Sun
+            const bodyKeys = Object.keys(PLANETS);
+            if (app.params.observer !== 'sun') {
+                bodyKeys.push('sun'); 
+            }
+
+            const allKeys = ['sun', ...Object.keys(PLANETS)]; // Iterate all potential bodies
+
+            allKeys.forEach(key => {
+                if (key === app.params.observer) return;
+                
+                // Get Props
+                let p = PLANETS[key];
+                if (key === 'sun') {
+                    p = { name: "שמש", color: 0xffff00 }; // Dummy prop for Sun
+                }
+
+                // Handle Moon visibility check
+                if (key === 'moon' && !app.params.showMoon) return;
+
+                // --- Drawing Bodies & Shapes ---
+                if (p.hiddenFromList) {
+                    const pos = app.physics.getPlanetPosition(key, app.params.time);
+                    const coords = app.physics.rectToSpherical(pos, obsPos);
+                    const scr = project(coords.ra, coords.dec);
+                    
+                    if (scr.x > 0 && scr.x < w && scr.y > 0 && scr.y < h) {
+                        ctx.fillStyle = "#" + p.color.toString(16).padStart(6, '0');
+                        ctx.fillRect(scr.x-1, scr.y-1, 2, 2);
+                    }
+                    return; 
+                }
+
+                if (app.params.showSkyTrails && app.skyTrails[key]) {
+                    ctx.strokeStyle = "#" + p.color.toString(16).padStart(6, '0');
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    const points = app.skyTrails[key];
+                    let started = false;
+                    for (let i = 0; i < points.length; i++) {
+                        const scr = project(points[i].ra, points[i].dec);
+                        
+                        // Don't draw if wrapping hugely
+                        if (!started) {
+                            ctx.moveTo(scr.x, scr.y);
+                            started = true;
+                        } else {
+                            // Simple distance check to prevent drawing across screen on wrap
+                            const dist = Math.abs(scr.x - (project(points[i-1].ra, points[i-1].dec).x));
+                            if (dist < w/2) {
+                                ctx.lineTo(scr.x, scr.y);
+                            } else {
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(scr.x, scr.y);
+                            }
+                        }
+                    }
+                    ctx.stroke();
+                }
+
+                let pos;
+                if (key === 'sun') pos = new THREE.Vector3(0,0,0);
+                else pos = app.physics.getPlanetPosition(key, app.params.time);
+                
+                const coords = app.physics.rectToSpherical(pos, obsPos);
+                const scr = project(coords.ra, coords.dec);
+
+                // Only draw if roughly visible (allow some margin for radius)
+                if (scr.x > -50 && scr.x < w+50 && scr.y > -50 && scr.y < h+50) {
+                    
+                    // Radius scales with zoom somewhat?
+                    let r = Math.max(3, 200 / coords.r);
+                    if (key === 'sun') r = 10; // Fixed base size for sun
+                    r = Math.min(r, 15) * Math.sqrt(camera.zoom); // Scale up slightly with zoom
+                    
+                    if (app.params.showPhases && key !== 'sun') {
+                        // Calculate Phase
+                        const vecToSun = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), pos).normalize();
+                        const vecToObs = new THREE.Vector3().subVectors(obsPos, pos).normalize();
+                        
+                        // Phase Angle (Angle between Sun and Obs from Planet's perspective)
+                        const phi = vecToSun.angleTo(vecToObs); 
+                        // Illuminated Fraction
+                        const k = (1 + Math.cos(phi)) / 2;
+                        
+                        // Rotation Angle on Screen
+                        // We need the direction towards the sun on screen
+                        // Sun Screen Pos: sunScr.x, sunScr.y
+                        // Planet Screen Pos: scr.x, scr.y
+                        
+                        let sx = sunScr.x;
+                        const px = scr.x;
+                        // Handle Wrapping for angle calc
+                        if (sx - px > w/2) sx -= w;
+                        else if (px - sx > w/2) sx += w;
+                        
+                        const rot = Math.atan2(sunScr.y - scr.y, sx - px);
+                        
+                        ctx.save();
+                        ctx.translate(scr.x, scr.y);
+                        drawPhase(ctx, r, k, rot, p.color);
+                        ctx.restore();
+                        
+                    } else {
+                        // Standard Dot
+                        ctx.fillStyle = "#" + p.color.toString(16).padStart(6, '0');
+                        ctx.beginPath();
+                        ctx.arc(scr.x, scr.y, r, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+
+                    if (app.params.targetedBodies[key]) {
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.rect(scr.x - r - 4, scr.y - r - 4, (r*2) + 8, (r*2) + 8);
+                        ctx.stroke();
+                    }
+
+                    ctx.fillStyle = "#fff";
+                    ctx.font = "12px Assistant";
+                    ctx.fillText(p.name, scr.x+r+2, scr.y);
+                }
+            });
+        }
+
+        // --- MAIN LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            app.params.time += 0.001 * app.params.speed;
+
+            let obsPos = new THREE.Vector3(0,0,0);
+            if (app.params.observer === 'sun') {
+                obsPos.set(0,0,0);
+            } else if (app.params.observer === 'custom' && app.customObject.visible) {
+                obsPos.copy(app.customObject.position);
+            } else if (PLANETS[app.params.observer]) {
+                obsPos = app.physics.getPlanetPosition(app.params.observer, app.params.time);
+            }
+            
+            // Sky Map Tracking
+            if (app.sky.camera.target !== 'free') {
+                // Calculate target position relative to observer
+                let targetPos = new THREE.Vector3(0,0,0);
+                if (app.sky.camera.target === 'sun') {
+                    targetPos.set(0,0,0);
+                } else if (PLANETS[app.sky.camera.target]) {
+                    targetPos = app.physics.getPlanetPosition(app.sky.camera.target, app.params.time);
+                }
+                
+                const coords = app.physics.rectToSpherical(targetPos, obsPos);
+                app.sky.camera.ra = coords.ra;
+                app.sky.camera.dec = coords.dec;
+            }
+
+            // Move Grids to Observer Position (To show local planes)
+            if (app.three.eclipticGrid) app.three.eclipticGrid.position.copy(obsPos);
+            if (app.three.equatorialGrid) {
+                app.three.equatorialGrid.position.copy(obsPos);
+                // Update Rotation based on controls
+                const tilt = app.params.equatorialTilt * (Math.PI / 180);
+                const rot = app.params.equatorialRotation * (Math.PI / 180);
+                
+                // Three.js Order YXZ: Rotate Y (Azimuth) first, then tilt X
+                app.three.equatorialGrid.rotation.y = rot;
+                app.three.equatorialGrid.rotation.x = tilt;
+            }
+            
+            // Update new Axis Helpers
+            if (app.three.earthAxisHelper) {
+                app.three.earthAxisHelper.visible = app.params.showEarthAxis;
+                if (app.objects['earth']) {
+                    app.three.earthAxisHelper.position.copy(app.objects['earth'].position);
+                    const tilt = app.params.equatorialTilt * (Math.PI / 180);
+                    const rot = app.params.equatorialRotation * (Math.PI / 180);
+                    // Earth Axis rotates with the equatorial grid definition
+                    app.three.earthAxisHelper.rotation.y = rot;
+                    app.three.earthAxisHelper.rotation.x = tilt;
+                }
+            }
+            
+            if (app.three.equinoxAxisHelper) {
+                app.three.equinoxAxisHelper.visible = app.params.showEquinoxAxis;
+                app.three.equinoxAxisHelper.position.copy(obsPos); // Centered on observer
+                // Rotates with precession (y) but stays flat on Ecliptic plane
+                const rot = app.params.equatorialRotation * (Math.PI / 180);
+                app.three.equinoxAxisHelper.rotation.y = rot;
+            }
+            
+            // Celestial Sphere Logic
+            if (app.three.celestialSphere) {
+                app.three.celestialSphere.visible = app.params.showCelestialSphere;
+                app.three.celestialSphere.position.copy(obsPos);
+                
+                // New: Scale based on param
+                const r = app.params.celestialSphereSize;
+                app.three.celestialSphere.scale.set(r, r, r);
+                
+                // Align sphere rotation with equatorial grid
+                if (app.params.coordSys === 'equatorial') {
+                    const tilt = app.params.equatorialTilt * (Math.PI / 180);
+                    const rot = app.params.equatorialRotation * (Math.PI / 180);
+                    app.three.celestialSphere.rotation.y = rot;
+                    app.three.celestialSphere.rotation.x = tilt;
+                } else {
+                    const tilt = app.params.equatorialTilt * (Math.PI / 180);
+                    const rot = app.params.equatorialRotation * (Math.PI / 180);
+                    app.three.celestialSphere.rotation.y = rot;
+                    app.three.celestialSphere.rotation.x = tilt;
+                }
+            }
+
+            if (app.ray.active && app.ray.mesh) {
+                app.ray.mesh.position.copy(obsPos);
+            }
+
+            // Camera Control Logic (Follow/Track)
+            if (app.params.cameraMode !== 'free') {
+                let targetVec = new THREE.Vector3(0,0,0);
+                
+                if (app.params.cameraTarget === 'sun') {
+                    targetVec.set(0,0,0);
+                } else if (app.params.cameraTarget === 'custom' && app.customObject.visible) {
+                    targetVec.copy(app.customObject.position);
+                } else if (PLANETS[app.params.cameraTarget]) {
+                    targetVec = app.physics.getPlanetPosition(app.params.cameraTarget, app.params.time);
+                }
+
+                if (app.params.cameraMode === 'track') {
+                    app.three.controls.target.copy(targetVec);
+                } else if (app.params.cameraMode === 'follow') {
+                    const prevTarget = app.three.controls.target.clone();
+                    app.three.controls.target.copy(targetVec);
+                    
+                    // Move camera by delta (displacement) of the target
+                    // This maintains relative position
+                    const delta = new THREE.Vector3().subVectors(targetVec, prevTarget);
+                    // Avoid large jumps on first frame or resets
+                    if (delta.length() < 100) { 
+                        app.three.camera.position.add(delta);
+                    }
+                }
+            }
+
+            // Unified loop for all bodies including Sun
+            const allKeys = ['sun', ...Object.keys(PLANETS)];
+
+            allKeys.forEach(key => {
+                let pos;
+                let p = PLANETS[key];
+                
+                if (key === 'sun') {
+                    pos = new THREE.Vector3(0,0,0);
+                    p = { hiddenFromList: false, type: 'star', size: 3, color: 0xffff00 }; // Dummy prop for Sun
+                } else {
+                    pos = app.physics.getPlanetPosition(key, app.params.time);
+                }
+                
+                // Hide object if needed
+                let isEnabled = true;
+                if (key === 'moon' && !app.params.showMoon) isEnabled = false;
+
+                if (app.objects[key]) {
+                    // Update Position
+                    app.objects[key].position.copy(pos);
+                    // Updated Visibility Logic:
+                    // Visible if Enabled AND (Global Bodies Toggle is ON)
+                    app.objects[key].visible = isEnabled && app.params.showBodies;
+                    
+                    // Scale logic
+                    if (p.hiddenFromList) {
+                        app.objects[key].scale.set(0.2, 0.2, 0.2); 
+                    } else if (p.type === 'fixed' && p.size) {
+                        app.objects[key].scale.set(p.size, p.size, p.size);
+                    } else {
+                        // If sun, keep size or scale? Let's keep fixed size for Sun mesh created in init
+                        if (key !== 'sun') {
+                            let scale;
+                            if (app.params.modelMode === 'realistic') {
+                                // 1 Earth Radius ~= 0.002125 AU (where 1 AU = 50 units)
+                                // So scale factor is roughly 0.002125 per relative radius
+                                scale = (p.radius || 1) * 0.002125;
+                            } else {
+                                scale = app.params.planetScale / 10;
+                            }
+                            app.objects[key].scale.set(scale, scale, scale);
+                        }
+                    }
+                }
+
+                // 3D Projections on Sphere
+                // Create projection marker if needed
+                // Updated Logic: Visible if Enabled AND (Global Projections Toggle is ON)
+                if (isEnabled && app.params.showProjections && key !== app.params.observer && !p.hiddenFromList) {
+                    if (!app.projectionMarkers[key]) {
+                        // Create marker
+                        const geo = new THREE.SphereGeometry(2, 8, 8);
+                        const mat = new THREE.MeshBasicMaterial({ color: p.color });
+                        const mesh = new THREE.Mesh(geo, mat);
+                        app.three.projectionGroup.add(mesh);
+                        app.projectionMarkers[key] = mesh;
+                        
+                        // Create line
+                        const lGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                        const lMat = new THREE.LineDashedMaterial({ color: p.color, dashSize: 10, gapSize: 5 });
+                        const line = new THREE.Line(lGeo, lMat);
+                        line.computeLineDistances(); // Required for dashed
+                        app.three.projectionGroup.add(line);
+                        app.projectionLines[key] = line;
+                    }
+                    
+                    // Update position
+                    // Get vector relative to observer
+                    const rel = new THREE.Vector3().subVectors(pos, obsPos).normalize();
+                    // Multiply by sphere radius from params
+                    const sphereRadius = app.params.celestialSphereSize;
+                    const projPos = rel.multiplyScalar(sphereRadius).add(obsPos);
+                    
+                    if (app.projectionMarkers[key]) {
+                        app.projectionMarkers[key].position.copy(projPos);
+                        // Scale marker based on sphere size somewhat? Keep consistent for now
+                        const scaleFactor = Math.max(0.5, sphereRadius / 200) * app.params.projectionScale;
+                        app.projectionMarkers[key].scale.set(scaleFactor, scaleFactor, scaleFactor);
+                        app.projectionMarkers[key].visible = true;
+                    }
+                    
+                    // Update line
+                    if (app.projectionLines[key]) {
+                        const line = app.projectionLines[key];
+                        line.geometry.setFromPoints([pos, projPos]);
+                        line.computeLineDistances();
+                        line.visible = true;
+                    }
+
+                } else {
+                    // Hide if exists
+                    if (app.projectionMarkers[key]) app.projectionMarkers[key].visible = false;
+                    if (app.projectionLines[key]) app.projectionLines[key].visible = false;
+                }
+
+                // Trails
+                // Don't update trails if object is hidden (like moon when toggled off)
+                if (key === 'moon' && !app.params.showMoon) {
+                    if (app.trails[key]) app.trails[key].mesh.visible = false;
+                    return; 
+                }
+
+                if (app.params.showTrails && !p.hiddenFromList && app.trails[key]) {
+                    const t = app.trails[key];
+                    
+                    let trailPoint;
+                    if (app.params.relativeTrails) {
+                        trailPoint = pos.clone().sub(obsPos);
+                        t.mesh.position.copy(obsPos);
+                    } else {
+                        trailPoint = pos.clone();
+                        t.mesh.position.set(0, 0, 0);
+                    }
+                    
+                    t.points.push(trailPoint);
+                    
+                    if (!app.params.infiniteTrail) {
+                        while(t.points.length > app.params.trailLength) {
+                            t.points.shift();
+                        }
+                    }
+                    
+                    t.mesh.geometry.setFromPoints(t.points);
+                    t.mesh.visible = true;
+                } else if (app.trails[key]) {
+                    app.trails[key].mesh.visible = false;
+                }
+
+                // Sphere Trails Logic (New)
+                if (app.params.showSphereTrails && app.params.showCelestialSphere && !p.hiddenFromList && key !== app.params.observer) {
+                     // We need to draw lines on the sphere surface.
+                     // The sphere is rotated to match grid.
+                     // So we convert RA/DEC history to cartesian on unit sphere (radius 1 * sphere scale).
+                     
+                     // Init trail line if missing
+                     if (!app.three.sphereTrails[key]) {
+                         const g = new THREE.BufferGeometry();
+                         const m = new THREE.LineBasicMaterial({ color: p.color, transparent: true, opacity: 0.6 });
+                         const l = new THREE.Line(g, m);
+                         app.three.sphereTrailGroup.add(l); // Attached to rotating sphere group
+                         app.three.sphereTrails[key] = l;
+                     }
+                     
+                     const sphereLine = app.three.sphereTrails[key];
+                     const skyPoints = app.skyTrails[key]; // [{ra, dec}, ...]
+                     
+                     if (skyPoints && skyPoints.length > 1) {
+                         const pts = [];
+                         // Convert RA/DEC to Cartesian.
+                         // RA = Azimuth (X-Z plane angle), Dec = Elevation (Y angle).
+                         // Standard conversion:
+                         // x = cos(dec) * cos(ra)
+                         // y = sin(dec)
+                         // z = cos(dec) * sin(ra)
+                         // Note: We are inside the rotated group, so we assume standard orientation.
+                         // RA 0 is X axis? Check castSkyRay logic.
+                         // in castSkyRay: vec = (cos(d)cos(r), sin(d), cos(d)sin(r))
+                         // This matches standard math.
+                         
+                         // Limit to last N points to keep performance? Or use all trailLength points?
+                         // skyTrails length is managed by trailLength.
+                         
+                         for(let i=0; i<skyPoints.length; i++) {
+                             const pt = skyPoints[i];
+                             const x = Math.cos(pt.dec) * Math.cos(pt.ra);
+                             const y = Math.sin(pt.dec);
+                             const z = Math.cos(pt.dec) * Math.sin(pt.ra);
+                             
+                             // Handle wrapping? 
+                             // If distance is large, break line? 
+                             // Line geometry can't break easily without separate segments.
+                             // For simplicity now, just draw. Wrapping might draw a line through sphere.
+                             
+                             // Simple wrap check: dot product with previous?
+                             if (i > 0) {
+                                 const prev = skyPoints[i-1];
+                                 if (Math.abs(pt.ra - prev.ra) > Math.PI) {
+                                     // Wrap detected. Add a break? BufferGeometry needs indices for that or just nan.
+                                     pts.push(new THREE.Vector3(0,0,0)); // Hacky, will draw to center.
+                                     // Better: Duplicate previous point to create degenerate line? No.
+                                     // Real solution: split lines.
+                                     // For this toy viz, let's just push.
+                                 }
+                             }
+                             
+                             pts.push(new THREE.Vector3(x, y, z));
+                         }
+                         sphereLine.geometry.setFromPoints(pts);
+                         sphereLine.visible = true;
+                     } else {
+                         sphereLine.visible = false;
+                     }
+                } else {
+                    if (app.three.sphereTrails && app.three.sphereTrails[key]) {
+                        app.three.sphereTrails[key].visible = false;
+                    }
+                }
+
+                // Sky Trails
+                if (key !== app.params.observer && !p.hiddenFromList) {
+                    const coords = app.physics.rectToSpherical(pos, obsPos);
+                    if (!app.skyTrails[key]) app.skyTrails[key] = [];
+                    app.skyTrails[key].push({ ra: coords.ra, dec: coords.dec });
+                    
+                    if (!app.params.infiniteTrail) {
+                         while(app.skyTrails[key].length > app.params.trailLength) {
+                            app.skyTrails[key].shift();
+                         }
+                    }
+                }
+            });
+
+            // Connector Lines
+            allKeys.forEach(key => {
+                const isTarget = app.params.targetedBodies[key];
+                let line = app.connectorLines[key];
+                
+                // Hide connector if object is hidden (moon)
+                if (key === 'moon' && !app.params.showMoon) {
+                    if (line) line.visible = false;
+                    return;
+                }
+                
+                if (isTarget && key !== app.params.observer && (app.objects[key] || key === 'sun')) {
+                    if (!line) {
+                        const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0)]);
+                        const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, dashSize: 2, gapSize: 1 });
+                        line = new THREE.Line(geo, mat);
+                        app.connectorLines[key] = line;
+                        app.lineGroup.add(line);
+                    }
+                    
+                    let targetPos;
+                    if (key === 'sun') targetPos = new THREE.Vector3(0,0,0);
+                    else targetPos = app.objects[key].position;
+
+                    line.geometry.setFromPoints([obsPos, targetPos]);
+                    line.visible = true;
+                } else if (line) {
+                    line.visible = false;
+                }
+            });
+
+            const custPos = app.physics.getCustomPosition(app.params.time);
+            if (custPos) {
+                app.customObject.position.copy(custPos);
+                app.customObject.visible = true;
+            } else {
+                app.customObject.visible = false;
+            }
+
+            // Preview Render
+            if (app.preview.active && app.preview.data) {
+                const pData = app.preview.data;
+                
+                if (pData.type === 'shape') {
+                    // Hide single mesh, show points
+                    if(app.preview.mesh) app.preview.mesh.visible = false;
+                    if(app.preview.orbitLine) app.preview.orbitLine.visible = false;
+                    if(app.preview.pointsMesh) app.preview.pointsMesh.visible = true;
+                    
+                    if (pData.points && app.preview.pointsMesh) {
+                        app.preview.pointsMesh.geometry.setFromPoints(pData.points);
+                        app.preview.pointsMesh.material.color.setHex(pData.color);
+                    }
+                } 
+                else {
+                    if(app.preview.pointsMesh) app.preview.pointsMesh.visible = false;
+                    const pos = app.physics.calculateOrbitalPosition(pData, app.params.time);
+                    if(app.preview.mesh) {
+                        app.preview.mesh.position.copy(pos);
+                        app.preview.mesh.material.color.setHex(pData.color);
+                    
+                        if (pData.type === 'fixed') {
+                            app.preview.mesh.scale.set(pData.size, pData.size, pData.size);
+                            if(app.preview.orbitLine) app.preview.orbitLine.visible = false;
+                        } else {
+                            const scale = app.params.planetScale / 10;
+                            app.preview.mesh.scale.set(scale, scale, scale);
+                            if(app.preview.orbitLine) app.preview.orbitLine.visible = true;
+                        }
+                        
+                        app.preview.mesh.visible = true;
+                    }
+
+                    if (pData.type === 'orbit' && app.preview.orbitLine) {
+                        const points = [];
+                        for(let i=0; i<=100; i++) {
+                            const tStep = (i / 100) * pData.period;
+                            points.push(app.physics.calculateOrbitalPosition(pData, tStep));
+                        }
+                        app.preview.orbitLine.geometry.setFromPoints(points);
+                        app.preview.orbitLine.material.color.setHex(pData.color);
+                    }
+                }
+            } else {
+                if(app.preview.mesh) app.preview.mesh.visible = false;
+                if(app.preview.orbitLine) app.preview.orbitLine.visible = false;
+                if(app.preview.pointsMesh) app.preview.pointsMesh.visible = false;
+            }
+
+            app.three.controls.update();
+            app.three.renderer.render(app.three.scene, app.three.camera);
+            drawSky();
+        }
+
+        // --- APP LOGIC ---
+        app.logic = {
+            createGeometry: function(shape, size=1) {
+                switch(shape) {
+                    case 'cube': return new THREE.BoxGeometry(size*1.5, size*1.5, size*1.5);
+                    case 'cone': return new THREE.ConeGeometry(size, size*2, 16);
+                    case 'torus': return new THREE.TorusGeometry(size, size/3, 8, 24);
+                    case 'icosahedron': return new THREE.IcosahedronGeometry(size);
+                    case 'sphere': 
+                    default: return new THREE.SphereGeometry(size, 16, 16);
+                }
+            },
+
+            initBody: function(key) {
+                const data = PLANETS[key];
+                const scene = app.three.scene;
+
+                // Create Mesh based on shape
+                const geo = app.logic.createGeometry(data.shape || 'sphere');
+                const mat = new THREE.MeshStandardMaterial({ color: data.color });
+                const mesh = new THREE.Mesh(geo, mat);
+                
+                // If shape point, small size
+                if (data.hiddenFromList) {
+                    mesh.scale.set(0.2, 0.2, 0.2);
+                }
+
+                scene.add(mesh);
+                app.objects[key] = mesh;
+
+                // 3D Trail (Only for orbits)
+                if (!data.hiddenFromList) {
+                    const trailPoints = []; 
+                    const trailGeo = new THREE.BufferGeometry();
+                    const trailMat = new THREE.LineBasicMaterial({ color: data.color, transparent: true, opacity: 0.5 });
+                    const trailLine = new THREE.Line(trailGeo, trailMat);
+                    scene.add(trailLine);
+                    app.trails[key] = { mesh: trailLine, points: trailPoints };
+                    
+                    app.skyTrails[key] = [];
+                    
+                    app.logic.addOptionToSelect('observerSelect', key, data.name);
+                    app.logic.addOptionToSelect('camTargetSelect', key, data.name);
+                    app.logic.addOptionToSelect('skyTargetSelect', key, data.name);
+                }
+            },
+            
+            // Helper for dropdowns
+            addOptionToSelect: function(selectId, value, text) {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+                let exists = false;
+                for(let i=0; i<select.options.length; i++) {
+                    if(select.options[i].value === value) exists = true;
+                }
+                if(!exists) {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.innerHTML = text;
+                    select.appendChild(opt);
+                }
+            },
+            
+            // Initial population of dropdowns
+            updateTargetOptions: function() {
+                // Add Sun and Custom manualy first
+                app.logic.addOptionToSelect('camTargetSelect', 'sun', 'השמש (Sun)');
+                app.logic.addOptionToSelect('camTargetSelect', 'custom', 'גוף מותאם (CSV)');
+                
+                app.logic.addOptionToSelect('skyTargetSelect', 'sun', 'השמש (Sun)');
+                // app.logic.addOptionToSelect('skyTargetSelect', 'custom', 'גוף מותאם (CSV)');
+            },
+            
+            castSkyRay: function(x, y, w, h) {
+                // Reverse projection based on current camera
+                // x = w/2 - (diffRA / fovRA) * w  => diffRA = (w/2 - x) * fovRA / w
+                // y = h/2 - (diffDec / fovDec) * h => diffDec = (h/2 - y) * fovDec / h
+                
+                const fovRA = (2 * Math.PI) / app.sky.camera.zoom;
+                const fovDec = Math.PI / app.sky.camera.zoom;
+                
+                const diffRA = ((w/2) - x) * (fovRA / w);
+                const diffDec = ((h/2) - y) * (fovDec / h);
+                
+                let ra = app.sky.camera.ra + diffRA;
+                let dec = app.sky.camera.dec + diffDec;
+                
+                // Wrap RA
+                if (ra < 0) ra += 2*Math.PI;
+                if (ra > 2*Math.PI) ra -= 2*Math.PI;
+                
+                // Clamp Dec
+                dec = Math.max(-Math.PI/2, Math.min(Math.PI/2, dec));
+
+                app.ray.ra = ra;
+                app.ray.dec = dec;
+                app.ray.active = true;
+                
+                // 3D Vector calculation
+                const r = 1;
+                // FIX: Use -sin(ra) for z to match new coordinate system
+                // x = r * cos(dec) * cos(ra)
+                // y = r * sin(dec)
+                // z = -r * cos(dec) * sin(ra)
+                const vec = new THREE.Vector3(
+                    r * Math.cos(dec) * Math.cos(ra),
+                    r * Math.sin(dec),
+                    -r * Math.cos(dec) * Math.sin(ra)
+                );
+                if (app.params.coordSys === 'equatorial') {
+                    const tilt = app.params.equatorialTilt * (Math.PI / 180);
+                    const rot = app.params.equatorialRotation * (Math.PI / 180);
+                    
+                    // Fix: Apply negative tilt for the inverse transform
+                    vec.applyAxisAngle(new THREE.Vector3(0, 1, 0), rot);
+                    vec.applyAxisAngle(new THREE.Vector3(1, 0, 0), -tilt);
+                }
+                app.ray.mesh.setDirection(vec.normalize());
+                app.ray.mesh.visible = true;
+            },
+
+            // Safe helper to get values
+            getVal: function(id, defaultVal = 0) {
+                const el = document.getElementById(id);
+                if (!el) {
+                    return defaultVal;
+                }
+                return el.value;
+            },
+
+            updatePreview: function() {
+                const getVal = app.logic.getVal; // Alias for cleaner code
+                
+                const name = getVal('nb_name', 'Object');
+                const colorHex = getVal('nb_color', '#ffffff');
+                const color = parseInt(colorHex.replace('#', '0x'));
+                let data;
+
+                if (app.params.addMode === 'orbit') {
+                    // Update preview mesh geometry if needed
+                    if(app.preview.mesh && app.preview.mesh.geometry.type !== 'SphereGeometry') {
+                         app.three.scene.remove(app.preview.mesh);
+                         app.preview.mesh = new THREE.Mesh(new THREE.SphereGeometry(1,16,16), new THREE.MeshStandardMaterial({color:0xffffff, transparent:true, opacity:0.7}));
+                         app.three.scene.add(app.preview.mesh);
+                    }
+                    
+                    const a = parseFloat(getVal('nb_a', 2.5));
+                    const e = parseFloat(getVal('nb_e', 0.2));
+                    const i = parseFloat(getVal('nb_i', 15));
+                    const N = parseFloat(getVal('nb_N', 0));
+                    const w = parseFloat(getVal('nb_w', 0));
+                    const shape = getVal('nb_orb_shape', 'sphere');
+
+                    const valA = document.getElementById('val_a'); if(valA) valA.innerText = a.toFixed(1) + ' AU';
+                    const valE = document.getElementById('val_e'); if(valE) valE.innerText = e.toFixed(2);
+                    const valI = document.getElementById('val_i'); if(valI) valI.innerText = i.toFixed(0) + '°';
+                    const valN = document.getElementById('val_N'); if(valN) valN.innerText = N.toFixed(0) + '°';
+                    const valW = document.getElementById('val_w'); if(valW) valW.innerText = w.toFixed(0) + '°';
+
+                    const period = Math.sqrt(Math.pow(a, 3)); 
+
+                    data = {
+                        type: 'orbit',
+                        a: a * AU,
+                        e: e,
+                        i: i,
+                        N: N,
+                        w: w,
+                        M: 0,
+                        period: period,
+                        color: color,
+                        name: name,
+                        shape: shape
+                    };
+                } else if (app.params.addMode === 'fixed') {
+                    const x = parseFloat(getVal('nb_x', 10));
+                    const y = parseFloat(getVal('nb_y', 0));
+                    const z = parseFloat(getVal('nb_z', 0));
+                    const size = parseFloat(getVal('nb_size', 1));
+
+                    data = {
+                        type: 'fixed',
+                        pos: {x, y, z},
+                        color: color,
+                        name: name,
+                        shape: 'sphere',
+                        size: size
+                    };
+                } else if (app.params.addMode === 'shape') {
+                    const cx = parseFloat(getVal('gen_x', 15));
+                    const cy = parseFloat(getVal('gen_y', 0));
+                    const cz = parseFloat(getVal('gen_z', 0));
+                    const size = parseFloat(getVal('gen_size', 5));
+                    const count = parseInt(getVal('gen_count', 50));
+                    const rx = parseFloat(getVal('gen_rot_x', 0));
+                    const ry = parseFloat(getVal('gen_rot_y', 0));
+                    const rz = parseFloat(getVal('gen_rot_z', 0));
+                    const type = getVal('gen_type', 'ring');
+
+                    const points = app.physics.generateShapePoints(
+                        type, 
+                        {x:cx, y:cy, z:cz}, 
+                        size, 
+                        count, 
+                        {x:rx, y:ry, z:rz}
+                    );
+
+                    data = {
+                        type: 'shape',
+                        color: color,
+                        name: name,
+                        points: points,
+                        shapeType: type
+                    };
+                }
+                
+                app.preview.active = true;
+                app.preview.data = data;
+            },
+
+            confirmAddBody: function() {
+                if(!app.preview.data) {
+                    app.logic.updatePreview();
+                }
+                const data = app.preview.data;
+                const baseId = 'custom_' + Date.now();
+
+                if (data.type === 'shape') {
+                    // Explode shape into individual fixed points
+                    data.points.forEach((p, idx) => {
+                        const id = baseId + '_' + idx;
+                        PLANETS[id] = {
+                            type: 'fixed',
+                            pos: {x: p.x, y: p.y, z: p.z},
+                            color: data.color,
+                            name: data.name, // Shared name
+                            shape: 'sphere', // Render as tiny spheres
+                            size: 0.2,
+                            hiddenFromList: true // Don't show in dropdowns
+                        };
+                        app.logic.initBody(id);
+                    });
+                } else {
+                    PLANETS[baseId] = JSON.parse(JSON.stringify(data));
+                    app.logic.initBody(baseId);
+                }
+
+                app.ui.closeDialogue('add-body');
+                app.preview.active = false;
+                app.skyTrails = {};
+                app.ui.renderTargetToggles();
+            },
+
+            captureCameraPos: function(idX, idY, idZ) {
+                const pos = app.three.camera.position;
+                const xEl = document.getElementById(idX || 'nb_x');
+                const yEl = document.getElementById(idY || 'nb_y');
+                const zEl = document.getElementById(idZ || 'nb_z');
+                
+                if(xEl) xEl.value = pos.x.toFixed(2);
+                if(yEl) yEl.value = pos.y.toFixed(2);
+                if(zEl) zEl.value = pos.z.toFixed(2);
+                
+                app.logic.updatePreview();
+            },
+
+            // --- Moon Specific Logic ---
+            resetMoon: function() {
+                // Reset to default params
+                PLANETS.moon = { ...MOON_DEFAULTS };
+                app.logic.updateMoonInputs();
+                app.skyTrails['moon'] = [];
+            },
+
+            updateMoonInputs: function() {
+                // Update slider values from current planet state
+                const m = PLANETS.moon;
+                const aEl = document.getElementById('moon_a');
+                if (aEl) aEl.value = m.a / AU;
+                const eEl = document.getElementById('moon_e');
+                if (eEl) eEl.value = m.e;
+                const iEl = document.getElementById('moon_i');
+                if (iEl) iEl.value = m.i;
+                
+                const valA = document.getElementById('moon_a_val');
+                if (valA) valA.innerText = (m.a/AU).toFixed(4) + ' AU';
+                const valE = document.getElementById('moon_e_val');
+                if (valE) valE.innerText = m.e.toFixed(3);
+                const valI = document.getElementById('moon_i_val');
+                if (valI) valI.innerText = m.i.toFixed(1) + '°';
+                
+                // Set toggle
+                const tog = document.getElementById('moonToggleCheckbox');
+                if (tog) tog.checked = app.params.showMoon;
+            },
+
+            updateMoonParams: function() {
+                const a = parseFloat(document.getElementById('moon_a').value);
+                const e = parseFloat(document.getElementById('moon_e').value);
+                const i = parseFloat(document.getElementById('moon_i').value);
+                
+                PLANETS.moon.a = a * AU;
+                PLANETS.moon.e = e;
+                PLANETS.moon.i = i;
+                
+                // Recalculate period based on new 'a' (using earth mass as center approx)
+                // Period T proportional to a^1.5
+                // Default T=0.0748 for a=0.00257
+                // T_new = T_old * (a_new / a_old)^1.5
+                const ratio = a / (MOON_DEFAULTS.a / AU);
+                PLANETS.moon.period = MOON_DEFAULTS.period * Math.pow(ratio, 1.5);
+
+                app.logic.updateMoonInputs();
+                // Clear trails
+                app.skyTrails['moon'] = [];
+                if(app.trails['moon']) {
+                    app.trails['moon'].points = [];
+                    app.trails['moon'].mesh.geometry.setFromPoints([]);
+                }
+            }
+        };
+
+        // --- UI LOGIC ---
+        app.ui = {
+            init: function() {
+                document.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    const menu = document.getElementById('context-menu');
+                    menu.style.display = 'flex';
+                    menu.style.left = e.clientX + 'px';
+                    menu.style.top = e.clientY + 'px';
+                });
+
+                document.addEventListener('click', (e) => {
+                    const menu = document.getElementById('context-menu');
+                    if (!menu.contains(e.target)) menu.style.display = 'none';
+                });
+
+                document.querySelectorAll('.dialogue-header').forEach(header => {
+                    header.addEventListener('mousedown', (e) => {
+                        const dialogue = header.parentElement;
+                        const rect = dialogue.getBoundingClientRect();
+                        dialogue.style.transform = 'none';
+                        dialogue.style.right = 'auto';
+                        dialogue.style.bottom = 'auto';
+                        dialogue.style.left = rect.left + 'px';
+                        dialogue.style.top = rect.top + 'px';
+                        const offsetX = e.clientX - rect.left;
+                        const offsetY = e.clientY - rect.top;
+                        function onMouseMove(ev) {
+                            dialogue.style.left = (ev.clientX - offsetX) + 'px';
+                            dialogue.style.top = (ev.clientY - offsetY) + 'px';
+                        }
+                        function onMouseUp() {
+                            document.removeEventListener('mousemove', onMouseMove);
+                            document.removeEventListener('mouseup', onMouseUp);
+                        }
+                        document.addEventListener('mousemove', onMouseMove);
+                        document.addEventListener('mouseup', onMouseUp);
+                    });
+                });
+
+                document.getElementById('timeSpeed').addEventListener('input', (e) => {
+                    app.params.speed = parseFloat(e.target.value);
+                });
+                
+                document.getElementById('planetScale').addEventListener('input', (e) => {
+                    app.params.planetScale = parseFloat(e.target.value);
+                });
+
+                document.getElementById('trailLengthInput').addEventListener('input', (e) => {
+                    app.params.trailLength = parseInt(e.target.value);
+                    document.getElementById('trailLengthVal').innerText = app.params.trailLength;
+                });
+
+                document.getElementById('infiniteTrailInput').addEventListener('change', (e) => {
+                    app.params.infiniteTrail = e.target.checked;
+                    document.getElementById('trailLengthInput').disabled = e.target.checked;
+                    document.getElementById('trailLengthVal').innerText = e.target.checked ? "∞" : app.params.trailLength;
+                });
+
+                document.getElementById('observerSelect').addEventListener('change', (e) => {
+                    app.params.observer = e.target.value;
+                    app.skyTrails = {};
+                    app.ray.active = false;
+                    app.ray.mesh.visible = false;
+                });
+
+                document.getElementById('coordSysSelect').addEventListener('change', (e) => {
+                    app.params.coordSys = e.target.value;
+                    app.skyTrails = {};
+                });
+                
+                // Equatorial Plane Toggle Logic
+                document.getElementById('eqPlaneToggle').addEventListener('change', (e) => {
+                    app.three.equatorialGrid.visible = e.target.checked;
+                    const controls = document.getElementById('equatorial-controls');
+                    if (e.target.checked) {
+                        controls.classList.remove('hidden-section');
+                    } else {
+                        controls.classList.add('hidden-section');
+                    }
+                });
+                
+                // Equatorial Sliders
+                document.getElementById('eqTilt').addEventListener('input', (e) => {
+                    app.params.equatorialTilt = parseFloat(e.target.value);
+                    document.getElementById('eqTiltVal').innerText = app.params.equatorialTilt.toFixed(1) + '°';
+                    app.skyTrails = {}; // Refresh sky trails as coord system changed
+                });
+                
+                document.getElementById('eqRot').addEventListener('input', (e) => {
+                    app.params.equatorialRotation = parseFloat(e.target.value);
+                    document.getElementById('eqRotVal').innerText = app.params.equatorialRotation.toFixed(0) + '°';
+                    app.skyTrails = {}; // Refresh sky trails
+                });
+
+                // Camera Controls
+                document.getElementById('camModeSelect').addEventListener('change', (e) => {
+                    app.params.cameraMode = e.target.value;
+                });
+                
+                document.getElementById('camTargetSelect').addEventListener('change', (e) => {
+                    app.params.cameraTarget = e.target.value;
+                });
+
+                // Sky Map Controls
+                document.getElementById('skyZoomSlider').addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    app.sky.camera.zoom = val;
+                });
+
+                document.getElementById('skyTargetSelect').addEventListener('change', (e) => {
+                    app.sky.camera.target = e.target.value;
+                });
+
+                document.getElementById('csvInput').addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        const text = evt.target.result;
+                        const lines = text.split('\n');
+                        const traj = [];
+                        lines.forEach(line => {
+                            const parts = line.split(',').map(s => s.trim());
+                            if(parts.length >= 4) {
+                                const t = parseFloat(parts[0]);
+                                const x = parseFloat(parts[1]);
+                                const y = parseFloat(parts[2]);
+                                const z = parseFloat(parts[3]);
+                                if(!isNaN(t) && !isNaN(x)) traj.push({t,x,y,z});
+                            }
+                        });
+                        traj.sort((a,b) => a.t - b.t);
+                        if(traj.length > 0) {
+                            app.params.customTraj = traj;
+                            document.getElementById('upload-status').classList.remove('hidden');
+                            app.params.time = traj[0].t; 
+                            app.params.observer = 'custom'; 
+                            document.getElementById('observerSelect').value = 'custom';
+                        }
+                    };
+                    reader.readAsText(file);
+                });
+            },
+            
+            setAddMode: function(mode) {
+                app.params.addMode = mode;
+                document.getElementById('tab-orbit').classList.toggle('active', mode === 'orbit');
+                document.getElementById('tab-fixed').classList.toggle('active', mode === 'fixed');
+                document.getElementById('tab-shape').classList.toggle('active', mode === 'shape');
+                
+                document.getElementById('section-orbit').classList.add('hidden-section');
+                document.getElementById('section-fixed').classList.add('hidden-section');
+                document.getElementById('section-shape').classList.add('hidden-section');
+
+                if (mode === 'orbit') document.getElementById('section-orbit').classList.remove('hidden-section');
+                if (mode === 'fixed') document.getElementById('section-fixed').classList.remove('hidden-section');
+                if (mode === 'shape') document.getElementById('section-shape').classList.remove('hidden-section');
+                
+                app.logic.updatePreview();
+            },
+
+            setViewMode: function(mode) {
+                const sky = document.getElementById('sky-view-container');
+                const orbit = document.getElementById('orbit-view-container');
+                const btns = document.querySelectorAll('.view-btn');
+                
+                btns.forEach(b => b.classList.remove('active'));
+                if(mode === 'sky') btns[0].classList.add('active');
+                if(mode === 'split') btns[1].classList.add('active');
+                if(mode === 'orbit') btns[2].classList.add('active');
+
+                if (mode === 'split') {
+                    sky.style.width = '50%';
+                    sky.style.display = 'block';
+                    orbit.style.width = '50%';
+                    orbit.style.display = 'block';
+                } else if (mode === 'sky') {
+                    sky.style.width = '100%';
+                    sky.style.display = 'block';
+                    orbit.style.width = '0%';
+                    orbit.style.display = 'none';
+                } else if (mode === 'orbit') {
+                    sky.style.width = '0%';
+                    sky.style.display = 'none';
+                    orbit.style.width = '100%';
+                    orbit.style.display = 'block';
+                }
+
+                setTimeout(() => {
+                    const skyRect = sky.getBoundingClientRect();
+                    if (skyRect.width > 0) {
+                        app.sky.cvs.width = skyRect.width;
+                        app.sky.cvs.height = skyRect.height;
+                    }
+
+                    const orbitRect = orbit.getBoundingClientRect();
+                    if (orbitRect.width > 0) {
+                        app.three.camera.aspect = orbitRect.width / orbitRect.height;
+                        app.three.camera.updateProjectionMatrix();
+                        app.three.renderer.setSize(orbitRect.width, orbitRect.height);
+                    }
+                }, 50); 
+            },
+
+            toggleRelativeTrails: function(isRelative) {
+                app.params.relativeTrails = isRelative;
+                // Clear existing trails to avoid mixing absolute/relative points
+                Object.keys(app.trails).forEach(key => {
+                    app.trails[key].points = [];
+                    app.trails[key].mesh.geometry.setFromPoints([]);
+                });
+            },
+            
+            toggleMoon: function(isVisible) {
+                app.params.showMoon = isVisible;
+                if (!isVisible) {
+                    // Clear moon trails immediately
+                    app.skyTrails['moon'] = [];
+                    if(app.trails['moon']) {
+                        app.trails['moon'].points = [];
+                        app.trails['moon'].mesh.geometry.setFromPoints([]);
+                        app.trails['moon'].mesh.visible = false;
+                    }
+                    if(app.objects['moon']) app.objects['moon'].visible = false;
+                    if(app.connectorLines['moon']) app.connectorLines['moon'].visible = false;
+                    // Also hide projections if moon is hidden
+                     if(app.projectionMarkers && app.projectionMarkers['moon']) app.projectionMarkers['moon'].visible = false;
+                     if(app.projectionLines && app.projectionLines['moon']) app.projectionLines['moon'].visible = false;
+                }
+                // Refresh list to update visibility in dropdowns/lists if needed
+                app.ui.renderTargetToggles();
+            },
+
+            toggleCelestialSphere: function(isVisible) {
+                app.params.showCelestialSphere = isVisible;
+                if (app.three.celestialSphere) {
+                    app.three.celestialSphere.visible = isVisible;
+                }
+            },
+
+            updateAmbient: function(val) {
+                app.params.ambientIntensity = parseFloat(val);
+                document.getElementById('ambientVal').innerText = Math.round(app.params.ambientIntensity*100) + '%';
+                if(app.three.ambient) app.three.ambient.intensity = app.params.ambientIntensity;
+            },
+
+            renderTargetToggles: function() {
+                const container = document.getElementById('planet-toggles-container');
+                container.innerHTML = '';
+                
+                const keys = ['sun', ...Object.keys(PLANETS)]; // Include Sun manually here too for UI
+
+                keys.forEach(key => {
+                    let p = PLANETS[key];
+                    if (key === 'sun') p = { name: "שמש" };
+                    
+                    if (key === 'moon' && !app.params.showMoon) return; // Don't show in target list if moon hidden
+
+                    if (key === app.params.observer || (p && p.hiddenFromList)) return;
+
+                    const row = document.createElement('div');
+                    row.className = 'flex justify-between items-center text-sm';
+                    
+                    const label = document.createElement('span');
+                    label.innerText = p.name;
+                    label.className = "text-gray-300";
+                    
+                    const check = document.createElement('input');
+                    check.type = 'checkbox';
+                    check.checked = !!app.params.targetedBodies[key];
+                    check.onchange = (e) => {
+                        app.params.targetedBodies[key] = e.target.checked;
+                    };
+                    
+                    row.appendChild(label);
+                    row.appendChild(check);
+                    container.appendChild(row);
+                });
+            },
+
+            toggleDialogue: function(id) {
+                const el = document.getElementById('dialogue-' + id);
+                document.querySelectorAll('.dialogue').forEach(d => {
+                    if(d !== el) d.style.display = 'none';
+                });
+                
+                if (el.style.display === 'flex') {
+                    el.style.display = 'none';
+                    if (id === 'add-body') app.preview.active = false;
+                } else {
+                    el.style.display = 'flex';
+                    if (id === 'add-body') app.logic.updatePreview();
+                    if (id === 'lines') app.ui.renderTargetToggles();
+                    if (id === 'moon-settings') app.logic.updateMoonInputs();
+                }
+                document.getElementById('context-menu').style.display = 'none';
+            },
+
+            closeDialogue: function(id) {
+                document.getElementById('dialogue-' + id).style.display = 'none';
+                if (id === 'add-body') app.preview.active = false;
+            },
+
+            toggleRTL: function(isRTL) {
+                document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+                document.querySelectorAll('.view-label').forEach(l => {
+                    l.style.right = isRTL ? '20px' : 'auto';
+                    l.style.left = isRTL ? 'auto' : '20px';
+                });
+            },
+
+            toggleNiqqud: function(show) {}
+        };
+
+        window.onload = function() {
+            initThree();
+            initSky();
+            app.ui.init();
+            animate();
+            
+            window.addEventListener('resize', () => {
+                const container = document.getElementById('orbit-view-container');
+                app.three.camera.aspect = container.clientWidth / container.clientHeight;
+                app.three.camera.updateProjectionMatrix();
+                app.three.renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+        };
+
+    </script>
+
+<!-- ═══ PhysiTal Recording Module ═══ -->
+<div id="rec-frame">
+    <div id="rec-frame-border">
+        <div class="rec-handle rec-handle-nw" data-dir="nw"></div>
+        <div class="rec-handle rec-handle-n"  data-dir="n"></div>
+        <div class="rec-handle rec-handle-ne" data-dir="ne"></div>
+        <div class="rec-handle rec-handle-e"  data-dir="e"></div>
+        <div class="rec-handle rec-handle-se" data-dir="se"></div>
+        <div class="rec-handle rec-handle-s"  data-dir="s"></div>
+        <div class="rec-handle rec-handle-sw" data-dir="sw"></div>
+        <div class="rec-handle rec-handle-w"  data-dir="w"></div>
+        <div id="rec-frame-dims">1920 × 1080</div>
+    </div>
+    <div id="rec-controls">
+        <button class="rc-btn" id="rc-rec" title="Record / Stop">⏺</button>
+        <button class="rc-btn" id="rc-pause" title="Pause" style="display:none;">⏸</button>
+        <span id="rc-timer">0:00</span>
+        <div class="rc-sep"></div>
+        <button class="rc-btn" id="rc-screenshot" title="Screenshot">📷</button>
+        <div class="rc-sep"></div>
+        <select id="rc-aspect">
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="21:9">21:9</option>
+            <option value="free">Free</option>
+        </select>
+        <select id="rc-resolution">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="3840x2160">4K</option>
+        </select>
+        <select id="rc-fps">
+            <option value="30" selected>30fps</option>
+            <option value="24">24fps</option>
+            <option value="60">60fps</option>
+        </select>
+        <div class="rc-sep"></div>
+        <button id="rc-close" title="Close">✕</button>
+    </div>
+</div>
+<div id="rec-download-overlay">
+    <div id="rec-download-dialog">
+        <h3 data-he="שמירת הקלטה" data-en="Save Recording">שמירת הקלטה</h3>
+        <input type="text" id="rec-filename" placeholder="filename" dir="ltr">
+        <div class="dl-btns">
+            <button class="dl-btn dl-btn-secondary" id="dl-cancel" data-he="ביטול" data-en="Cancel">ביטול</button>
+            <button class="dl-btn dl-btn-primary" id="dl-confirm" data-he="הורדה" data-en="Download">הורדה</button>
+        </div>
+    </div>
+</div>
+<div id="rec-hint">Press <b>R</b> to open recording frame</div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════
+// PhysiTal Recording Module (auto-injected)
+// ═══════════════════════════════════════════════════════════
+(function() {
+    var REC_SIM_NAME = 'radec-simulation';
+
+    // ── State ──
+    var rec = window._rec = {
+        isActive: false,
+        isPaused: false,
+        mediaRecorder: null,
+        chunks: [],
+        offscreenCanvas: null,
+        offscreenCtx: null,
+        stream: null,
+        startTimestamp: 0,
+        pausedElapsed: 0,
+        timerInterval: null,
+        lastBlob: null,
+        resolution: { w: 1920, h: 1080 },
+        fps: 30,
+        frame: { x: 0, y: 0, w: 0, h: 0 },
+        aspectRatio: 16 / 9,
+        _domCache: null,
+        _domCaptureActive: false,
+        _lastDomCapture: 0,
+        _domCaptureInterval: 120
+    };
+
+    // ── Aspect Ratio ──
+    rec.parseAspect = function(val) {
+        if (val === 'free') return null;
+        var parts = val.split(':').map(Number);
+        return parts[0] / parts[1];
+    };
+
+    rec.enforceAspect = function() {
+        if (!this.aspectRatio) return;
+        var border = document.getElementById('rec-frame-border');
+        var w = parseInt(border.style.width) || 0;
+        var newH = Math.round(w / this.aspectRatio);
+        border.style.height = newH + 'px';
+        this.syncFrameFromDOM();
+        this.positionControls();
+    };
+
+    // ── Offscreen Canvas ──
+    rec.setupOffscreen = function() {
+        if (!this.offscreenCanvas) {
+            this.offscreenCanvas = document.createElement('canvas');
+            this.offscreenCanvas.id = '_rec_offscreen';
+        }
+        this.offscreenCanvas.width = this.resolution.w;
+        this.offscreenCanvas.height = this.resolution.h;
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    };
+
+    // ── Universal compositeOnto — draws all visible canvases ──
+    rec.compositeOnto = function(targetCtx, targetW, targetH, region) {
+        var r = region || { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+        var sx = targetW / r.w;
+        var sy = targetH / r.h;
+
+        // Fill background
+        var bgColor = getComputedStyle(document.body).backgroundColor;
+        targetCtx.fillStyle = (bgColor && bgColor !== 'rgba(0, 0, 0, 0)') ? bgColor : '#0a0a14';
+        targetCtx.fillRect(0, 0, targetW, targetH);
+
+        // Draw all visible canvases at correct positions
+        var canvases = document.querySelectorAll('canvas');
+        for (var i = 0; i < canvases.length; i++) {
+            var cvs = canvases[i];
+            if (cvs.id === '_rec_offscreen') continue;
+            if (cvs.offsetWidth === 0 && cvs.offsetHeight === 0) continue;
+
+            var rect = cvs.getBoundingClientRect();
+            // Check overlap with recording frame
+            if (rect.right <= r.x || rect.left >= r.x + r.w) continue;
+            if (rect.bottom <= r.y || rect.top >= r.y + r.h) continue;
+
+            var dx = (rect.left - r.x) * sx;
+            var dy = (rect.top - r.y) * sy;
+            var dw = rect.width * sx;
+            var dh = rect.height * sy;
+
+            try { targetCtx.drawImage(cvs, dx, dy, dw, dh); } catch(e) {}
+        }
+    };
+
+    // ── Update recording frame (called each animation frame) ──
+    rec.updateFrame = function() {
+        if (!this.offscreenCtx) return;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        // Draw canvases (fast, every frame)
+        this.compositeOnto(this.offscreenCtx, this.resolution.w, this.resolution.h, region);
+
+        // Draw cached DOM overlay
+        if (this._domCache) {
+            this.offscreenCtx.drawImage(this._domCache, 0, 0);
+        }
+
+        // Trigger async DOM capture (throttled)
+        var now = performance.now();
+        if (!this._domCaptureActive && now - this._lastDomCapture >= this._domCaptureInterval) {
+            this._lastDomCapture = now;
+            this._captureDomOverlay();
+        }
+    };
+
+    // ── Async DOM overlay capture via html2canvas ──
+    rec._captureDomOverlay = async function() {
+        if (typeof html2canvas === 'undefined') return;
+        this._domCaptureActive = true;
+
+        try {
+            var f = this.frame;
+            var scaleX = this.resolution.w / f.w;
+            var scaleY = this.resolution.h / f.h;
+
+            var tempCanvas = document.createElement('canvas');
+            tempCanvas.width = this.resolution.w;
+            tempCanvas.height = this.resolution.h;
+            var tempCtx = tempCanvas.getContext('2d');
+
+            // Find visible dialogues / overlay panels
+            var selectors = '.dialogue, .glass-panel, [class*="dialog"], [class*="panel"]:not(#rec-controls)';
+            var elements = document.querySelectorAll(selectors);
+            var anyRendered = false;
+
+            for (var j = 0; j < elements.length; j++) {
+                var dlg = elements[j];
+                if (dlg.style.display === 'none' || dlg.offsetParent === null) continue;
+                if (dlg.id === 'rec-frame' || dlg.id === 'rec-download-overlay' || dlg.id === 'rec-controls') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+
+                var rendered = await html2canvas(dlg, {
+                    backgroundColor: null, logging: false, useCORS: true
+                });
+                var ddx = (rect.left - f.x) * scaleX;
+                var ddy = (rect.top - f.y) * scaleY;
+                var ddw = rect.width * scaleX;
+                var ddh = rect.height * scaleY;
+                tempCtx.drawImage(rendered, ddx, ddy, ddw, ddh);
+                anyRendered = true;
+            }
+
+            this._domCache = anyRendered ? tempCanvas : null;
+        } catch (e) {
+            console.warn('DOM overlay capture failed:', e);
+        }
+
+        this._domCaptureActive = false;
+    };
+
+    // ── Start Recording ──
+    rec.start = function(options) {
+        var opts = options || {};
+        if (opts.width) this.resolution.w = opts.width;
+        if (opts.height) this.resolution.h = opts.height;
+        if (opts.fps) this.fps = opts.fps;
+
+        this.setupOffscreen();
+        this.chunks = [];
+        this.isPaused = false;
+        this.pausedElapsed = 0;
+
+        this.stream = this.offscreenCanvas.captureStream(this.fps);
+
+        var mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        var mimeType = '';
+        for (var i = 0; i < mimeTypes.length; i++) {
+            if (MediaRecorder.isTypeSupported(mimeTypes[i])) { mimeType = mimeTypes[i]; break; }
+        }
+
+        this.mediaRecorder = new MediaRecorder(this.stream, {
+            mimeType: mimeType,
+            videoBitsPerSecond: this.resolution.w >= 3840 ? 20000000 :
+                               this.resolution.w >= 1920 ? 10000000 : 5000000
+        });
+
+        this.mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size > 0) rec.chunks.push(e.data);
+        };
+
+        this.mediaRecorder.start(1000);
+        this.isActive = true;
+        this.startTimestamp = Date.now();
+        this._startTimer();
+
+        var border = document.getElementById('rec-frame-border');
+        var recBtn = document.getElementById('rc-rec');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('recording');
+        recBtn.classList.add('rec-active');
+        recBtn.textContent = '⏹';
+        recBtn.title = 'Stop';
+        pauseBtn.style.display = 'inline-flex';
+    };
+
+    // ── Stop Recording ──
+    rec.stop = function() {
+        return new Promise(function(resolve) {
+            if (!rec.mediaRecorder || rec.mediaRecorder.state === 'inactive') {
+                resolve(null); return;
+            }
+            if (rec.mediaRecorder.state === 'paused') {
+                rec.mediaRecorder.resume();
+            }
+            rec.mediaRecorder.onstop = function() {
+                var blob = new Blob(rec.chunks, { type: rec.mediaRecorder.mimeType });
+                rec.isActive = false;
+                rec.isPaused = false;
+                rec._stopTimer();
+                rec.lastBlob = blob;
+                rec._domCache = null;
+                rec._domCaptureActive = false;
+
+                var border = document.getElementById('rec-frame-border');
+                var recBtn = document.getElementById('rc-rec');
+                var pauseBtn = document.getElementById('rc-pause');
+                border.classList.remove('recording', 'paused');
+                recBtn.classList.remove('rec-active');
+                recBtn.textContent = '⏺';
+                recBtn.title = 'Record';
+                pauseBtn.style.display = 'none';
+                pauseBtn.classList.remove('paused-active');
+                pauseBtn.textContent = '⏸';
+
+                rec._showDownloadDialog(blob);
+                resolve(blob);
+            };
+            rec.mediaRecorder.stop();
+        });
+    };
+
+    // ── Pause ──
+    rec.pause = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+        this.mediaRecorder.pause();
+        this.isPaused = true;
+        this.pausedElapsed += Date.now() - this.startTimestamp;
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.add('paused');
+        pauseBtn.classList.add('paused-active');
+        pauseBtn.textContent = '▶';
+        pauseBtn.title = 'Resume';
+    };
+
+    // ── Resume ──
+    rec.resume = function() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+        this.mediaRecorder.resume();
+        this.isPaused = false;
+        this.startTimestamp = Date.now();
+
+        var border = document.getElementById('rec-frame-border');
+        var pauseBtn = document.getElementById('rc-pause');
+        border.classList.remove('paused');
+        pauseBtn.classList.remove('paused-active');
+        pauseBtn.textContent = '⏸';
+        pauseBtn.title = 'Pause';
+    };
+
+    // ── Screenshot ──
+    rec.screenshot = async function(options) {
+        var opts = options || {};
+        var w = opts.width || this.resolution.w;
+        var h = opts.height || this.resolution.h;
+        var f = this.frame;
+        var region = { x: f.x, y: f.y, w: f.w, h: f.h };
+
+        var offscreen = document.createElement('canvas');
+        offscreen.width = w;
+        offscreen.height = h;
+        var ctx = offscreen.getContext('2d');
+
+        this.compositeOnto(ctx, w, h, region);
+
+        if (typeof html2canvas !== 'undefined') {
+            var scaleX = w / f.w;
+            var scaleY = h / f.h;
+            var dlgs = document.querySelectorAll('.dialogue, .glass-panel');
+            for (var i = 0; i < dlgs.length; i++) {
+                var dlg = dlgs[i];
+                if (dlg.style.display === 'none') continue;
+                var rect = dlg.getBoundingClientRect();
+                if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+                if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+                try {
+                    var rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+                    ctx.drawImage(rendered, (rect.left - f.x) * scaleX, (rect.top - f.y) * scaleY, rect.width * scaleX, rect.height * scaleY);
+                } catch(e) {}
+            }
+        }
+
+        return offscreen.toDataURL(opts.format || 'image/png', opts.quality || 0.95);
+    };
+
+    // ── Download helpers ──
+    rec.downloadBlob = function(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    };
+
+    rec.downloadDataURL = function(dataURL, filename) {
+        var a = document.createElement('a');
+        a.href = dataURL; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+
+    // ── Timer ──
+    rec._startTimer = function() {
+        var el = document.getElementById('rc-timer');
+        this.timerInterval = setInterval(function() {
+            var elapsed;
+            if (rec.isPaused) {
+                elapsed = Math.floor(rec.pausedElapsed / 1000);
+            } else {
+                elapsed = Math.floor((rec.pausedElapsed + Date.now() - rec.startTimestamp) / 1000);
+            }
+            var min = Math.floor(elapsed / 60);
+            var sec = String(elapsed % 60).padStart(2, '0');
+            el.textContent = min + ':' + sec;
+        }, 250);
+    };
+
+    rec._stopTimer = function() {
+        clearInterval(this.timerInterval);
+        document.getElementById('rc-timer').textContent = '0:00';
+    };
+
+    // ── Download Dialog ──
+    rec._showDownloadDialog = function(blob) {
+        var overlay = document.getElementById('rec-download-overlay');
+        var input = document.getElementById('rec-filename');
+        var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        input.value = 'physital-' + REC_SIM_NAME + '-' + ts;
+        overlay.style.display = 'flex';
+        input.focus(); input.select();
+        overlay._pendingBlob = blob;
+    };
+
+    rec._hideDownloadDialog = function() {
+        document.getElementById('rec-download-overlay').style.display = 'none';
+    };
+
+    // ── Sync frame from DOM ──
+    rec.syncFrameFromDOM = function() {
+        var border = document.getElementById('rec-frame-border');
+        this.frame.x = parseInt(border.style.left) || 0;
+        this.frame.y = parseInt(border.style.top) || 0;
+        this.frame.w = parseInt(border.style.width) || window.innerWidth;
+        this.frame.h = parseInt(border.style.height) || window.innerHeight;
+        document.getElementById('rec-frame-dims').textContent = this.frame.w + ' \u00d7 ' + this.frame.h;
+    };
+
+    // ── Position controls below frame ──
+    rec.positionControls = function() {
+        var border = document.getElementById('rec-frame-border');
+        var controls = document.getElementById('rec-controls');
+        var bLeft = parseInt(border.style.left) || 0;
+        var bWidth = parseInt(border.style.width) || 0;
+        var bTop = parseInt(border.style.top) || 0;
+        var bHeight = parseInt(border.style.height) || 0;
+        controls.style.left = (bLeft + bWidth / 2) + 'px';
+        controls.style.transform = 'translateX(-50%)';
+        controls.style.top = (bTop + bHeight + 12) + 'px';
+        controls.style.bottom = 'auto';
+    };
+
+    // ── Toggle Recording Frame ──
+    function toggleRecFrame() {
+        var frame = document.getElementById('rec-frame');
+        var isVisible = frame.classList.contains('active');
+
+        // Close context menu if present
+        var ctxMenu = document.getElementById('ctx-menu') || document.getElementById('context-menu');
+        if (ctxMenu) ctxMenu.style.display = 'none';
+
+        if (isVisible) {
+            if (rec.isActive) return; // don't close while recording
+            frame.classList.remove('active');
+        } else {
+            frame.classList.add('active');
+            var border = document.getElementById('rec-frame-border');
+            var pad = 60;
+            var maxW = window.innerWidth - pad * 2;
+            var maxH = window.innerHeight - pad * 2 - 60;
+            var ar = rec.aspectRatio;
+            var fw, fh;
+            if (ar) {
+                if (maxW / maxH > ar) { fh = maxH; fw = Math.round(fh * ar); }
+                else { fw = maxW; fh = Math.round(fw / ar); }
+            } else { fw = maxW; fh = maxH; }
+            var offsetX = pad + Math.round((maxW - fw) / 2);
+            var offsetY = pad + Math.round((maxH - fh) / 2);
+            border.style.left = offsetX + 'px';
+            border.style.top = offsetY + 'px';
+            border.style.width = fw + 'px';
+            border.style.height = fh + 'px';
+            rec.syncFrameFromDOM();
+            rec.positionControls();
+        }
+    }
+
+    // Expose for context menu integration
+    window._recToggle = toggleRecFrame;
+
+    // ── Bind events after DOM ready ──
+    function bindRecEvents() {
+        // Record / Stop
+        document.getElementById('rc-rec').addEventListener('click', function() {
+            if (rec.isActive) { rec.stop(); } else { rec.start(); }
+        });
+
+        // Pause / Resume
+        document.getElementById('rc-pause').addEventListener('click', function() {
+            if (rec.isPaused) { rec.resume(); } else { rec.pause(); }
+        });
+
+        // Screenshot
+        document.getElementById('rc-screenshot').addEventListener('click', async function() {
+            var dataURL = await rec.screenshot();
+            var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            rec.downloadDataURL(dataURL, 'physital-' + REC_SIM_NAME + '-' + ts + '.png');
+        });
+
+        // Aspect ratio
+        document.getElementById('rc-aspect').addEventListener('change', function(e) {
+            rec.aspectRatio = rec.parseAspect(e.target.value);
+            rec.enforceAspect();
+        });
+
+        // Resolution
+        document.getElementById('rc-resolution').addEventListener('change', function(e) {
+            var parts = e.target.value.split('x').map(Number);
+            rec.resolution = { w: parts[0], h: parts[1] };
+        });
+
+        // FPS
+        document.getElementById('rc-fps').addEventListener('change', function(e) {
+            rec.fps = parseInt(e.target.value);
+        });
+
+        // Close
+        document.getElementById('rc-close').addEventListener('click', function() {
+            if (rec.isActive) return;
+            toggleRecFrame();
+        });
+
+        // Download confirm
+        document.getElementById('dl-confirm').addEventListener('click', function() {
+            var overlay = document.getElementById('rec-download-overlay');
+            var filename = document.getElementById('rec-filename').value.trim() || 'recording';
+            var blob = overlay._pendingBlob;
+            if (blob) rec.downloadBlob(blob, filename + '.webm');
+            rec._hideDownloadDialog();
+        });
+
+        // Download cancel
+        document.getElementById('dl-cancel').addEventListener('click', function() {
+            rec._hideDownloadDialog();
+        });
+
+        // Download Enter/Escape
+        document.getElementById('rec-filename').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('dl-confirm').click();
+            if (e.key === 'Escape') rec._hideDownloadDialog();
+        });
+
+        // Frame drag
+        document.getElementById('rec-frame-border').addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('rec-handle')) return;
+            e.preventDefault();
+            var border = document.getElementById('rec-frame-border');
+            var startX = e.clientX - (parseInt(border.style.left) || 0);
+            var startY = e.clientY - (parseInt(border.style.top) || 0);
+            function onMove(ev) {
+                border.style.left = (ev.clientX - startX) + 'px';
+                border.style.top = (ev.clientY - startY) + 'px';
+                rec.syncFrameFromDOM();
+                rec.positionControls();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        // Frame resize handles
+        document.querySelectorAll('.rec-handle').forEach(function(handle) {
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var dir = handle.dataset.dir;
+                var border = document.getElementById('rec-frame-border');
+                var startMouseX = e.clientX;
+                var startMouseY = e.clientY;
+                var startLeft = parseInt(border.style.left) || 0;
+                var startTop = parseInt(border.style.top) || 0;
+                var startW = parseInt(border.style.width) || 0;
+                var startH = parseInt(border.style.height) || 0;
+                var MIN = 100;
+                function onMove(ev) {
+                    var dx = ev.clientX - startMouseX;
+                    var dy = ev.clientY - startMouseY;
+                    var l = startLeft, t = startTop, w = startW, h = startH;
+                    var ar = rec.aspectRatio;
+                    if (dir.includes('e')) { w = Math.max(MIN, startW + dx); }
+                    if (dir.includes('w')) { w = Math.max(MIN, startW - dx); l = startLeft + (startW - w); }
+                    if (dir.includes('s')) { h = Math.max(MIN, startH + dy); }
+                    if (dir.includes('n')) { h = Math.max(MIN, startH - dy); t = startTop + (startH - h); }
+                    if (ar) {
+                        if (dir === 'e' || dir === 'w') { h = Math.round(w / ar); }
+                        else if (dir === 'n' || dir === 's') { w = Math.round(h * ar); }
+                        else {
+                            if (Math.abs(w - startW) >= Math.abs(h - startH)) { h = Math.round(w / ar); }
+                            else { w = Math.round(h * ar); }
+                        }
+                        if (w < MIN) { w = MIN; h = Math.round(w / ar); }
+                        if (h < MIN) { h = MIN; w = Math.round(h * ar); }
+                        if (dir.includes('n')) { t = startTop + startH - h; }
+                        if (dir.includes('w')) { l = startLeft + startW - w; }
+                    }
+                    border.style.left = l + 'px';
+                    border.style.top = t + 'px';
+                    border.style.width = w + 'px';
+                    border.style.height = h + 'px';
+                    rec.syncFrameFromDOM();
+                    rec.positionControls();
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+
+        // Keyboard shortcut: R to toggle recording frame
+        document.addEventListener('keydown', function(e) {
+            // Skip if typing in an input/textarea/select
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.key === 'r' || e.key === 'R') {
+                if (e.ctrlKey || e.altKey || e.metaKey) return;
+                toggleRecFrame();
+            }
+        });
+
+        // Show hint briefly on load
+        var hint = document.getElementById('rec-hint');
+        if (hint) {
+            setTimeout(function() { hint.classList.add('show'); }, 1500);
+            setTimeout(function() { hint.classList.remove('show'); }, 5000);
+        }
+    }
+
+    // ── Self-sustaining recording render loop ──
+    function recLoop() {
+        if (rec.isActive) { rec.updateFrame(); }
+        requestAnimationFrame(recLoop);
+    }
+
+    // ── Init ──
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { bindRecEvents(); requestAnimationFrame(recLoop); });
+    } else {
+        bindRecEvents();
+        requestAnimationFrame(recLoop);
+    }
+})();
+
+</script>
+</body>
+</html>
