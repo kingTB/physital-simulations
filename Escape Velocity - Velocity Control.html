@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>סימולציית מהירות מילוט</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;800&family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #05050A;
+            font-family: 'Assistant', sans-serif;
+            user-select: none;
+            touch-action: none; /* Prevent native mobile scrolling/zooming */
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        #bgCanvas { z-index: 0; }
+        #trailCanvas { z-index: 1; }
+        #simCanvas { z-index: 2; cursor: grab; }
+        #simCanvas:active { cursor: grabbing; }
+
+        .glass-panel {
+            background: rgba(18, 18, 24, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+            color: #e2e8f0;
+        }
+
+        /* Custom Range Slider - Forced LTR & Slimmer */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            direction: ltr; 
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+        }
+        
+        .math { font-family: 'Times New Roman', Times, serif; font-style: italic; }
+
+        /* Custom Scrollbar for the bottom panel */
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .pointer-events-auto { pointer-events: auto; }
+    </style>
+</head>
+<body class="text-sm">
+
+    <!-- Canvases -->
+    <canvas id="bgCanvas"></canvas>
+    <canvas id="trailCanvas"></canvas>
+    <canvas id="simCanvas"></canvas>
+
+    <!-- UI Layer -->
+    <div id="ui-layer">
+        
+        <!-- Hint Overlay -->
+        <div id="placing-hint" class="absolute top-10 left-1/2 transform -translate-x-1/2 bg-blue-600/90 backdrop-blur text-white px-5 py-2.5 rounded-full shadow-2xl font-bold text-base border border-blue-400 hidden pointer-events-none text-center w-11/12 max-w-sm">
+            לחץ על המסך לבחירת נקודת שיגור...
+        </div>
+
+        <!-- Floating Action Buttons (Top Right - Resized for mobile) -->
+        <div class="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto">
+            <button onclick="cam.targetZoom *= 1.3" class="w-10 h-10 glass-panel border border-white/10 rounded-full flex items-center justify-center text-xl font-bold text-white hover:bg-white/20 active:scale-95 transition-all shadow-lg mb-1">+</button>
+            <button onclick="cam.targetZoom /= 1.3" class="w-10 h-10 glass-panel border border-white/10 rounded-full flex items-center justify-center text-xl font-bold text-white hover:bg-white/20 active:scale-95 transition-all shadow-lg">-</button>
+            <button onclick="cam.target='planet'" class="w-10 h-10 glass-panel border border-white/10 rounded-full flex items-center justify-center text-lg text-white hover:bg-white/20 active:scale-95 transition-all shadow-lg mt-1" title="התמקד בכוכב">🌍</button>
+            <button onclick="clearAllRockets()" class="w-10 h-10 glass-panel border border-white/10 rounded-full flex items-center justify-center text-lg text-red-400 hover:bg-red-500/20 active:scale-95 transition-all shadow-lg" title="נקה מסך">🗑️</button>
+        </div>
+
+        <!-- Bottom Control Panel (Ultra Compact) -->
+        <div id="bottom-panel" class="fixed bottom-0 left-0 w-full glass-panel border-t border-white/5 rounded-t-[24px] pointer-events-auto transition-transform duration-300 ease-in-out shadow-[0_-15px_40px_rgba(0,0,0,0.6)]">
+            
+            <!-- Drag/Collapse Handle -->
+            <div class="w-full flex justify-center py-2.5 cursor-pointer" onclick="togglePanel()">
+                <div class="w-12 h-1 bg-white/20 rounded-full"></div>
+            </div>
+
+            <!-- Content -->
+            <div class="px-4 pb-5 md:pb-6 custom-scrollbar max-h-[60vh] overflow-y-auto">
+                <div class="max-w-2xl mx-auto flex flex-col gap-3">
+                    
+                    <!-- Planet Params (Grid 2 cols) -->
+                    <div class="grid grid-cols-2 gap-4 bg-white/5 p-3 rounded-2xl border border-white/5">
+                        <div>
+                            <div class="flex justify-between items-baseline mb-1">
+                                <label class="text-xs text-gray-400">מסה (M)</label>
+                                <span id="val-mass" class="text-blue-300 font-mono text-sm font-semibold">10000</span>
+                            </div>
+                            <input type="range" id="slider-mass" min="1000" max="1000000" step="1000" value="10000">
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-baseline mb-1">
+                                <label class="text-xs text-gray-400">רדיוס (r)</label>
+                                <span id="val-radius" class="text-blue-300 font-mono text-sm font-semibold">100</span>
+                            </div>
+                            <input type="range" id="slider-radius" min="20" max="250" step="5" value="100">
+                        </div>
+                    </div>
+
+                    <!-- Launch Params -->
+                    <div class="bg-blue-900/20 p-3.5 rounded-2xl border border-blue-500/20 flex flex-col gap-3.5">
+                        
+                        <!-- Velocity -->
+                        <div>
+                            <div class="flex justify-between items-end mb-1">
+                                <div class="text-sm">מהירות שיגור <span id="val-vel" class="text-green-400 font-mono font-bold ml-1">10.0</span></div>
+                                <div class="text-[10px] text-blue-200 bg-blue-900/60 px-1.5 py-0.5 rounded flex items-center gap-1" dir="ltr">
+                                    <span class="math">v<sub>esc</sub> =</span>
+                                    <span id="lbl-vesc" class="font-mono font-bold">14.14</span>
+                                </div>
+                            </div>
+                            <div class="relative w-full py-1">
+                                <input type="range" id="slider-vel" min="0" max="80" step="0.1" value="10.0" class="relative z-10">
+                                <div id="tick-vesc" class="absolute h-4 w-[2px] bg-red-500 z-20 pointer-events-none shadow-[0_0_5px_rgba(239,68,68,1)]" style="left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 1px;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Angle & Position Grid -->
+                        <div class="grid grid-cols-2 gap-4 items-center pt-1">
+                            <div>
+                                <div class="flex justify-between items-baseline mb-1">
+                                    <label class="text-xs text-gray-400">זווית</label>
+                                    <span id="val-angle" class="text-green-400 font-mono text-sm font-semibold">90&deg;</span>
+                                </div>
+                                <input type="range" id="slider-angle" min="-90" max="90" step="1" value="90">
+                            </div>
+                            
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[10px] text-gray-500 text-center">מיקום שיגור</label>
+                                <div class="flex items-center p-0.5 bg-black/40 rounded-lg border border-white/5">
+                                    <button id="btn-reset-pos" class="flex-1 py-1.5 text-xs rounded-md bg-white/20 text-white font-medium shadow-sm transition">🌍 קרקע</button>
+                                    <button id="btn-set-pos" class="flex-1 py-1.5 text-xs rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition">📍 חלל</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Button -->
+                    <button id="btn-launch" class="w-full h-12 mt-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 active:scale-[0.98] text-white rounded-xl transition-all font-bold shadow-[0_4px_20px_rgba(37,99,235,0.4)] text-lg flex items-center justify-center gap-2">
+                        <span>🚀</span> שגר טיל
+                    </button>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Physics Engine & State ---
+        const G = 1; 
+        const MAX_TRAIL = 2000;
+        const rocketNames = ['אפולו', 'בראשית', 'ספוטניק', 'ווייאג\'ר', 'אטלנטיס', 'קאסיני', 'גלילאו', 'האבל', 'פלקון', 'אריאן'];
+        
+        const sim = {
+            dt: 0.1, 
+            planet: { x: 0, y: 0, mass: 10000, radius: 100 },
+            rockets: [], 
+            rocketIdCounter: 0,
+            launcher: { v: 10, angle: 90, mode: 'surface', customPos: {x: 0, y: -200} },
+            escVel: 0
+        };
+
+        const cam = { x: 0, y: 0, zoom: 1.0, target: 'planet', targetZoom: 1.0 }; 
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        // --- Canvas Setup ---
+        const bgCanvas = document.getElementById('bgCanvas');
+        const trailCanvas = document.getElementById('trailCanvas');
+        const simCanvas = document.getElementById('simCanvas');
+        
+        const bgCtx = bgCanvas.getContext('2d', { alpha: false });
+        const trailCtx = trailCanvas.getContext('2d');
+        const simCtx = simCanvas.getContext('2d');
+
+        function resizeCanvases() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            [bgCanvas, trailCanvas, simCanvas].forEach(c => {
+                c.width = width;
+                c.height = height;
+            });
+            drawBackground(); 
+        }
+        window.addEventListener('resize', resizeCanvases);
+
+        // --- Environment (Stars) ---
+        const stars = Array.from({length: 400}, () => ({
+            x: (Math.random() - 0.5) * 10000,
+            y: (Math.random() - 0.5) * 10000,
+            r: Math.random() * 1.5,
+            alpha: Math.random() * 0.8 + 0.2
+        }));
+
+        function drawBackground() {
+            bgCtx.fillStyle = '#05050A';
+            bgCtx.fillRect(0, 0, width, height);
+            
+            stars.forEach(s => {
+                const sx = (s.x - cam.x * 0.05) * cam.zoom + width/2;
+                const sy = (s.y - cam.y * 0.05) * cam.zoom + height/2;
+                
+                if(sx > 0 && sx < width && sy > 0 && sy < height) {
+                    bgCtx.beginPath();
+                    bgCtx.arc(sx, sy, s.r * Math.max(0.5, cam.zoom*0.5), 0, Math.PI*2);
+                    bgCtx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`;
+                    bgCtx.fill();
+                }
+            });
+        }
+
+        // --- Core Functions ---
+        function worldToScreen(wx, wy) {
+            return {
+                x: (wx - cam.x) * cam.zoom + width / 2,
+                y: (wy - cam.y) * cam.zoom + height / 2
+            };
+        }
+
+        function screenToWorld(sx, sy) {
+            return {
+                x: (sx - width / 2) / cam.zoom + cam.x,
+                y: (sy - height / 2) / cam.zoom + cam.y
+            };
+        }
+
+        function getLauncherPos() {
+            if (sim.launcher.mode === 'surface') {
+                return { x: 0, y: -(sim.planet.radius + 0.5) };
+            } else {
+                return sim.launcher.customPos;
+            }
+        }
+
+        function calculateEscapeVelocity() {
+            const lPos = getLauncherPos();
+            const dist = Math.max(0.1, Math.hypot(lPos.x - sim.planet.x, lPos.y - sim.planet.y));
+            sim.escVel = Math.sqrt((2 * G * sim.planet.mass) / dist);
+            
+            document.getElementById('lbl-vesc').innerText = sim.escVel.toFixed(2);
+            
+            const slider = document.getElementById('slider-vel');
+            const min = parseFloat(slider.min);
+            const max = parseFloat(slider.max);
+            let ratio = (sim.escVel - min) / (max - min);
+            ratio = Math.max(0, Math.min(1, ratio)); 
+            
+            // 8px represents half of the 16px thumb to ensure accurate alignment
+            document.getElementById('tick-vesc').style.left = `calc(8px + ${ratio} * (100% - 16px))`;
+        }
+
+        function launchRocket() {
+            const pos = getLauncherPos();
+            
+            const dx = pos.x - sim.planet.x;
+            const dy = pos.y - sim.planet.y;
+            const normalAngle = Math.atan2(dy, dx);
+            const rad = normalAngle + (sim.launcher.angle * Math.PI / 180);
+            
+            const vx = sim.launcher.v * Math.cos(rad);
+            const vy = sim.launcher.v * Math.sin(rad);
+            
+            sim.rocketIdCounter++;
+            const rName = rocketNames[sim.rocketIdCounter % rocketNames.length] + ' ' + sim.rocketIdCounter;
+
+            sim.rockets.push({
+                id: sim.rocketIdCounter,
+                name: rName,
+                x: pos.x,
+                y: pos.y,
+                vx: vx,
+                vy: vy,
+                state: 'launched',
+                history: [],
+                color: `hsl(${Math.random() * 360}, 80%, 70%)` 
+            });
+            
+            if(sim.rockets.length > 50) {
+                sim.rockets.shift();
+            }
+        }
+
+        window.clearAllRockets = function() {
+            sim.rockets = [];
+            cam.target = 'planet';
+        };
+
+        window.trackRocket = function(id) {
+            cam.target = 'rocket_' + id;
+        };
+
+        function updatePhysics() {
+            const subSteps = 5;
+            const subDt = sim.dt / subSteps;
+
+            for (let r of sim.rockets) {
+                if (r.state === 'crashed') continue;
+
+                for(let i=0; i<subSteps; i++) {
+                    const dx = sim.planet.x - r.x;
+                    const dy = sim.planet.y - r.y;
+                    const distSq = dx*dx + dy*dy;
+                    const dist = Math.sqrt(distSq);
+
+                    if (dist < sim.planet.radius) {
+                        r.state = 'crashed';
+                        const overlap = sim.planet.radius - dist;
+                        r.x -= (dx/dist) * overlap;
+                        r.y -= (dy/dist) * overlap;
+                        break; 
+                    }
+
+                    const accel = (G * sim.planet.mass) / distSq;
+                    const ax = accel * (dx / dist);
+                    const ay = accel * (dy / dist);
+
+                    r.vx += ax * subDt;
+                    r.vy += ay * subDt;
+                    r.x += r.vx * subDt;
+                    r.y += r.vy * subDt;
+                }
+
+                if (r.history.length === 0 || 
+                    Math.hypot(r.x - r.history[r.history.length-1].x, 
+                               r.y - r.history[r.history.length-1].y) > 2) {
+                    r.history.push({x: r.x, y: r.y});
+                    if (r.history.length > MAX_TRAIL) {
+                        r.history.shift();
+                    }
+                }
+            }
+        }
+
+        function updateCamera() {
+            cam.zoom += (cam.targetZoom - cam.zoom) * 0.15;
+
+            if (cam.target === 'planet') {
+                cam.x += (sim.planet.x - cam.x) * 0.1;
+                cam.y += (sim.planet.y - cam.y) * 0.1;
+            } else if (cam.target === 'rocket' && sim.rockets.length > 0) {
+                const latest = sim.rockets[sim.rockets.length - 1];
+                cam.x += (latest.x - cam.x) * 0.1;
+                cam.y += (latest.y - cam.y) * 0.1;
+            } else if (typeof cam.target === 'string' && cam.target.startsWith('rocket_')) {
+                const targetId = parseInt(cam.target.split('_')[1]);
+                const targetRocket = sim.rockets.find(r => r.id === targetId);
+                if (targetRocket) {
+                    cam.x += (targetRocket.x - cam.x) * 0.1;
+                    cam.y += (targetRocket.y - cam.y) * 0.1;
+                } else {
+                    cam.target = 'free'; 
+                }
+            }
+        }
+
+        // --- Rendering ---
+        function render() {
+            updatePhysics();
+            updateCamera();
+
+            if(Math.abs(cam.x) > 0.1 || Math.abs(cam.y) > 0.1 || Math.abs(cam.zoom - cam.targetZoom) > 0.001) {
+                 drawBackground();
+            }
+
+            trailCtx.clearRect(0, 0, width, height);
+            simCtx.clearRect(0, 0, width, height);
+
+            // Draw Trails
+            for(let r of sim.rockets) {
+                if (r.history.length > 1) {
+                    trailCtx.beginPath();
+                    const start = worldToScreen(r.history[0].x, r.history[0].y);
+                    trailCtx.moveTo(start.x, start.y);
+                    
+                    for(let i=1; i<r.history.length; i++) {
+                        const pt = worldToScreen(r.history[i].x, r.history[i].y);
+                        trailCtx.lineTo(pt.x, pt.y);
+                    }
+                    
+                    trailCtx.strokeStyle = r.state === 'crashed' ? 'rgba(239, 68, 68, 0.6)' : r.color;
+                    trailCtx.globalAlpha = 0.6;
+                    trailCtx.lineWidth = Math.max(1, 2 * cam.zoom);
+                    trailCtx.lineJoin = 'round';
+                    trailCtx.stroke();
+                    trailCtx.globalAlpha = 1.0;
+                }
+            }
+
+            // Draw Planet
+            const pScreen = worldToScreen(sim.planet.x, sim.planet.y);
+            const pRadiusScreen = sim.planet.radius * cam.zoom;
+            
+            const glow = simCtx.createRadialGradient(pScreen.x, pScreen.y, pRadiusScreen * 0.9, pScreen.x, pScreen.y, pRadiusScreen * 1.5);
+            glow.addColorStop(0, 'rgba(56, 189, 248, 0.4)');
+            glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+            simCtx.fillStyle = glow;
+            simCtx.beginPath();
+            simCtx.arc(pScreen.x, pScreen.y, pRadiusScreen * 1.5, 0, Math.PI*2);
+            simCtx.fill();
+
+            simCtx.beginPath();
+            simCtx.arc(pScreen.x, pScreen.y, pRadiusScreen, 0, Math.PI*2);
+            const planetGrad = simCtx.createRadialGradient(pScreen.x - pRadiusScreen*0.3, pScreen.y - pRadiusScreen*0.3, 0, pScreen.x, pScreen.y, pRadiusScreen);
+            planetGrad.addColorStop(0, '#1e3a8a');
+            planetGrad.addColorStop(1, '#0f172a'); 
+            simCtx.fillStyle = planetGrad;
+            simCtx.fill();
+            simCtx.strokeStyle = 'rgba(255,255,255,0.1)';
+            simCtx.lineWidth = 2;
+            simCtx.stroke();
+
+            // Draw Pre-launch Vector
+            const lPos = getLauncherPos();
+            const lScreen = worldToScreen(lPos.x, lPos.y);
+            
+            const dx = lPos.x - sim.planet.x;
+            const dy = lPos.y - sim.planet.y;
+            const normalAngle = Math.atan2(dy, dx);
+            const lRad = normalAngle + (sim.launcher.angle * Math.PI / 180);
+            
+            const vLen = sim.launcher.v * 3 * cam.zoom; 
+            
+            simCtx.save();
+            simCtx.translate(lScreen.x, lScreen.y);
+            
+            simCtx.beginPath();
+            simCtx.arc(0, 0, 4, 0, Math.PI*2);
+            simCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            simCtx.fill();
+            simCtx.strokeStyle = 'rgba(74, 222, 128, 1)';
+            simCtx.lineWidth = 1;
+            simCtx.stroke();
+
+            simCtx.rotate(lRad);
+            simCtx.beginPath();
+            simCtx.moveTo(0, 0);
+            simCtx.lineTo(vLen, 0);
+            simCtx.strokeStyle = 'rgba(74, 222, 128, 0.8)';
+            simCtx.lineWidth = 2;
+            simCtx.stroke();
+            
+            simCtx.beginPath();
+            simCtx.moveTo(vLen, 0);
+            simCtx.lineTo(vLen - 6, -4);
+            simCtx.lineTo(vLen - 6, 4);
+            simCtx.fillStyle = 'rgba(74, 222, 128, 0.8)';
+            simCtx.fill();
+            simCtx.restore();
+
+            // Draw Rockets
+            const rSize = Math.max(5, 8 * cam.zoom); 
+            
+            for(let r of sim.rockets) {
+                const rScreen = worldToScreen(r.x, r.y);
+                
+                simCtx.save();
+                simCtx.translate(rScreen.x, rScreen.y);
+                
+                let angle = 0;
+                if (r.state === 'crashed') {
+                     angle = Math.atan2(r.y - sim.planet.y, r.x - sim.planet.x);
+                } else if (Math.hypot(r.vx, r.vy) > 0.1) {
+                    angle = Math.atan2(r.vy, r.vx);
+                }
+                
+                simCtx.rotate(angle);
+                
+                simCtx.beginPath();
+                simCtx.moveTo(rSize, 0);
+                simCtx.lineTo(-rSize/2, rSize/2);
+                simCtx.lineTo(-rSize/2, -rSize/2);
+                simCtx.closePath();
+                simCtx.fillStyle = r.state === 'crashed' ? '#ef4444' : '#f8fafc';
+                simCtx.fill();
+
+                if (r.state !== 'crashed' && r.history.length < 50) {
+                     simCtx.beginPath();
+                     simCtx.moveTo(-rSize/2, 0);
+                     simCtx.lineTo(-rSize*1.5 - Math.random()*rSize, 0);
+                     simCtx.strokeStyle = '#f97316';
+                     simCtx.lineWidth = rSize/2;
+                     simCtx.stroke();
+                }
+
+                simCtx.restore();
+
+                simCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                simCtx.font = '11px Assistant';
+                simCtx.textAlign = 'center';
+                simCtx.fillText(r.name, rScreen.x, rScreen.y + rSize + 14);
+                
+                if (cam.target === 'rocket_' + r.id || (cam.target === 'rocket' && r === sim.rockets[sim.rockets.length-1])) {
+                    simCtx.beginPath();
+                    simCtx.arc(rScreen.x, rScreen.y, rSize * 2.5, 0, Math.PI*2);
+                    simCtx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+                    simCtx.lineWidth = 1;
+                    simCtx.setLineDash([4, 4]);
+                    simCtx.stroke();
+                    simCtx.setLineDash([]);
+                }
+                
+                const distFromPlanet = Math.hypot(r.x - sim.planet.x, r.y - sim.planet.y);
+                if (r.state === 'launched' && distFromPlanet > sim.planet.radius * 6) {
+                    const currentEscVel = Math.sqrt((2 * G * sim.planet.mass) / distFromPlanet);
+                    const currentVel = Math.hypot(r.vx, r.vy);
+                    
+                    if (currentVel >= currentEscVel) {
+                        simCtx.fillStyle = 'rgba(255, 215, 0, 0.9)';
+                        simCtx.font = 'bold 12px Assistant';
+                        simCtx.fillText("🚀 להתראות!", rScreen.x, rScreen.y - rSize - 14);
+                    }
+                }
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        // --- Interaction & UI Logic ---
+        function updateLauncherModeUI() {
+            const btnSurface = document.getElementById('btn-reset-pos');
+            const btnCustom = document.getElementById('btn-set-pos');
+            
+            const activeClass = "flex-1 py-1.5 text-xs rounded-md bg-white/20 text-white font-medium shadow-sm transition";
+            const inactiveClass = "flex-1 py-1.5 text-xs rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition";
+
+            if (sim.launcher.mode === 'surface') {
+                btnSurface.className = activeClass;
+                btnCustom.className = inactiveClass;
+            } else {
+                btnCustom.className = activeClass;
+                btnSurface.className = inactiveClass;
+            }
+        }
+
+        let isPanelOpen = true;
+        window.togglePanel = function() {
+            const panel = document.getElementById('bottom-panel');
+            if(isPanelOpen) {
+                const scrollContent = panel.querySelector('.overflow-y-auto');
+                const heightToHide = scrollContent.offsetHeight;
+                panel.style.transform = `translateY(${heightToHide}px)`;
+                isPanelOpen = false;
+            } else {
+                panel.style.transform = `translateY(0)`;
+                isPanelOpen = true;
+            }
+        };
+
+        // Pointer / Touch Events
+        let isPanning = false;
+        let isPlacingLauncher = false;
+        let isDraggingLauncher = false;
+        let panStartX, panStartY, camStartX, camStartY;
+        let initialPinchDistance = null;
+        let initialZoom = 1;
+
+        document.getElementById('btn-set-pos').addEventListener('click', () => {
+            isPlacingLauncher = true;
+            simCanvas.style.cursor = 'crosshair';
+            document.getElementById('placing-hint').style.display = 'block';
+            if (window.innerWidth < 768 && isPanelOpen) togglePanel(); 
+        });
+
+        document.getElementById('btn-reset-pos').addEventListener('click', () => {
+            isPlacingLauncher = false;
+            simCanvas.style.cursor = 'grab';
+            document.getElementById('placing-hint').style.display = 'none';
+            sim.launcher.mode = 'surface';
+            updateLauncherModeUI();
+            calculateEscapeVelocity();
+        });
+
+        function handlePointerDown(clientX, clientY) {
+            if (isPlacingLauncher) {
+                const worldPos = screenToWorld(clientX, clientY);
+                sim.launcher.mode = 'custom';
+                sim.launcher.customPos = worldPos;
+                isPlacingLauncher = false;
+                simCanvas.style.cursor = 'grab';
+                document.getElementById('placing-hint').style.display = 'none';
+                updateLauncherModeUI();
+                calculateEscapeVelocity();
+                if (window.innerWidth < 768 && !isPanelOpen) togglePanel(); 
+                return;
+            }
+
+            const lPos = getLauncherPos();
+            const lScreen = worldToScreen(lPos.x, lPos.y);
+            if (Math.hypot(clientX - lScreen.x, clientY - lScreen.y) < 40) {
+                isDraggingLauncher = true;
+                sim.launcher.mode = 'custom';
+                sim.launcher.customPos = screenToWorld(clientX, clientY);
+                updateLauncherModeUI();
+                calculateEscapeVelocity();
+                simCanvas.style.cursor = 'move';
+                return;
+            }
+
+            let clickedRocket = null;
+            for(let r of sim.rockets) {
+                const screenPos = worldToScreen(r.x, r.y);
+                if (Math.hypot(clientX - screenPos.x, clientY - screenPos.y) < 30) {
+                    clickedRocket = r;
+                    break;
+                }
+            }
+            
+            if (clickedRocket) {
+                trackRocket(clickedRocket.id);
+                return;
+            }
+
+            isPanning = true;
+            cam.target = 'free';
+            panStartX = clientX;
+            panStartY = clientY;
+            camStartX = cam.x;
+            camStartY = cam.y;
+        }
+
+        function handlePointerMove(clientX, clientY) {
+            if (isDraggingLauncher) {
+                sim.launcher.customPos = screenToWorld(clientX, clientY);
+                calculateEscapeVelocity();
+                return;
+            }
+            
+            if (isPanning) {
+                const dx = (clientX - panStartX) / cam.zoom;
+                const dy = (clientY - panStartY) / cam.zoom;
+                cam.x = camStartX - dx;
+                cam.y = camStartY - dy;
+            }
+        }
+
+        function handlePointerUp() {
+            isPanning = false; 
+            if (isDraggingLauncher) {
+                isDraggingLauncher = false;
+                simCanvas.style.cursor = 'grab';
+            }
+        }
+
+        // Mouse Listeners
+        simCanvas.addEventListener('mousedown', (e) => {
+            if(e.button !== 0 && e.button !== 1) return; 
+            handlePointerDown(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            handlePointerMove(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('mouseup', handlePointerUp);
+
+        simCanvas.addEventListener('wheel', (e) => {
+            const zoomFactor = 1.1;
+            if (e.deltaY < 0) cam.targetZoom *= zoomFactor;
+            else cam.targetZoom /= zoomFactor;
+            cam.targetZoom = Math.max(0.05, Math.min(cam.targetZoom, 15));
+        });
+
+        // Touch Listeners (Mobile support)
+        simCanvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2) {
+                isPanning = false;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                initialPinchDistance = Math.hypot(dx, dy);
+                initialZoom = cam.targetZoom;
+            }
+        }, {passive: false});
+
+        simCanvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); 
+            if (e.touches.length === 1) {
+                handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2 && initialPinchDistance) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.hypot(dx, dy);
+                cam.targetZoom = initialZoom * (dist / initialPinchDistance);
+                cam.targetZoom = Math.max(0.05, Math.min(cam.targetZoom, 15));
+            }
+        }, {passive: false});
+
+        simCanvas.addEventListener('touchend', (e) => {
+            if (e.touches.length === 0) {
+                handlePointerUp();
+                initialPinchDistance = null;
+            }
+        });
+
+        // --- Controls Binding ---
+        function bindSlider(sliderId, valId, callback) {
+            const s = document.getElementById(sliderId);
+            const v = document.getElementById(valId);
+            s.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                v.innerText = val;
+                callback(val);
+            });
+        }
+
+        bindSlider('slider-mass', 'val-mass', v => { sim.planet.mass = v; calculateEscapeVelocity(); });
+        bindSlider('slider-radius', 'val-radius', v => { sim.planet.radius = v; calculateEscapeVelocity(); });
+        bindSlider('slider-vel', 'val-vel', v => { sim.launcher.v = v; });
+        bindSlider('slider-angle', 'val-angle', v => { sim.launcher.angle = v; document.getElementById('val-angle').innerHTML = v + '&deg;'; });
+
+        document.getElementById('btn-launch').addEventListener('click', () => {
+            launchRocket();
+            cam.target = 'rocket'; // Auto follow new rocket
+        });
+        
+        // --- Initialization ---
+        function init() {
+            resizeCanvases();
+            updateLauncherModeUI();
+            calculateEscapeVelocity();
+            
+            const rOrbit = sim.planet.radius + 150;
+            const vCirc = Math.sqrt((G * sim.planet.mass) / rOrbit);
+            sim.rocketIdCounter++;
+            sim.rockets.push({
+                id: sim.rocketIdCounter,
+                name: 'לוויין מדגים',
+                x: 0,
+                y: -rOrbit,
+                vx: vCirc,
+                vy: 0,
+                state: 'orbiting',
+                history: [],
+                color: '#3b82f6' 
+            });
+            
+            cam.zoom = 1.2;
+            cam.targetZoom = 0.8;
+            
+            requestAnimationFrame(render);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

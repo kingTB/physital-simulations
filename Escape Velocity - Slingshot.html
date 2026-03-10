@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>סימולציית כבידה</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #020617; /* Slate 950 */
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Rubik', sans-serif;
+            touch-action: none; /* Prevents browser pull-to-refresh and default panning */
+        }
+
+        #simCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        /* --- Glassmorphism UI --- */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-panel.collapsed {
+            transform: translateY(calc(100% - 48px));
+        }
+
+        .drag-handle {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            margin: 0 auto;
+        }
+
+        /* --- Custom Inputs --- */
+        select {
+            background-color: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: left 10px center;
+            background-size: 16px;
+            padding-left: 32px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            outline: none;
+            direction: ltr; /* Ensure slider works intuitively regardless of RTL */
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #3b82f6;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #3b82f6;
+        }
+
+        /* Floating buttons */
+        .fab {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .fab:hover { background: rgba(51, 65, 85, 0.9); }
+        .fab:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="text-slate-200 selection:bg-blue-500/30">
+
+    <canvas id="simCanvas"></canvas>
+
+    <!-- Floating Tools (Top Right) -->
+    <div class="fixed top-4 right-4 flex flex-col gap-3 z-40">
+        <button id="zoomInBtn" class="fab shadow-lg" aria-label="Zoom In">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="zoomOutBtn" class="fab shadow-lg" aria-label="Zoom Out">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="recenterBtn" class="fab shadow-lg mt-2" aria-label="Recenter">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+    </div>
+
+    <!-- Floating Top Left - Clean Screen -->
+    <div class="fixed top-4 left-4 z-40">
+        <button id="clearScreenBtn" class="bg-red-500/80 hover:bg-red-600/90 backdrop-blur text-white px-4 py-2 rounded-full font-medium shadow-lg transition-all text-sm flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            נקה מסך
+        </button>
+    </div>
+
+    <!-- Bottom Control Panel -->
+    <div id="bottomPanel" class="glass-panel fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl pb-safe">
+        <!-- Header / Drag Handle -->
+        <div id="panelHeader" class="p-4 cursor-pointer flex flex-col items-center justify-center border-b border-white/5 relative">
+            <div class="drag-handle mb-3"></div>
+            <div class="text-sm font-semibold tracking-wide text-blue-300">הגדרות סימולציה ומצב שיגועים</div>
+        </div>
+
+        <!-- Controls Container -->
+        <div class="p-4 overflow-y-auto max-h-[50vh] flex flex-col gap-6 md:flex-row md:flex-wrap md:justify-around">
+            
+            <!-- Central Body & Time Scale Selection -->
+            <div class="flex-1 min-w-[250px] flex flex-col gap-4">
+                <div class="flex flex-col gap-2">
+                    <label class="text-xs text-slate-400 uppercase tracking-wider">גרם שמיים מרכזי</label>
+                    <select id="bodySelect" class="w-full font-medium"></select>
+                </div>
+                
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-400">קצב זמן</span>
+                        <span id="timeScaleValue" class="font-mono text-blue-400">x1.0</span>
+                    </div>
+                    <input type="range" id="timeScaleSlider" min="0" max="5" step="0.1" value="1">
+                </div>
+            </div>
+
+            <!-- Mass & Radius -->
+            <div class="flex-1 min-w-[250px] flex flex-col gap-4">
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-400">מסה (<span class="text-[10px]">&times;10&sup2;&sup4;</span> ק"ג)</span>
+                        <span id="massValue" class="font-mono text-blue-400"></span>
+                    </div>
+                    <input type="range" id="massSlider" min="100" max="200000000000" step="100">
+                </div>
+                
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-400">רדיוס (ק"מ)</span>
+                        <span id="radiusValue" class="font-mono text-blue-400"></span>
+                    </div>
+                    <input type="range" id="radiusSlider" min="0.1" max="7000" step="0.1">
+                </div>
+            </div>
+
+            <!-- Shenanigans -->
+            <div class="flex-1 min-w-[250px] bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-24 h-24 bg-blue-500/20 blur-2xl rounded-full pointer-events-none"></div>
+                
+                <div class="flex justify-between items-center mb-4">
+                    <span class="font-bold text-transparent bg-clip-text bg-gradient-to-l from-blue-400 to-purple-400">
+                        מצב שיגועים 🚀
+                    </span>
+                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" id="shenanigansToggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-slate-600 appearance-none cursor-pointer z-10 transition-all duration-300 right-5 checked:right-0 checked:border-blue-500"/>
+                        <label for="shenanigansToggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-slate-600 cursor-pointer transition-colors duration-300"></label>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-400">קצב שיגור</span>
+                        <span id="shenanigansRateValue" class="font-mono text-purple-400">x1</span>
+                    </div>
+                    <input type="range" id="shenanigansRateSlider" min="0.1" max="50" step="0.1" value="1" class="accent-purple-500">
+                </div>
+                
+                <div class="flex justify-between items-center mt-3 pt-3 border-t border-blue-500/20">
+                    <span class="text-xs text-slate-300">מסלולים בלבד (ללא התרסקות)</span>
+                    <div class="relative inline-block w-8 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" id="shenanigansOrbitToggle" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 border-slate-600 appearance-none cursor-pointer z-10 transition-all duration-300 right-4 checked:right-0 checked:border-blue-500"/>
+                        <label for="shenanigansOrbitToggle" class="toggle-label block overflow-hidden h-4 rounded-full bg-slate-600 cursor-pointer transition-colors duration-300"></label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- 0. Physics & Config Constants ---
+        const G_SIM = 500;
+        const SCALE_MASS = 1e20; 
+        const SCALE_DISTANCE = 1e5;
+        const PROJECTILE_EMOJIS = ['🍎', '🌙', '🪐', '✨', '🚀', '🛸', '☄️', '🛰️', '👽', '⭐️', '👾', '🤖', '🍕', '🍔', '🥎', '👻', '💎', '🔥'];
+
+        const celestialBodies = {
+            earth: { name: "כדור הארץ", mass: 59720, radius: 63.71, colors: ['#0ea5e9', '#3b82f6', '#1e3a8a'] },
+            moon: { name: "הירח", mass: 734, radius: 17.37, colors: ['#e2e8f0', '#94a3b8', '#475569'] },
+            mars: { name: "מאדים", mass: 6417, radius: 33.90, colors: ['#f97316', '#ea580c', '#7c2d12'] },
+            jupiter: { name: "צדק", mass: 18980000, radius: 699.11, colors: ['#fbbf24', '#d97706', '#78350f'] },
+            sun: { name: "השמש", mass: 19890000000, radius: 6957.00, colors: ['#fef08a', '#f59e0b', '#b45309'], glow: true },
+            neutron_star: { name: "כוכב נייטרונים", mass: 39780000000, radius: 0.1, colors: ['#ffffff', '#38bdf8', '#0284c7'], glow: true },
+            black_hole: { name: "חור שחור", mass: 198900000000, radius: 0.295, colors: ['#000000', '#000000', '#4c1d95'], accretionDisk: true },
+            custom: { name: "מותאם אישית", mass: 59720, radius: 63.71, colors: ['#10b981', '#059669', '#064e3b'] }
+        };
+
+        // --- 1. State ---
+        const state = {
+            centralBody: null,
+            currentBodyKey: 'earth',
+            projectiles: [],
+            nextProjectileId: 0,
+            timeScale: 1.0,
+            view: { zoom: 4.0, panX: 0, panY: 0, targetZoom: 4.0, targetPanX: 0, targetPanY: 0 },
+            launch: { active: false, startX: 0, startY: 0, endX: 0, endY: 0, previewPath: [], previewStatus: 'orbiting' },
+            touch: { pointers: [], initialDist: 0, initialPanX: 0, initialPanY: 0 },
+            pan: { active: false, startX: 0, startY: 0 },
+            shenanigans: { enabled: false, rate: 1, timer: 0, onlyOrbit: false }
+        };
+
+        // --- 2. DOM Elements ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const bottomPanel = document.getElementById('bottomPanel');
+        const panelHeader = document.getElementById('panelHeader');
+        
+        const ui = {
+            bodySelect: document.getElementById('bodySelect'),
+            timeScaleSlider: document.getElementById('timeScaleSlider'),
+            timeScaleValue: document.getElementById('timeScaleValue'),
+            massSlider: document.getElementById('massSlider'),
+            massValue: document.getElementById('massValue'),
+            radiusSlider: document.getElementById('radiusSlider'),
+            radiusValue: document.getElementById('radiusValue'),
+            shenanigansToggle: document.getElementById('shenanigansToggle'),
+            shenanigansRateSlider: document.getElementById('shenanigansRateSlider'),
+            shenanigansRateValue: document.getElementById('shenanigansRateValue'),
+            shenanigansOrbitToggle: document.getElementById('shenanigansOrbitToggle'),
+            zoomInBtn: document.getElementById('zoomInBtn'),
+            zoomOutBtn: document.getElementById('zoomOutBtn'),
+            recenterBtn: document.getElementById('recenterBtn'),
+            clearScreenBtn: document.getElementById('clearScreenBtn')
+        };
+
+        let canvasWidth, canvasHeight;
+
+        // --- 3. Physics & Math Helpers ---
+        
+        // Helper function to determine the color of the trajectory based on orbital mechanics
+        function getOrbitStatus(x, y, vx, vy, M, R) {
+            const r = Math.hypot(x, y);
+            if (r <= R) return 'crashed';
+            
+            const vSq = vx*vx + vy*vy;
+            const mu = G_SIM * M;
+            if (mu === 0) return 'escaped';
+            
+            // Specific orbital energy
+            const epsilon = (vSq / 2) - (mu / r);
+            // Specific relative angular momentum
+            const h = Math.abs(x * vy - y * vx);
+            
+            // Eccentricity
+            const eSq = 1 + (2 * epsilon * h * h) / (mu * mu);
+            const e = Math.sqrt(Math.max(0, eSq));
+            
+            // Periapsis (closest approach)
+            const rp = (h * h) / (mu * (1 + e));
+            
+            // Is it moving away from the planet?
+            const movingOutward = (x * vx + y * vy) > 0;
+            
+            if (rp <= R) {
+                if (epsilon < 0) return 'crashed'; // Closed orbit, will hit the planet
+                if (epsilon >= 0 && movingOutward) return 'escaped'; // Open orbit, already passed closest approach without hitting
+                return 'crashed'; // Open orbit, moving inward, will hit the planet
+            }
+            
+            if (epsilon >= 0) return 'escaped';
+            return 'orbiting';
+        }
+
+        function getOrbitColor(status) {
+            if (status === 'crashed') return '#ef4444'; // Red
+            if (status === 'orbiting') return '#22c55e'; // Green
+            if (status === 'escaped') return '#a855f7'; // Purple
+            return '#ffffff';
+        }
+
+        function updatePhysics(scaledDt) {
+            if (!state.centralBody || scaledDt === 0) return;
+            const M = state.centralBody.mass;
+            const R = state.centralBody.radius;
+            
+            // Sub-stepping for stability when timeScale is large
+            const MAX_STEP = 0.016; 
+            const steps = Math.ceil(scaledDt / MAX_STEP);
+            const dt = scaledDt / steps;
+            
+            for (let i = state.projectiles.length - 1; i >= 0; i--) {
+                const p = state.projectiles[i];
+                
+                if (p.crashed) {
+                    p.color = getOrbitColor('crashed');
+                    continue; 
+                }
+                
+                // Perform sub-steps
+                for(let step = 0; step < steps; step++) {
+                    if(p.crashed) break;
+
+                    const rSquared = p.x * p.x + p.y * p.y;
+                    const r = Math.sqrt(rSquared);
+                    
+                    const a = (rSquared > 0) ? (G_SIM * M) / rSquared : 0;
+                    const ax = (r > 0) ? a * (-p.x / r) : 0;
+                    const ay = (r > 0) ? a * (-p.y / r) : 0;
+                    
+                    p.vx += ax * dt;
+                    p.vy += ay * dt;
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+
+                    const r_new = Math.sqrt(p.x * p.x + p.y * p.y);
+                    
+                    if (r_new <= R) {
+                        p.crashed = true;
+                        p.color = getOrbitColor('crashed');
+                    }
+                }
+
+                if (p.crashed) {
+                    p.trail.push({ x: p.x, y: p.y });
+                    continue;
+                }
+
+                // Add to trail path periodically
+                if (p.trail.length === 0 || (p.x - p.trail[p.trail.length-1].x)**2 + (p.y - p.trail[p.trail.length-1].y)**2 > 25) {
+                    p.trail.push({ x: p.x, y: p.y });
+                    if (p.trail.length > 200) p.trail.shift();
+                }
+
+                // Update trajectory color dynamically
+                p.status = getOrbitStatus(p.x, p.y, p.vx, p.vy, M, R);
+                p.color = getOrbitColor(p.status);
+
+                // Cleanup objects that flew way too far out of bounds
+                const safeZoom = Math.max(0.01, state.view.zoom);
+                const maxDist = Math.max(canvasWidth, canvasHeight) * 20 / safeZoom;
+                if (Math.hypot(p.x, p.y) > maxDist) {
+                    state.projectiles.splice(i, 1);
+                }
+            }
+        }
+
+        function calculatePreviewPath() {
+            if (!state.centralBody || !state.launch.active) {
+                state.launch.previewPath = [];
+                return;
+            }
+
+            const M = state.centralBody.mass;
+            const R = state.centralBody.radius;
+            const dt = 0.05;
+            const steps = 400;
+
+            const { x: startX, y: startY } = screenToWorld(state.launch.startX, state.launch.startY);
+            const vx = (state.launch.startX - state.launch.endX) / state.view.zoom;
+            const vy = (state.launch.startY - state.launch.endY) / state.view.zoom;
+
+            // Pre-calculate trajectory status for smart coloring
+            state.launch.previewStatus = getOrbitStatus(startX, startY, vx, vy, M, R);
+
+            let cx = startX, cy = startY, cvx = vx, cvy = vy;
+            const path = [];
+
+            for (let i = 0; i < steps; i++) {
+                const rSquared = cx * cx + cy * cy;
+                const r = Math.sqrt(rSquared);
+
+                if (r <= R) break;
+
+                const a = (rSquared > 0) ? (G_SIM * M) / rSquared : 0;
+                cvx += (a * (-cx / r)) * dt;
+                cvy += (a * (-cy / r)) * dt;
+                cx += cvx * dt;
+                cy += cvy * dt;
+                path.push({ x: cx, y: cy });
+            }
+            state.launch.previewPath = path;
+        }
+
+        function spawnProjectile(x, y, vx, vy) {
+            const emoji = PROJECTILE_EMOJIS[Math.floor(Math.random() * PROJECTILE_EMOJIS.length)];
+            const status = getOrbitStatus(x, y, vx, vy, state.centralBody.mass, state.centralBody.radius);
+            
+            state.projectiles.push({
+                id: state.nextProjectileId++,
+                x, y, vx, vy,
+                trail: [{x, y}],
+                emoji,
+                status: status,
+                color: getOrbitColor(status),
+                crashed: false
+            });
+        }
+
+        function fireRandomProjectile() {
+            if (!state.centralBody) return;
+            const R = state.centralBody.radius;
+            const M = state.centralBody.mass;
+            
+            let v, v_angle;
+            let launchDist;
+            let angle = Math.random() * Math.PI * 2;
+
+            if (state.shenanigans.onlyOrbit) {
+                launchDist = (R * 1.5) + (Math.random() * R * 3);
+                const circV = Math.sqrt((G_SIM * M) / launchDist);
+                v = circV * (0.8 + Math.random() * 0.4); 
+                v_angle = angle + (Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2);
+                v_angle += (Math.random() - 0.5) * 0.3; 
+            } else {
+                launchDist = R + (Math.random() * R * 4) + (R * 0.5);
+                const escV = Math.sqrt((2 * G_SIM * M) / launchDist);
+                v = escV * (Math.random() * 1.2 + 0.2); 
+                v_angle = Math.random() * Math.PI * 2;
+            }
+            
+            const startX = Math.cos(angle) * launchDist;
+            const startY = Math.sin(angle) * launchDist;
+            spawnProjectile(startX, startY, Math.cos(v_angle) * v, Math.sin(v_angle) * v);
+        }
+
+        // --- 4. Coordinate Helpers ---
+        function screenToWorld(x, y) {
+            return {
+                x: (x - canvasWidth / 2 - state.view.panX) / state.view.zoom,
+                y: (y - canvasHeight / 2 - state.view.panY) / state.view.zoom
+            };
+        }
+
+        // --- 5. Rendering ---
+        function draw() {
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            drawGravityWell();
+
+            ctx.save();
+            ctx.translate(canvasWidth / 2 + state.view.panX, canvasHeight / 2 + state.view.panY);
+            ctx.scale(state.view.zoom, state.view.zoom);
+            
+            drawCentralBody();
+            drawProjectiles();
+            
+            if (state.launch.active) {
+                drawPreviewPath();
+            }
+            
+            ctx.restore();
+
+            if (state.launch.active) {
+                drawSlingshotUI();
+            }
+        }
+
+        function drawGravityWell() {
+            if (!state.centralBody) return;
+            ctx.save();
+            ctx.translate(canvasWidth / 2 + state.view.panX, canvasHeight / 2 + state.view.panY);
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            const r = state.centralBody.radius * state.view.zoom;
+            
+            // Start drawing from a slightly visible radius
+            let dist = Math.max(r * 1.5, 5); 
+            const maxDist = Math.max(canvasWidth, canvasHeight) * 2; // Cover entire screen regardless of zoom
+            let count = 0;
+            
+            while (dist < maxDist && count < 40) {
+                ctx.beginPath();
+                ctx.arc(0, 0, dist, 0, Math.PI * 2);
+                ctx.stroke();
+                dist *= 1.5;
+                count++;
+            }
+            ctx.restore();
+        }
+
+        function drawCentralBody() {
+            if (!state.centralBody) return;
+            const body = state.centralBody;
+            const r = body.radius;
+            let r_vis = Math.max(r, 5); // Fix visibility for small objects
+
+            if (body.glow) {
+                ctx.shadowBlur = 50;
+                ctx.shadowColor = body.colors[1];
+            } else if (body.accretionDisk) {
+                ctx.save();
+                ctx.rotate(Date.now() / 2000);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, r_vis * 3, r_vis * 0.8, 0, 0, Math.PI * 2);
+                const aGrad = ctx.createRadialGradient(0,0,r_vis, 0,0,r_vis*3);
+                aGrad.addColorStop(0, 'rgba(255, 200, 0, 0)');
+                aGrad.addColorStop(0.2, 'rgba(255, 100, 0, 0.8)');
+                aGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = aGrad;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            const grad = ctx.createRadialGradient(-r_vis*0.3, -r_vis*0.3, 0, 0, 0, r_vis);
+            grad.addColorStop(0, body.colors[0]);
+            grad.addColorStop(0.6, body.colors[1]);
+            grad.addColorStop(1, body.colors[2]);
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, r_vis, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+        }
+
+        function drawProjectiles() {
+            state.projectiles.forEach(p => {
+                if (p.trail.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.trail[0].x, p.trail[0].y);
+                    for (let j = 1; j < p.trail.length; j++) {
+                        ctx.lineTo(p.trail[j].x, p.trail[j].y);
+                    }
+                    
+                    let alpha = p.crashed ? '44' : 'aa'; 
+                    ctx.strokeStyle = p.color + alpha;
+                    ctx.lineWidth = Math.max(1 / state.view.zoom, 2 / state.view.zoom);
+                    
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.stroke();
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+
+                const fontSize = Math.max(10, 24 / state.view.zoom);
+                ctx.font = `${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if(p.crashed) ctx.globalAlpha = 0.5;
+                ctx.fillText(p.emoji, p.x, p.y);
+                ctx.globalAlpha = 1.0;
+            });
+        }
+
+        function drawPreviewPath() {
+            if (state.launch.previewPath.length < 2) return;
+            
+            ctx.beginPath();
+            ctx.moveTo(state.launch.previewPath[0].x, state.launch.previewPath[0].y);
+            for (let i = 1; i < state.launch.previewPath.length; i++) {
+                ctx.lineTo(state.launch.previewPath[i].x, state.launch.previewPath[i].y);
+            }
+            
+            // Preview color based on predicted status
+            const previewColor = getOrbitColor(state.launch.previewStatus) + 'aa';
+            
+            ctx.strokeStyle = previewColor;
+            ctx.lineWidth = 2 / state.view.zoom;
+            ctx.setLineDash([10 / state.view.zoom, 10 / state.view.zoom]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawSlingshotUI() {
+            const { startX, startY, endX, endY } = state.launch;
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            
+            if(len < 5) return;
+
+            const color = getOrbitColor(state.launch.previewStatus);
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.globalAlpha = 0.8;
+            ctx.stroke();
+            
+            ctx.save();
+            ctx.translate(startX, startY);
+            ctx.rotate(Math.atan2(-dy, -dx));
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-12, -8);
+            ctx.lineTo(-12, 8);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.restore();
+            
+            ctx.globalAlpha = 1.0;
+        }
+
+        // --- 6. Interaction (Mouse & Touch) ---
+        function getPointerPos(e, index = 0) {
+            if (e.touches) {
+                return { x: e.touches[index].clientX, y: e.touches[index].clientY };
+            }
+            return { x: e.clientX, y: e.clientY };
+        }
+
+        function handlePointerDown(e) {
+            if (e.target.closest('.glass-panel') || e.target.closest('.fab')) return; 
+            
+            if (e.touches && e.touches.length === 2) {
+                const p1 = getPointerPos(e, 0);
+                const p2 = getPointerPos(e, 1);
+                state.touch.initialDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                state.touch.initialPanX = state.view.targetPanX;
+                state.touch.initialPanY = state.view.targetPanY;
+                state.launch.active = false;
+            } else if (!e.touches || e.touches.length === 1) {
+                if (e.button === 1 || e.button === 2 || e.altKey) {
+                    // Right click, Middle click, or Alt+Drag for Pan
+                    state.pan.active = true;
+                    state.pan.startX = e.clientX;
+                    state.pan.startY = e.clientY;
+                } else {
+                    // Slingshot
+                    const p = getPointerPos(e);
+                    state.launch.active = true;
+                    state.launch.startX = p.x;
+                    state.launch.startY = p.y;
+                    state.launch.endX = p.x;
+                    state.launch.endY = p.y;
+                    calculatePreviewPath();
+                }
+            }
+        }
+
+        function handlePointerMove(e) {
+            if (e.touches && e.touches.length === 2) {
+                const p1 = getPointerPos(e, 0);
+                const p2 = getPointerPos(e, 1);
+                const currentDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                
+                if (state.touch.initialDist > 0) {
+                    const scale = currentDist / state.touch.initialDist;
+                    const newZoom = state.view.zoom * scale;
+                    state.view.targetZoom = Math.max(0.001, Math.min(1000, newZoom));
+                    state.touch.initialDist = currentDist;
+                }
+
+                const cx = (p1.x + p2.x) / 2;
+                const cy = (p1.y + p2.y) / 2;
+                if(!state.touch.lastCx) {
+                    state.touch.lastCx = cx;
+                    state.touch.lastCy = cy;
+                }
+                state.view.targetPanX += (cx - state.touch.lastCx);
+                state.view.targetPanY += (cy - state.touch.lastCy);
+                state.touch.lastCx = cx;
+                state.touch.lastCy = cy;
+
+            } else if (state.pan.active) {
+                const dx = e.clientX - state.pan.startX;
+                const dy = e.clientY - state.pan.startY;
+                state.view.targetPanX += dx;
+                state.view.targetPanY += dy;
+                state.pan.startX = e.clientX;
+                state.pan.startY = e.clientY;
+            } else if (state.launch.active) {
+                const p = getPointerPos(e);
+                state.launch.endX = p.x;
+                state.launch.endY = p.y;
+                calculatePreviewPath();
+            }
+        }
+
+        function handlePointerUp(e) {
+            state.touch.lastCx = null;
+            state.touch.lastCy = null;
+
+            if (state.pan.active) {
+                state.pan.active = false;
+            }
+
+            if (state.launch.active && (!e.touches || e.touches.length === 0)) {
+                state.launch.active = false;
+                
+                const { x: startX, y: startY } = screenToWorld(state.launch.startX, state.launch.startY);
+                const dx = (state.launch.startX - state.launch.endX);
+                const dy = (state.launch.startY - state.launch.endY);
+                
+                if (Math.hypot(dx, dy) > 10) {
+                    spawnProjectile(startX, startY, dx / state.view.zoom, dy / state.view.zoom);
+                }
+                state.launch.previewPath = [];
+            }
+        }
+
+        function handleWheel(e) {
+            if (e.target.closest('.glass-panel')) return;
+            const zoomAmount = 0.15;
+            const delta = e.deltaY > 0 ? -zoomAmount : zoomAmount;
+            state.view.targetZoom = Math.max(0.001, Math.min(1000, state.view.targetZoom * (1 + delta)));
+        }
+
+        // --- 7. UI & App Logic ---
+        function updateBody(bodyKey) {
+            const body = celestialBodies[bodyKey];
+            state.centralBody = { ...body };
+            state.currentBodyKey = bodyKey;
+            
+            ui.massSlider.value = body.mass;
+            ui.massValue.textContent = (body.mass * SCALE_MASS / 1e24).toFixed(1);
+            ui.radiusSlider.value = body.radius;
+            ui.radiusValue.textContent = (body.radius * 100).toFixed(0);
+        }
+
+        function switchToCustomIfNeeded() {
+            if (state.currentBodyKey !== 'custom') {
+                state.currentBodyKey = 'custom';
+                ui.bodySelect.value = 'custom';
+                // Inherit visuals from the current body so transition is seamless
+                celestialBodies.custom.colors = [...state.centralBody.colors];
+                celestialBodies.custom.glow = state.centralBody.glow;
+                celestialBodies.custom.accretionDisk = state.centralBody.accretionDisk;
+            }
+        }
+
+        function initUI() {
+            Object.keys(celestialBodies).forEach(key => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = celestialBodies[key].name;
+                ui.bodySelect.appendChild(opt);
+            });
+
+            ui.bodySelect.addEventListener('change', e => updateBody(e.target.value));
+            
+            ui.timeScaleSlider.addEventListener('input', e => {
+                state.timeScale = parseFloat(e.target.value);
+                ui.timeScaleValue.textContent = `x${state.timeScale.toFixed(1)}`;
+            });
+
+            ui.massSlider.addEventListener('input', e => {
+                switchToCustomIfNeeded();
+                state.centralBody.mass = parseFloat(e.target.value);
+                celestialBodies.custom.mass = state.centralBody.mass;
+                ui.massValue.textContent = (state.centralBody.mass * SCALE_MASS / 1e24).toFixed(1);
+            });
+            
+            ui.radiusSlider.addEventListener('input', e => {
+                switchToCustomIfNeeded();
+                state.centralBody.radius = parseFloat(e.target.value);
+                celestialBodies.custom.radius = state.centralBody.radius;
+                ui.radiusValue.textContent = (state.centralBody.radius * 100).toFixed(0);
+            });
+
+            ui.shenanigansToggle.addEventListener('change', e => state.shenanigans.enabled = e.target.checked);
+            ui.shenanigansOrbitToggle.addEventListener('change', e => state.shenanigans.onlyOrbit = e.target.checked);
+            
+            ui.shenanigansRateSlider.addEventListener('input', e => {
+                state.shenanigans.rate = parseFloat(e.target.value);
+                ui.shenanigansRateValue.textContent = `x${state.shenanigans.rate.toFixed(1)}`;
+            });
+
+            ui.zoomInBtn.addEventListener('click', () => state.view.targetZoom *= 1.5);
+            ui.zoomOutBtn.addEventListener('click', () => state.view.targetZoom /= 1.5);
+            ui.recenterBtn.addEventListener('click', () => {
+                state.view.targetPanX = 0;
+                state.view.targetPanY = 0;
+                state.view.targetZoom = 4.0;
+            });
+            
+            ui.clearScreenBtn.addEventListener('click', () => {
+                state.projectiles = [];
+            });
+
+            panelHeader.addEventListener('click', () => {
+                bottomPanel.classList.toggle('collapsed');
+            });
+
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+            canvas.addEventListener('mousedown', handlePointerDown);
+            window.addEventListener('mousemove', handlePointerMove);
+            window.addEventListener('mouseup', handlePointerUp);
+            
+            canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+            window.addEventListener('touchmove', handlePointerMove, { passive: false });
+            window.addEventListener('touchend', handlePointerUp);
+            
+            canvas.addEventListener('wheel', handleWheel, { passive: false });
+            
+            window.addEventListener('resize', resize);
+        }
+
+        function resize() {
+            canvasWidth = window.innerWidth;
+            canvasHeight = window.innerHeight;
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+        }
+
+        // --- 8. Main Loop ---
+        let lastTime = 0;
+        function loop(time) {
+            const dtRaw = (time - lastTime) / 1000;
+            lastTime = time;
+
+            if (dtRaw < 0.5) { 
+                state.view.zoom += (state.view.targetZoom - state.view.zoom) * 0.15;
+                state.view.panX += (state.view.targetPanX - state.view.panX) * 0.15;
+                state.view.panY += (state.view.targetPanY - state.view.panY) * 0.15;
+
+                // Pass the scaled delta time to physics
+                updatePhysics(dtRaw * state.timeScale);
+
+                if (state.shenanigans.enabled) {
+                    // Shenanigans rate scales with timeScale too
+                    state.shenanigans.timer += (dtRaw * state.timeScale);
+                    const interval = 1 / state.shenanigans.rate;
+                    if (state.shenanigans.timer > interval) {
+                        state.shenanigans.timer -= interval;
+                        fireRandomProjectile();
+                    }
+                }
+            }
+
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Boot ---
+        resize();
+        initUI();
+        updateBody('earth');
+        bottomPanel.classList.remove('collapsed'); 
+        requestAnimationFrame(loop);
+
+    </script>
+</body>
+</html>

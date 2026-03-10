@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>התארכות הזמן | PhysiTal 2.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{overflow:hidden;background:#000;font-family:'Rubik',sans-serif;cursor:crosshair;user-select:none;}
+  #trailCanvas,#simCanvas{position:fixed;top:0;left:0;width:100vw;height:100vh}
+  #trailCanvas{z-index:0}
+  #simCanvas{z-index:1}
+  #ui{position:fixed;top:0;left:0;width:100%;height:100%;z-index:100;pointer-events:none}
+
+  /* Context Menu */
+  #ctxMenu{
+    position:fixed;opacity:0;transform:scale(0.95);transition:opacity 0.2s, transform 0.2s;
+    background:rgba(8,12,22,0.85);
+    border:1px solid rgba(80,160,255,0.2);
+    border-radius:12px;
+    backdrop-filter:blur(24px);
+    -webkit-backdrop-filter:blur(24px);
+    box-shadow:0 15px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
+    z-index:200;pointer-events:none;overflow:hidden;
+    font-family:'Rubik',sans-serif;
+  }
+  #ctxMenu.active { opacity:1; transform:scale(1); pointer-events:all; }
+  
+  .ctx-item{
+    display:flex;align-items:center;justify-content:flex-end;gap:12px;
+    padding:10px 20px;font-size:14px;color:rgba(220,230,255,0.85);
+    cursor:pointer;transition:all 0.15s;direction:rtl;
+  }
+  .ctx-item:hover{background:rgba(80,140,255,0.2);color:#fff;padding-right:24px;}
+  .ctx-icon{font-size:16px;width:24px;text-align:center;filter:drop-shadow(0 0 4px rgba(255,255,255,0.3))}
+  .ctx-sep{height:1px;background:linear-gradient(90deg, transparent, rgba(80,140,255,0.2), transparent);margin:4px 0}
+  .ctx-header{padding:12px 20px 8px;font-size:11px;color:rgba(100,160,255,0.6);text-align:right;letter-spacing:0.1em;text-transform:uppercase;font-weight:700;}
+
+  /* Dialogues */
+  .dialogue{
+    position:fixed;opacity:0;transform:translateY(10px);transition:opacity 0.3s cubic-bezier(0.1,0.8,0.2,1), transform 0.3s cubic-bezier(0.1,0.8,0.2,1);
+    background:linear-gradient(180deg, rgba(12,16,30,0.85) 0%, rgba(8,10,20,0.95) 100%);
+    border:1px solid rgba(80,160,255,0.25);
+    border-radius:16px;
+    backdrop-filter:blur(32px);
+    -webkit-backdrop-filter:blur(32px);
+    box-shadow:0 24px 80px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
+    pointer-events:none; /* Disabled when hidden */
+    overflow:hidden;
+    z-index:150;
+    font-family:'Rubik',sans-serif;
+    direction:rtl;
+  }
+  .dialogue.active { opacity:1; transform:translateY(0); pointer-events:all; }
+  
+  .dialogue-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 20px;
+    background:rgba(30,60,120,0.2);
+    border-bottom:1px solid rgba(80,160,255,0.15);
+    cursor:move;user-select:none;
+  }
+  .dialogue-title{font-size:15px;font-weight:600;color:rgba(200,230,255,0.95);direction:rtl;text-shadow:0 2px 4px rgba(0,0,0,0.5);}
+  .dialogue-close{
+    width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+    border-radius:50%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+    color:rgba(255,255,255,0.6);font-size:12px;cursor:pointer;
+    transition:all 0.2s;
+  }
+  .dialogue-close:hover{background:rgba(255,80,80,0.8);border-color:rgba(255,100,100,1);color:#fff;box-shadow:0 0 12px rgba(255,80,80,0.5)}
+  .dialogue-body{padding:18px 20px;overflow-y:auto;max-height:70vh;}
+  .dialogue-body::-webkit-scrollbar { width: 6px; }
+  .dialogue-body::-webkit-scrollbar-track { background: transparent; }
+  .dialogue-body::-webkit-scrollbar-thumb { background: rgba(80,140,255,0.3); border-radius: 4px; }
+  .dialogue-body::-webkit-scrollbar-thumb:hover { background: rgba(80,140,255,0.6); }
+
+  /* Controls Styling */
+  .param-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;direction:rtl}
+  .param-label{font-size:13px;color:rgba(180,210,255,0.85);min-width:110px;text-align:right}
+  .param-value{font-size:13px;color:rgba(120,220,255,0.95);min-width:45px;text-align:center;font-family:'Space Mono',monospace;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;border:1px solid rgba(80,160,255,0.2)}
+  
+  input[type=range]{
+    -webkit-appearance:none;flex:1;height:4px;
+    background:rgba(255,255,255,0.1);border-radius:4px;direction:ltr;
+    cursor:pointer;outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#4facfe;cursor:pointer;
+    box-shadow:0 0 10px rgba(79,172,254,0.6), inset 0 0 0 2px rgba(255,255,255,0.8);
+    transition:transform 0.1s;
+  }
+  input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.2);box-shadow:0 0 15px rgba(79,172,254,0.9), inset 0 0 0 2px #fff;}
+
+  .check-row{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:12px;cursor:pointer;padding:6px 8px;border-radius:8px;transition:background 0.2s}
+  .check-row:hover{background:rgba(255,255,255,0.05)}
+  .check-row label{font-size:13px;color:rgba(200,220,255,0.9);cursor:pointer;flex:1;text-align:right}
+  input[type=checkbox]{
+    -webkit-appearance:none;width:18px;height:18px;
+    border:2px solid rgba(80,160,255,0.5);border-radius:4px;
+    cursor:pointer;background:rgba(10,15,30,0.6);position:relative;
+    transition:all 0.2s;
+  }
+  input[type=checkbox]:checked{background:#4facfe;border-color:#4facfe;box-shadow:0 0 10px rgba(79,172,254,0.4)}
+  input[type=checkbox]:checked::after{
+    content:'';position:absolute;left:5px;top:2px;width:5px;height:9px;
+    border:solid #000;border-width:0 2px 2px 0;transform:rotate(45deg);
+  }
+
+  /* GPS info */
+  .gps-info-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 14px;border-radius:10px;margin-bottom:8px;
+    background:rgba(20,40,80,0.4);border:1px solid rgba(80,160,255,0.2);
+    direction:rtl;box-shadow:inset 0 2px 10px rgba(0,0,0,0.2);
+  }
+  .gps-label{font-size:13px;color:rgba(180,210,255,0.9)}
+  .gps-val{font-size:14px;color:rgba(100,255,200,1);font-family:'Space Mono',monospace;text-shadow:0 0 8px rgba(100,255,200,0.4)}
+  .gps-val.neg{color:rgba(255,120,100,1);text-shadow:0 0 8px rgba(255,120,100,0.4)}
+  .gps-val.total{color:rgba(255,210,80,1);text-shadow:0 0 8px rgba(255,210,80,0.4);font-weight:bold;}
+
+  /* Mode buttons */
+  .mode-btn{
+    flex:1;padding:10px 0;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;
+    border:1px solid rgba(80,160,255,0.3);transition:all 0.2s;
+    background:rgba(20,40,90,0.4);color:rgba(180,220,255,0.8);
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .mode-btn.active{background:linear-gradient(135deg, #3a7bd5 0%, #3a6073 100%);border-color:rgba(120,180,255,0.8);color:#fff;box-shadow:0 4px 15px rgba(58,123,213,0.4)}
+  .mode-btn:hover:not(.active){background:rgba(40,80,160,0.6);color:#fff;}
+
+  /* Emoji Palette */
+  .emoji-grid{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-bottom:12px}
+  .emoji-btn{
+    font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+    border-radius:12px;cursor:pointer;border:1px solid rgba(80,160,255,0.2);
+    background:rgba(20,30,60,0.5);transition:all 0.15s;
+  }
+  .emoji-btn:hover{background:rgba(60,120,220,0.35);border-color:rgba(100,180,255,0.5);transform:scale(1.15);box-shadow:0 0 12px rgba(80,160,255,0.3)}
+  .emoji-btn.placing{background:rgba(80,220,140,0.3);border-color:rgba(100,255,150,0.7);box-shadow:0 0 15px rgba(100,255,150,0.4)}
+  .emoji-section-title{font-size:11px;color:rgba(120,180,255,0.7);text-align:right;margin-bottom:6px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;}
+  .clear-btn{
+    width:100%;padding:10px;border-radius:10px;font-size:13px;font-family:'Rubik',sans-serif;
+    cursor:pointer;border:1px solid rgba(255,80,80,0.3);
+    background:rgba(80,20,20,0.4);color:rgba(255,120,120,0.9);
+    transition:all 0.15s;margin-top:8px;font-weight:500;
+  }
+  .clear-btn:hover{background:rgba(200,40,40,0.5);border-color:rgba(255,100,100,0.8);color:#fff;box-shadow:0 0 15px rgba(255,60,60,0.4)}
+
+  /* Documentation */
+  .doc-section{margin-bottom:18px}
+  .doc-title{font-size:12px;color:rgba(120,200,255,0.8);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;border-bottom:1px solid rgba(80,160,255,0.2);padding-bottom:4px;font-weight:600;}
+  .doc-text{font-size:13px;color:rgba(200,220,255,0.75);line-height:1.6}
+  .doc-formula{
+    font-family:'Space Mono',monospace;font-size:13px;
+    color:rgba(180,230,255,0.95);background:rgba(10,20,40,0.6);
+    padding:10px 14px;border-radius:8px;border-right:3px solid #4facfe;
+    margin:10px 0;direction:ltr;text-align:center;box-shadow:inset 0 2px 8px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+
+<canvas id="trailCanvas"></canvas>
+<canvas id="simCanvas"></canvas>
+
+<div id="ui">
+  <!-- Context Menu -->
+  <div id="ctxMenu">
+    <div class="ctx-header">PhysiTal 2.0</div>
+    <div class="ctx-item" onclick="toggleDlg('dlgInstructions')"><span class="ctx-icon">❓</span>הוראות</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="toggleDlg('dlgControls')"><span class="ctx-icon">🎛️</span>בקרים</div>
+    <div class="ctx-item" onclick="toggleDlg('dlgView')"><span class="ctx-icon">👁️</span>תצוגה</div>
+    <div class="ctx-item" onclick="toggleDlg('dlgObjects')"><span class="ctx-icon">🌀</span>זרוק לחור</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="toggleDlg('dlgGPS')"><span class="ctx-icon">🛰️</span>נתוני GPS</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="toggleDlg('dlgDoc')"><span class="ctx-icon">📄</span>תיעוד</div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="dialogue" id="dlgInstructions" style="top:80px;right:80px;width:380px;">
+    <div class="dialogue-header">
+      <div class="dialogue-close" onclick="closeDlg('dlgInstructions')">✕</div>
+      <span class="dialogue-title">מדריך סימולציה</span>
+    </div>
+    <div class="dialogue-body">
+      <div class="doc-section">
+        <div class="doc-title">על הסימולציה</div>
+        <div class="doc-text">הדמיה אינטראקטיבית של <strong style="color:#4facfe">התארכות הזמן הכבידתית</strong>. ככל שמתקרבים למקור כבידה עוצמתי (כמו חור שחור), המרחב-זמן מתעקם והזמן המקומי מאיט ביחס לצופה המרוחק. ליד אופק האירועים, הזמן כמעט קופא לחלוטין.</div>
+      </div>
+      <div class="doc-section">
+        <div class="doc-title">בקרת מצלמה ואינטראקציה</div>
+        <div class="doc-text">
+          <ul style="list-style-type:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;">
+            <li>🖱️ <strong>גרירת אובייקטים:</strong> לחץ וגרור שעונים ואמוג׳ים במרחב.</li>
+            <li>🖱️ <strong>דאבל-קליק:</strong> מציב שעון חדש (בכל מקום במרחב).</li>
+            <li>🔍 <strong>גלגלת עכבר:</strong> תקריב והתרחקות (Zoom) חכמה.</li>
+            <li>✋ <strong>Alt + גרירה:</strong> הזזת המצלמה (Pan) במרחב.</li>
+            <li>⚙️ <strong>קליק ימני:</strong> פתיחת תפריט השליטה הראשי.</li>
+            <li>🚀 <strong>מקש רווח (Space):</strong> מאפס את האסטרונאוט.</li>
+            <li>⌨️ <strong>מקש Esc:</strong> ביטול מצב "הנחת אמוג׳י".</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="dialogue active" id="dlgControls" style="top:80px;right:480px;width:360px">
+    <div class="dialogue-header">
+      <div class="dialogue-close" onclick="closeDlg('dlgControls')">✕</div>
+      <span class="dialogue-title">פאנל שליטה</span>
+    </div>
+    <div class="dialogue-body">
+      <div style="display:flex;gap:12px;margin-bottom:20px;">
+        <div class="mode-btn active" id="btnBH" onclick="setMode('blackhole')">🕳️ חור שחור</div>
+        <div class="mode-btn" id="btnGPS" onclick="setMode('gps')">🌍 רשת GPS</div>
+      </div>
+      <div class="param-row">
+        <span class="param-value" id="valMass">1.0</span>
+        <input type="range" id="slMass" min="0.2" max="3" step="0.1" value="1" oninput="onMassChange(this.value)">
+        <span class="param-label">מסת החור השחור</span>
+      </div>
+      <div class="param-row">
+        <span class="param-value" id="valSpeed">1.0</span>
+        <input type="range" id="slSpeed" min="0.1" max="5" step="0.1" value="1" oninput="state.simSpeed=parseFloat(this.value);document.getElementById('valSpeed').textContent=parseFloat(this.value).toFixed(1)">
+        <span class="param-label">מהירות סימולציה</span>
+      </div>
+      <div class="param-row">
+        <span class="param-value" id="valClocks">5</span>
+        <input type="range" id="slClocks" min="2" max="10" step="1" value="5" oninput="onClocksChange(this.value)">
+        <span class="param-label">מספר שעונים</span>
+      </div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(80,160,255,0.15)">
+        <div class="check-row" onclick="toggleCheck('chkAstronaut')">
+          <label for="chkAstronaut">הצג אסטרונאוט נופל</label>
+          <input type="checkbox" id="chkAstronaut" checked onchange="state.showAstronaut=this.checked">
+        </div>
+        <div class="check-row" onclick="toggleCheck('chkFreezeEffect')">
+          <label for="chkFreezeEffect">הדליית אופק אירועים (קיפאון)</label>
+          <input type="checkbox" id="chkFreezeEffect" checked onchange="state.freezeEffect=this.checked">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View -->
+  <div class="dialogue" id="dlgView" style="bottom:80px;right:80px;width:300px;">
+    <div class="dialogue-header">
+      <div class="dialogue-close" onclick="closeDlg('dlgView')">✕</div>
+      <span class="dialogue-title">שכבות תצוגה</span>
+    </div>
+    <div class="dialogue-body">
+      <div class="check-row" onclick="toggleCheck('chkGrid')">
+        <label>רשת מרחב-זמן (Spacetime Grid)</label>
+        <input type="checkbox" id="chkGrid" checked onchange="state.showGrid=this.checked">
+      </div>
+      <div class="check-row" onclick="toggleCheck('chkEventHorizon')">
+        <label>אופק אירועים (Event Horizon)</label>
+        <input type="checkbox" id="chkEventHorizon" checked onchange="state.showEventHorizon=this.checked">
+      </div>
+      <div class="check-row" onclick="toggleCheck('chkPhotonSphere')">
+        <label>ספֵרת פוטונים (Photon Sphere)</label>
+        <input type="checkbox" id="chkPhotonSphere" checked onchange="state.showPhotonSphere=this.checked">
+      </div>
+      <div class="check-row" onclick="toggleCheck('chkDilationRings')">
+        <label>טבעות אזורי התארכות</label>
+        <input type="checkbox" id="chkDilationRings" checked onchange="state.showDilationRings=this.checked">
+      </div>
+      <div class="check-row" onclick="toggleCheck('chkLabels')">
+        <label>תוויות ונתונים על הקנבס</label>
+        <input type="checkbox" id="chkLabels" checked onchange="state.showLabels=this.checked">
+      </div>
+      <div class="check-row" onclick="toggleCheck('chkAccretion')">
+        <label>דיסקת ספיחה דינמית</label>
+        <input type="checkbox" id="chkAccretion" checked onchange="state.showAccretion=this.checked">
+      </div>
+      <div class="check-row" onclick="toggleCheck('chkTrails')">
+        <label>עקבות תנועה ארוכים</label>
+        <input type="checkbox" id="chkTrails" checked onchange="state.showTrails=this.checked">
+      </div>
+      <div style="height:1px;background:rgba(80,160,255,0.15);margin:12px 0"></div>
+      <div class="check-row" onclick="toggleCheck('chkTidal')">
+        <label>כוחות גאות (ספגטיפיקציה!)</label>
+        <input type="checkbox" id="chkTidal" onchange="state.tidalForces=this.checked">
+      </div>
+    </div>
+  </div>
+
+  <!-- Objects / Emoji Dropper -->
+  <div class="dialogue" id="dlgObjects" style="top:80px;left:480px;width:340px;">
+    <div class="dialogue-header">
+      <div class="dialogue-close" onclick="closeDlg('dlgObjects')">✕</div>
+      <span class="dialogue-title">🌀 זרוק לחור השחור</span>
+    </div>
+    <div class="dialogue-body">
+      <div style="font-size:12px;color:rgba(180,210,255,0.8);margin-bottom:16px;line-height:1.6">
+        בחר אמוג׳י והקלק על המסך כדי להניח אותו במרחב-זמן.
+      </div>
+
+      <div class="emoji-section-title">חיות</div>
+      <div class="emoji-grid">
+        <div class="emoji-btn" onclick="startPlacing('🐱')">🐱</div>
+        <div class="emoji-btn" onclick="startPlacing('🐶')">🐶</div>
+        <div class="emoji-btn" onclick="startPlacing('🐭')">🐭</div>
+        <div class="emoji-btn" onclick="startPlacing('🐸')">🐸</div>
+        <div class="emoji-btn" onclick="startPlacing('🦊')">🦊</div>
+        <div class="emoji-btn" onclick="startPlacing('🐻')">🐻</div>
+        <div class="emoji-btn" onclick="startPlacing('🐼')">🐼</div>
+        <div class="emoji-btn" onclick="startPlacing('🐧')">🐧</div>
+        <div class="emoji-btn" onclick="startPlacing('🦁')">🦁</div>
+        <div class="emoji-btn" onclick="startPlacing('🐙')">🐙</div>
+        <div class="emoji-btn" onclick="startPlacing('🦋')">🦋</div>
+        <div class="emoji-btn" onclick="startPlacing('🐠')">🐠</div>
+      </div>
+
+      <div class="emoji-section-title" style="margin-top:12px">חפצים ואנשים</div>
+      <div class="emoji-grid">
+        <div class="emoji-btn" onclick="startPlacing('👨‍🚀')">👨‍🚀</div>
+        <div class="emoji-btn" onclick="startPlacing('🤖')">🤖</div>
+        <div class="emoji-btn" onclick="startPlacing('👾')">👾</div>
+        <div class="emoji-btn" onclick="startPlacing('🚀')">🚀</div>
+        <div class="emoji-btn" onclick="startPlacing('🌍')">🌍</div>
+        <div class="emoji-btn" onclick="startPlacing('⭐')">⭐</div>
+        <div class="emoji-btn" onclick="startPlacing('💎')">💎</div>
+        <div class="emoji-btn" onclick="startPlacing('🎸')">🎸</div>
+        <div class="emoji-btn" onclick="startPlacing('🍕')">🍕</div>
+        <div class="emoji-btn" onclick="startPlacing('🎩')">🎩</div>
+        <div class="emoji-btn" onclick="startPlacing('🔮')">🔮</div>
+        <div class="emoji-btn" onclick="startPlacing('☕')">☕</div>
+      </div>
+
+      <div class="emoji-section-title" style="margin-top:12px">קוסמוס ופיזיקה</div>
+      <div class="emoji-grid">
+        <div class="emoji-btn" onclick="startPlacing('⚛️')">⚛️</div>
+        <div class="emoji-btn" onclick="startPlacing('🌌')">🌌</div>
+        <div class="emoji-btn" onclick="startPlacing('🌠')">🌠</div>
+        <div class="emoji-btn" onclick="startPlacing('☄️')">☄️</div>
+        <div class="emoji-btn" onclick="startPlacing('🪐')">🪐</div>
+        <div class="emoji-btn" onclick="startPlacing('🌙')">🌙</div>
+        <div class="emoji-btn" onclick="startPlacing('💥')">💥</div>
+        <div class="emoji-btn" onclick="startPlacing('🕳️')">🕳️</div>
+      </div>
+
+      <button class="clear-btn" onclick="state.droppables=[]">🗑️ נקה הכל</button>
+
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(80,160,255,0.15)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <button id="btnChaos" class="mode-btn" onclick="toggleChaos()"
+            style="flex:1;padding:12px;font-size:14px;font-weight:600">
+            🌀 מצב שיגועים (Chaos)
+          </button>
+        </div>
+        <div class="param-row">
+          <span class="param-value" id="valChaosInterval">1.2s</span>
+          <input type="range" id="slChaosInterval" min="0.1" max="3" step="0.1" value="1.2"
+            oninput="state.chaosInterval=parseFloat(this.value);document.getElementById('valChaosInterval').textContent=parseFloat(this.value).toFixed(1)+'s'">
+          <span class="param-label">קצב שיגורים</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GPS Dialogue -->
+  <div class="dialogue" id="dlgGPS" style="bottom:80px;left:80px;width:360px;">
+    <div class="dialogue-header">
+      <div class="dialogue-close" onclick="closeDlg('dlgGPS')">✕</div>
+      <span class="dialogue-title">ניתוח נתוני GPS 🛰️</span>
+    </div>
+    <div class="dialogue-body" id="gpsBody">
+      <div style="font-size:13px;color:rgba(180,210,255,0.85);margin-bottom:16px;line-height:1.6">
+        לווייני ה-GPS נתונים לשתי השפעות יחסותיות מנוגדות. ללא פיצוי אלגוריתמי במערכות הלוויין, רשת ה-GPS הייתה צוברת שגיאת מיקום של <strong style="color:#ffdc50">כ-10 ק"מ בכל יום!</strong>
+      </div>
+      <div class="gps-info-row">
+        <span class="gps-val" id="gpsGrav">+45.9 μs/יום</span>
+        <span class="gps-label">התארכות כבידתית</span>
+      </div>
+      <div class="gps-info-row">
+        <span class="gps-val neg" id="gpsVel">−7.2 μs/יום</span>
+        <span class="gps-label">כיווץ זמן (מהירות)</span>
+      </div>
+      <div class="gps-info-row" style="border-color:rgba(255,210,80,0.4);background:rgba(255,210,80,0.05)">
+        <span class="gps-val total" id="gpsNet">+38.4 μs/יום</span>
+        <span class="gps-label" style="color:rgba(255,220,100,0.9);font-weight:600">תיקון נדרש נטו</span>
+      </div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(80,160,255,0.15)">
+        <div style="font-size:12px;color:rgba(150,190,240,0.8);margin-bottom:8px;text-align:center;">סחיפת זמן מצטברת (לוויין מול קרקע)</div>
+        <div id="gpsClockBar" style="position:relative;height:10px;background:rgba(10,20,40,0.8);border-radius:5px;overflow:hidden;margin-bottom:6px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(80,160,255,0.2)">
+          <div id="gpsBarFill" style="position:absolute;right:0;top:0;height:100%;background:linear-gradient(90deg, #f6d365 0%, #fda085 100%);width:0%;transition:width 0.2s linear;border-radius:5px;box-shadow:0 0 10px rgba(253,160,133,0.8)"></div>
+        </div>
+        <div id="gpsBarLabel" style="font-family:'Space Mono',monospace;font-size:13px;color:#fda085;text-align:center;text-shadow:0 0 8px rgba(253,160,133,0.5)">+0.000 μs</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documentation -->
+  <div class="dialogue" id="dlgDoc" style="top:80px;left:80px;width:400px;">
+    <div class="dialogue-header">
+      <div class="dialogue-close" onclick="closeDlg('dlgDoc')">✕</div>
+      <span class="dialogue-title">תיעוד פיזיקלי</span>
+    </div>
+    <div class="dialogue-body">
+      <div class="doc-section">
+        <div class="doc-title">ייחוס ופיתוח</div>
+        <div class="doc-text">פותח על ידי <strong>PhysiTal</strong> בסטנדרט 2.0 עבור שוחרי פיזיקה, תחת רישיון שימוש חופשי.</div>
+      </div>
+      <div class="doc-section">
+        <div class="doc-title">המטריקה של שוורצשילד</div>
+        <div class="doc-text">
+          הסימולציה מבוססת על פתרון משוואות שדה איינשטיין עבור מסה נקודתית נטולת ספין. היחס בין הזמן העצמי ($d\tau$) לזמן הקואורדינטות ($dt$) נתון על ידי:
+        </div>
+        <div class="doc-formula">dτ = dt · √(1 - rₛ/r)</div>
+        <div class="doc-text mt-2">
+          כאשר <strong style="color:#4facfe">rₛ</strong> הוא רדיוס שוורצשילד ($2GM/c^2$) ו-<strong style="color:#4facfe">r</strong> הוא מרחק הצופה ממרכז המסה. ככל שמתקרבים ל-$r_s$, השורש שואף לאפס, והזמן המקומי עוצר.
+        </div>
+      </div>
+      <div class="doc-section">
+        <div class="doc-title">ספגטיפיקציה (Spaghettification)</div>
+        <div class="doc-text">
+          במידה ותפעילו את מנגנון "כוחות הגאות", תוכלו לראות כיצד האסטרונאוט (והאובייקטים המושלכים) נמתחים באופק האירועים. זהו ביטוי ויזואלי להפרש העצום בכוח הכבידה בין ראשו לרגליו של הנופל.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONSTANTS & CONFIG
+// ═══════════════════════════════════════════
+const C_LIGHT = 1; 
+const GPS_GRAV_US = 45.9;    
+const GPS_VEL_US = -7.2;     
+const GPS_NET_US = 38.4;     
+const GPS_VIS_FACTOR = 0.08; // Visual exaggeration factor for GPS mode
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const state = {
+  mode: 'blackhole', 
+  bhMass: 1.0,       
+  simSpeed: 1.0,
+  simTime: 0,        
+  earthTime: 0,      
+  showGrid: true,
+  showEventHorizon: true,
+  showPhotonSphere: true,
+  showDilationRings: true,
+  showLabels: true,
+  showAccretion: true,
+  showTrails: true,
+  showAstronaut: true,
+  freezeEffect: true,
+  zoom: 1.0,
+  panX: 0, panY: 0,
+  
+  // Dragging & Interaction
+  isDragging: false,
+  isPanning: false,
+  dragClock: null,
+  dragOffX: 0, dragOffY: 0,
+  isDraggingAstronaut: false,
+  astDragOffX: 0, astDragOffY: 0,
+  
+  // Entities
+  clocks: [],
+  astronaut: null,
+  stars: [],
+  
+  // Droppables & Chaos
+  droppables: [],
+  placingEmoji: null,
+  placingGhostX: 0, placingGhostY: 0,
+  isDraggingDroppable: false,
+  dragDroppable: null,
+  dragDropOffX: 0, dragDropOffY: 0,
+  chaosMode: false,
+  chaosTimer: 0,
+  chaosInterval: 1.2,
+  tidalForces: false, // Spaghettification
+  
+  // GPS Mode
+  gpsSatellites: [],
+  gpsClocks: [],
+  gpsElapsed: 0,
+  gpsPanX: 0, gpsPanY: 0,
+  gpsZoom: 1.0,
+};
+
+// ═══════════════════════════════════════════
+// CANVAS SETUP & OPTIMIZATION
+// ═══════════════════════════════════════════
+const trailCanvas = document.getElementById('trailCanvas');
+const simCanvas = document.getElementById('simCanvas');
+const tCtx = trailCanvas.getContext('2d', { alpha: false }); 
+const sCtx = simCanvas.getContext('2d');
+
+// Global offscreen canvas for rendering tinted emojis efficiently
+const offCanvas = document.createElement('canvas');
+const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+
+function resize() {
+  const W = window.innerWidth, H = window.innerHeight;
+  trailCanvas.width = simCanvas.width = W;
+  trailCanvas.height = simCanvas.height = H;
+  
+  tCtx.fillStyle = '#000002';
+  tCtx.fillRect(0, 0, W, H);
+}
+resize();
+window.addEventListener('resize', () => { resize(); initStars(); });
+
+// ═══════════════════════════════════════════
+// PHYSICS
+// ═══════════════════════════════════════════
+function getRS() {
+  return 80 * state.bhMass; // Visually scaled Schwarzschild radius
+}
+
+function dilationFactor(r) {
+  const rs = getRS();
+  if (r <= rs) return 0;
+  return Math.sqrt(Math.max(0, 1 - rs / r));
+}
+
+function dilationColor(factor) {
+  if (factor > 1) return 'rgb(80,255,160)'; // GPS Faster
+  if (factor > 0.95) return `rgb(100, 200, 255)`;
+  if (factor > 0.7) {
+    const t = (factor - 0.7) / 0.25;
+    return `rgb(${Math.round(255 - t*155)}, ${Math.round(200)}, 255)`; 
+  }
+  if (factor > 0.4) {
+    const t = (factor - 0.4) / 0.3;
+    return `rgb(255, ${Math.round(150 + t*50)}, ${Math.round(t*255)})`;
+  }
+  const t = Math.max(0, factor / 0.4);
+  return `rgb(255, ${Math.round(t*100)}, 0)`;
+}
+
+// ═══════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════
+function initStars() {
+  state.stars = [];
+  const W = simCanvas.width, H = simCanvas.height;
+  for (let i = 0; i < 500; i++) {
+    state.stars.push({
+      x: (Math.random() - 0.5) * W * 4,
+      y: (Math.random() - 0.5) * H * 4,
+      z: Math.random() * 2 + 0.1, 
+      r: Math.random() * 1.5 + 0.5,
+      bright: Math.random(),
+      twinkle: Math.random() * Math.PI * 2,
+      speed: Math.random() * 0.03 + 0.01
+    });
+  }
+}
+
+function initClocks(n) {
+  state.clocks = [];
+  const W = simCanvas.width, H = simCanvas.height;
+  const rs = getRS();
+  const minR = rs * 1.35;
+  const maxR = Math.min(W, H) * 0.48;
+  for (let i = 0; i < n; i++) {
+    const frac = i / (n - 1);
+    const r = minR + frac * (maxR - minR);
+    const angle = -Math.PI / 2 + frac * 0.8 - 0.4;
+    state.clocks.push({
+      x: Math.cos(angle + frac * Math.PI) * r,
+      y: Math.sin(angle + frac * Math.PI) * r,
+      localTime: 0,
+      coordTime: 0,
+      id: i,
+      radius: 40 - i * 1.5,
+      dragging: false
+    });
+  }
+}
+
+function initAstronaut() {
+  const rs = getRS();
+  state.astronaut = {
+    x: rs * 6,
+    y: -rs * 2,
+    vx: -0.4,
+    vy: 0.08,
+    localTime: 0,
+    coordTime: 0,
+    size: 20,
+    active: true,
+    trail: []
+  };
+}
+
+function initGPSSatellites() {
+  state.gpsSatellites = [];
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    state.gpsSatellites.push({
+      angle: (i / n) * Math.PI * 2,
+      localTime: 0,
+      id: i,
+      pingRing: 0 
+    });
+  }
+}
+
+function initGPSClocks() {
+  const W = simCanvas.width, H = simCanvas.height;
+  const earthR = Math.min(W, H) * 0.12;
+  state.gpsClocks = [
+    { x: earthR * 1.4, y: -earthR * 2.2, altitude: 'פני השטח', localTime: 0, radius: 34, id: 'surface', dragging: false },
+    { x: -earthR * 3.5, y: earthR * 1.0, altitude: 'ISS (~400 ק"מ)', localTime: 0, radius: 34, id: 'iss', dragging: false },
+  ];
+}
+
+function init() {
+  initStars();
+  initClocks(5);
+  initAstronaut();
+  initGPSSatellites();
+  initGPSClocks();
+}
+init();
+
+// ═══════════════════════════════════════════
+// UPDATE PHYSICS
+// ═══════════════════════════════════════════
+function update(dt) {
+  state.simTime += dt * state.simSpeed;
+
+  if (state.mode === 'blackhole') {
+    const rs = getRS();
+    state.accretionAngle = (state.accretionAngle || 0) + dt * 0.4 * state.simSpeed;
+
+    // Clocks
+    for (const clk of state.clocks) {
+      if (clk.dragging) continue;
+      const r = Math.sqrt(clk.x * clk.x + clk.y * clk.y);
+      const df = dilationFactor(r);
+      clk.localTime += dt * state.simSpeed * df * 60; 
+      clk.coordTime += dt * state.simSpeed * 60;
+    }
+
+    // Astronaut
+    if (state.astronaut && state.astronaut.active && state.showAstronaut && !state.isDraggingAstronaut) {
+      const ast = state.astronaut;
+      const r = Math.sqrt(ast.x * ast.x + ast.y * ast.y);
+      const df = dilationFactor(r);
+      const coordFactor = state.freezeEffect ? df : 1.0;
+      
+      ast.x += ast.vx * dt * state.simSpeed * coordFactor * 60;
+      ast.y += ast.vy * dt * state.simSpeed * coordFactor * 60;
+      const pull = rs * rs / (r * r) * 0.3 * dt * state.simSpeed;
+      ast.vx -= (ast.x / r) * pull;
+      ast.vy -= (ast.y / r) * pull;
+      ast.localTime += dt * state.simSpeed * df * 60;
+      ast.coordTime += dt * state.simSpeed * 60;
+
+      if (state.showTrails) {
+        ast.trail.push({ x: ast.x, y: ast.y, df });
+        if (ast.trail.length > 300) ast.trail.shift();
+      }
+      if (r < rs * 1.01 || r > simCanvas.width * 2) initAstronaut(); 
+    }
+
+    // Droppables
+    for (let i = state.droppables.length - 1; i >= 0; i--) {
+      const obj = state.droppables[i];
+      if (obj.dragging) continue;
+      const r = Math.sqrt(obj.x * obj.x + obj.y * obj.y);
+      const df = dilationFactor(r);
+      const coordFactor = state.freezeEffect ? df : 1.0;
+      
+      obj.x += obj.vx * dt * state.simSpeed * coordFactor * 60;
+      obj.y += obj.vy * dt * state.simSpeed * coordFactor * 60;
+      const pull = rs * rs / (r * r) * 0.3 * dt * state.simSpeed;
+      obj.vx -= (obj.x / r) * pull;
+      obj.vy -= (obj.y / r) * pull;
+      obj.df = df;
+      obj.fallAngle = Math.atan2(-obj.y, -obj.x);
+      
+      if (state.showTrails) {
+        obj.trail.push({ x: obj.x, y: obj.y, df });
+        if (obj.trail.length > 300) obj.trail.shift();
+      }
+      if (r > Math.max(simCanvas.width, simCanvas.height) * 1.5) state.droppables.splice(i, 1);
+    }
+
+    // Chaos Mode
+    if (state.chaosMode) {
+      state.chaosTimer -= dt * state.simSpeed;
+      if (state.chaosTimer <= 0) {
+        state.chaosTimer = state.chaosInterval * (0.5 + Math.random() * 0.8);
+        const allEmojis = ['🐱','🐶','🐭','🐸','🦊','🐻','🐼','🐧','🦁','🐙','🦋','🐠',
+                           '👨‍🚀','🤖','👾','🚀','🌍','⭐','💎','🎸','🍕','🎩','🔮','☕',
+                           '⚛️','🌌','☄️','🪐','🌙','💥'];
+        const emoji = allEmojis[Math.floor(Math.random() * allEmojis.length)];
+        const spawnR = rs * (4 + Math.random() * 6);
+        const spawnAngle = Math.random() * Math.PI * 2;
+        const sx = Math.cos(spawnAngle) * spawnR;
+        const sy = Math.sin(spawnAngle) * spawnR;
+        const tangAngle = spawnAngle + Math.PI / 2;
+        const tangSpeed = (Math.random() - 0.5) * 0.4;
+        
+        state.droppables.push({
+          emoji, x: sx, y: sy,
+          vx: tangSpeed * Math.cos(tangAngle),
+          vy: tangSpeed * Math.sin(tangAngle),
+          size: 26, df: 1.0,
+          fallAngle: Math.atan2(-sy, -sx),
+          trail: [], dragging: false
+        });
+      }
+    }
+
+  } else if (state.mode === 'gps') {
+    const W = simCanvas.width, H = simCanvas.height;
+    const gpsOrbitR = Math.min(W, H) * 0.38;
+    
+    for (const sat of state.gpsSatellites) {
+      const speed = Math.sqrt(1 / gpsOrbitR) * 0.6 * state.simSpeed;
+      sat.angle += dt * speed;
+      sat.localTime += dt * state.simSpeed * (1 + GPS_VIS_FACTOR);
+      sat.pingRing += dt * state.simSpeed * 2;
+      if (sat.pingRing > 1) sat.pingRing = 0;
+    }
+    state.earthTime += dt * state.simSpeed * 1.0;
+
+    const earthR_phys = Math.min(W, H) * 0.12;
+    for (const clk of state.gpsClocks) {
+      if (clk.dragging) continue;
+      const distFromEarth = Math.sqrt(clk.x*clk.x + clk.y*clk.y);
+      const gravitationalTerm = Math.min(0.999, (earthR_phys / Math.max(distFromEarth, earthR_phys * 0.9)) * GPS_VIS_FACTOR * 2);
+      const dfGPS = Math.sqrt(Math.max(0, 1 - gravitationalTerm));
+      clk.df = dfGPS;
+      clk.localTime += dt * state.simSpeed * dfGPS * 60;
+    }
+    state.gpsElapsed += dt * state.simSpeed;
+  }
+}
+
+// ═══════════════════════════════════════════
+// DRAWING HELPERS
+// ═══════════════════════════════════════════
+function worldToScreen(wx, wy) {
+  const W = simCanvas.width, H = simCanvas.height;
+  if (state.mode === 'gps') {
+    return [W/2 + wx * state.gpsZoom + state.gpsPanX, H/2 + wy * state.gpsZoom + state.gpsPanY];
+  }
+  return [W/2 + wx * state.zoom + state.panX, H/2 + wy * state.zoom + state.panY];
+}
+
+function screenToWorld(sx, sy) {
+  const W = simCanvas.width, H = simCanvas.height;
+  if (state.mode === 'gps') {
+    return [(sx - W/2 - state.gpsPanX) / state.gpsZoom, (sy - H/2 - state.gpsPanY) / state.gpsZoom];
+  }
+  return [(sx - W/2 - state.panX) / state.zoom, (sy - H/2 - state.panY) / state.zoom];
+}
+
+// ── Background & Warped Grid ──
+function drawBackground(ctx) {
+  const W = simCanvas.width, H = simCanvas.height;
+  const cx = W/2 + state.panX, cy = H/2 + state.panY;
+  
+  tCtx.fillStyle = 'rgba(2, 3, 8, 0.15)';
+  tCtx.fillRect(0, 0, W, H);
+
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H));
+  bg.addColorStop(0, '#040714');
+  bg.addColorStop(0.5, '#02030a');
+  bg.addColorStop(1, '#000000');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  for (const s of state.stars) {
+    s.twinkle += s.speed;
+    const alpha = 0.2 + 0.8 * (0.5 + 0.5 * Math.sin(s.twinkle)) * s.bright;
+    
+    let sx = W/2 + (s.x + state.panX * s.z) * state.zoom;
+    let sy = H/2 + (s.y + state.panY * s.z) * state.zoom;
+    if (state.mode === 'gps') {
+       sx = W/2 + (s.x + state.gpsPanX * s.z) * state.gpsZoom;
+       sy = H/2 + (s.y + state.gpsPanY * s.z) * state.gpsZoom;
+    }
+    
+    let lensedX = sx, lensedY = sy;
+    
+    if (state.mode === 'blackhole') {
+       let dx = sx - cx, dy = sy - cy;
+       let r = Math.sqrt(dx*dx + dy*dy);
+       const rsScreen = getRS() * state.zoom;
+       if (r > rsScreen) {
+         const bend = (rsScreen * rsScreen) / (r * 1.5);
+         const factor = 1 + bend/r;
+         lensedX = cx + dx * factor;
+         lensedY = cy + dy * factor;
+       }
+    }
+
+    if(lensedX < 0 || lensedX > W || lensedY < 0 || lensedY > H) continue;
+
+    ctx.beginPath();
+    ctx.arc(lensedX, lensedY, s.r * (state.mode === 'gps' ? state.gpsZoom : state.zoom), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(180,220,255,${alpha.toFixed(2)})`;
+    ctx.fill();
+  }
+
+  // Warped Spacetime Grid
+  if (state.showGrid && state.mode === 'blackhole') {
+    ctx.strokeStyle = 'rgba(60, 120, 255, 0.08)';
+    ctx.lineWidth = 1 * state.zoom;
+    const step = 80 * state.zoom;
+    const rsScreen = getRS() * state.zoom;
+    
+    ctx.beginPath();
+    for (let x = (cx % step) - step; x < W + step; x += step) {
+      for(let y = 0; y < H; y += 15) {
+         let dx = x - cx, dy = y - cy;
+         let r = Math.sqrt(dx*dx + dy*dy);
+         let px = x, py = y;
+         if (r > rsScreen * 0.8) {
+             const pull = Math.min(0.9, (rsScreen * rsScreen) / (r * r * 1.5));
+             px = cx + dx * (1 - pull);
+             py = cy + dy * (1 - pull);
+         }
+         if(y===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+    }
+    for (let y = (cy % step) - step; y < H + step; y += step) {
+      for(let x = 0; x < W; x += 15) {
+         let dx = x - cx, dy = y - cy;
+         let r = Math.sqrt(dx*dx + dy*dy);
+         let px = x, py = y;
+         if (r > rsScreen * 0.8) {
+             const pull = Math.min(0.9, (rsScreen * rsScreen) / (r * r * 1.5));
+             px = cx + dx * (1 - pull);
+             py = cy + dy * (1 - pull);
+         }
+         if(x===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+    }
+    ctx.stroke();
+  }
+}
+
+// ── Cinematic Black Hole ──
+function drawBlackHole(ctx) {
+  const W = simCanvas.width, H = simCanvas.height;
+  const cx = W/2 + state.panX, cy = H/2 + state.panY;
+  const rs = getRS() * state.zoom;
+
+  const halo = ctx.createRadialGradient(cx, cy, rs * 0.8, cx, cy, rs * 4);
+  halo.addColorStop(0, 'rgba(80, 140, 255, 0.15)');
+  halo.addColorStop(0.1, 'rgba(40, 80, 200, 0.08)');
+  halo.addColorStop(0.5, 'rgba(10, 30, 80, 0.02)');
+  halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rs * 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (state.showAccretion) {
+    const outerR = rs * 3.5;
+    const innerR = rs * 1.1;
+    
+    ctx.save();
+    
+    // Outer faint orange glow
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, outerR, outerR*0.25, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255, 100, 30, 0.06)';
+    ctx.fill();
+
+    // Middle bright blurred band
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, outerR * 0.7, (outerR * 0.7)*0.25, 0, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255, 150, 50, 0.12)';
+    ctx.lineWidth = 15 * state.zoom;
+    ctx.filter = 'blur(6px)';
+    ctx.stroke();
+
+    // Clear blur for inner crisp rings
+    ctx.filter = 'none';
+
+    // Inner bright photon rings
+    for(let i=0; i<3; i++) {
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, innerR + i*5*state.zoom, (innerR + i*5*state.zoom)*0.25, 0, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(255, ${200 - i*30}, ${100 - i*20}, ${0.5 - i*0.15})`;
+        ctx.lineWidth = 3 * state.zoom;
+        ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if (state.showDilationRings) {
+    const rings = [1.2, 1.5, 2.0, 3.0, 5.0];
+    rings.forEach(frac => {
+      const r = rs * frac;
+      const df = dilationFactor(r / state.zoom);
+      const col = dilationColor(df);
+      
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = col.replace('rgb', 'rgba').replace(')', ',0.15)');
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4 * state.zoom, 8 * state.zoom]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      if (state.showLabels) {
+        ctx.font = `${10 * state.zoom}px "Space Mono"`;
+        ctx.fillStyle = col.replace('rgb', 'rgba').replace(')', ',0.6)');
+        ctx.fillText(`×${df.toFixed(2)}`, cx + r + 5, cy + 3);
+      }
+    });
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, rs, 0, Math.PI * 2);
+  ctx.fillStyle = '#000000';
+  ctx.fill();
+
+  if (state.showPhotonSphere) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, rs * 1.5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255, 100, 200, 0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  if (state.showEventHorizon) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, rs, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255, 50, 50, 0.8)';
+    ctx.lineWidth = 1.5 * state.zoom;
+    ctx.stroke();
+    const inner = ctx.createRadialGradient(cx, cy, rs*0.8, cx, cy, rs);
+    inner.addColorStop(0, 'rgba(0,0,0,1)');
+    inner.addColorStop(1, 'rgba(50,0,0,0.5)');
+    ctx.fillStyle = inner;
+    ctx.fill();
+  }
+}
+
+// ── Masterpiece Clock Render ──
+function drawClock(ctx, wx, wy, radius, localTime, df, label, isReference) {
+  const [sx, sy] = isReference ? [wx, wy] : worldToScreen(wx, wy);
+  const z = state.mode === 'gps' ? state.gpsZoom : state.zoom;
+  const R = radius * (isReference ? 1 : z);
+  const glow = dilationColor(df);
+  
+  // Spaghettification inside horizon
+  const W = simCanvas.width, H = simCanvas.height;
+  const cx = W / 2, cy = H / 2;
+  const rs = getRS();
+  const rDist = Math.sqrt(wx*wx + wy*wy);
+  
+  if (state.mode === 'blackhole' && rDist < rs && !isReference) {
+    const depth = 1 - rDist / rs;
+    ctx.save();
+    ctx.translate(sx, sy);
+    if (state.tidalForces) {
+      const angle = Math.atan2(-wy, -wx);
+      ctx.rotate(angle);
+      const stretchX = 1 + depth * 4;
+      const stretchY = Math.max(0.05, 1 - depth * 0.9);
+      ctx.scale(stretchX, stretchY);
+    }
+    const alpha = Math.max(0, 1 - depth * 0.85);
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(60,5,5,0.8)`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(200,30,30,0.6)`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    const frozenAngle = -Math.PI / 2;
+    for (const [len, w] of [[R*0.5,3],[R*0.7,2],[R*0.8,1]]) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(frozenAngle)*len, Math.sin(frozenAngle)*len);
+      ctx.strokeStyle = `rgba(255,60,30,0.7)`;
+      ctx.lineWidth = w;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+    if (depth > 0.3) {
+      ctx.font = `${R * 0.5}px "Space Mono"`;
+      ctx.fillStyle = `rgba(255,80,30,0.6)`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('∞', 0, 0);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // Normal Holographic Clock
+  ctx.shadowColor = glow;
+  ctx.shadowBlur = R * 0.5;
+  ctx.beginPath();
+  ctx.arc(sx, sy, R, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(10, 15, 30, 0.85)';
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.beginPath();
+  ctx.arc(sx, sy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = isReference ? 'rgba(255, 200, 80, 0.8)' : glow.replace('rgb', 'rgba').replace(')', ',0.8)');
+  ctx.lineWidth = R * 0.05;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(sx, sy, R * 0.85, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
+    const isH = i % 5 === 0;
+    const rOuter = R * 0.95;
+    const rInner = rOuter - (isH ? R * 0.15 : R * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(sx + Math.cos(a) * rInner, sy + Math.sin(a) * rInner);
+    ctx.lineTo(sx + Math.cos(a) * rOuter, sy + Math.sin(a) * rOuter);
+    ctx.strokeStyle = isH ? glow : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = isH ? R * 0.04 : R * 0.02;
+    ctx.stroke();
+  }
+
+  const hours = (localTime / 3600) % 12;
+  const mins = (localTime / 60) % 60;
+  const secs = localTime % 60;
+  
+  const ha = (hours / 12) * Math.PI * 2 - Math.PI / 2;
+  const ma = (mins / 60) * Math.PI * 2 - Math.PI / 2;
+  const sa = (secs / 60) * Math.PI * 2 - Math.PI / 2; 
+
+  drawHand(ctx, sx, sy, ha, R * 0.5, R * 0.06, 'rgba(255,255,255,0.9)');
+  drawHand(ctx, sx, sy, ma, R * 0.7, R * 0.04, 'rgba(200,220,255,0.9)');
+  
+  const secColor = isReference ? '#f6d365' : glow;
+  drawHand(ctx, sx, sy, sa, R * 0.85, R * 0.02, secColor);
+  drawHand(ctx, sx, sy, sa + Math.PI, R * 0.15, R * 0.02, secColor);
+
+  ctx.beginPath();
+  ctx.arc(sx, sy, R * 0.08, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(sx, sy, R * 0.04, 0, Math.PI * 2);
+  ctx.fillStyle = secColor;
+  ctx.fill();
+
+  if (state.showLabels) {
+    ctx.textAlign = 'center';
+    ctx.font = `${R * 0.18}px "Space Mono"`;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    const pad = n => Math.floor(n).toString().padStart(2, '0');
+    ctx.fillText(`${pad(hours)}:${pad(mins)}:${pad(secs)}`, sx, sy + R * 0.4);
+
+    ctx.font = `600 ${R * 0.16}px Rubik`;
+    ctx.fillStyle = isReference ? 'rgba(255,200,80,1)' : 'rgba(200,220,255,0.8)';
+    ctx.fillText(label, sx, sy - R * 0.4);
+
+    if (!isReference) {
+      ctx.font = `bold ${R * 0.2}px "Space Mono"`;
+      ctx.fillStyle = glow;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 4;
+      ctx.fillText(`×${df.toFixed(3)}`, sx, sy + R * 0.65);
+      ctx.shadowBlur = 0;
+    }
+  }
+}
+
+function drawHand(ctx, cx, cy, angle, length, width, color) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(angle) * length, cy + Math.sin(angle) * length);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+}
+
+// ── Astronaut Spaghettification ──
+function drawAstronaut(ctx) {
+  if (!state.showAstronaut || !state.astronaut) return;
+  const ast = state.astronaut;
+  const [sx, sy] = worldToScreen(ast.x, ast.y);
+  const r = Math.sqrt(ast.x * ast.x + ast.y * ast.y);
+  const df = dilationFactor(r);
+  const col = dilationColor(df);
+  
+  let baseScale = state.zoom * ast.size * 0.05;
+  const rs = getRS();
+  let stretchY = 1.0;
+  let squeezeX = 1.0;
+  
+  if (state.tidalForces && r < rs * 3) {
+      const tidalForce = Math.pow(rs / r, 3); 
+      stretchY = 1.0 + tidalForce * 2.0; 
+      squeezeX = 1.0 / Math.sqrt(stretchY); 
+  }
+
+  if (state.showTrails && ast.trail.length > 1) {
+    tCtx.beginPath();
+    const last = ast.trail[ast.trail.length - 2];
+    const [lx, ly] = worldToScreen(last.x, last.y);
+    tCtx.moveTo(lx, ly);
+    tCtx.lineTo(sx, sy);
+    tCtx.strokeStyle = col.replace('rgb', 'rgba').replace(')', `,0.8)`);
+    tCtx.lineWidth = 3 * state.zoom;
+    tCtx.lineCap = 'round';
+    tCtx.stroke();
+  }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  
+  const angleToCenter = Math.atan2(-ast.y, -ast.x);
+  ctx.rotate(angleToCenter - Math.PI/2); 
+  ctx.scale(baseScale * squeezeX, baseScale * stretchY);
+
+  ctx.fillStyle = 'rgba(230,240,255,0.9)';
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 2;
+
+  ctx.beginPath(); ctx.roundRect(-10, -10, 20, 25, 5); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, -15, 12, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  
+  const redshift = 1 - df;
+  ctx.fillStyle = `rgba(${Math.round(50 + redshift*200)}, ${Math.round(150 - redshift*150)}, 255, 0.8)`;
+  ctx.beginPath(); ctx.ellipse(0, -15, 8, 5, 0, 0, Math.PI*2); ctx.fill();
+
+  ctx.fillStyle = 'rgba(200,220,240,0.9)';
+  ctx.beginPath(); ctx.roundRect(-16, -10, 6, 15, 3); ctx.fill(); ctx.stroke(); 
+  ctx.beginPath(); ctx.roundRect(10, -10, 6, 15, 3); ctx.fill(); ctx.stroke();  
+  ctx.beginPath(); ctx.roundRect(-8, 15, 6, 15, 3); ctx.fill(); ctx.stroke();   
+  ctx.beginPath(); ctx.roundRect(2, 15, 6, 15, 3); ctx.fill(); ctx.stroke();    
+
+  ctx.restore();
+
+  if (state.showLabels) {
+    ctx.font = `bold ${12 * state.zoom}px "Space Mono"`;
+    ctx.fillStyle = col;
+    ctx.textAlign = 'center';
+    const labelOffset = 30 * state.zoom * stretchY;
+    ctx.fillText(`×${df.toFixed(3)}`, sx, sy - labelOffset);
+  }
+}
+
+// ── Droppables (Emojis) with Advanced Render ──
+function drawDroppables(ctx) {
+  const rs = getRS();
+
+  for (const obj of state.droppables) {
+    const [sx, sy] = worldToScreen(obj.x, obj.y);
+    const r = Math.sqrt(obj.x * obj.x + obj.y * obj.y);
+    const df = obj.df ?? dilationFactor(r);
+    const insideHorizon = r < rs;
+    const depth = insideHorizon ? Math.max(0, 1 - r / rs) : 0;
+    const sz = obj.size * state.zoom;
+
+    let stretchX = 1, stretchY = 1;
+    if (state.tidalForces) {
+      const spaghettiZone = 4.0 * rs;
+      if (r < spaghettiZone) {
+        const t = Math.min(1, 1 - (r - rs) / (spaghettiZone - rs));
+        stretchX = 1 + t * t * 2.5;
+        stretchY = Math.max(0.35, 1 - t * t * 0.65);
+      }
+      if (insideHorizon) {
+        stretchX = 3.5 + depth * 8;
+        stretchY = Math.max(0.03, 1 - depth * 0.97);
+      }
+    }
+
+    const fallAngle = obj.fallAngle ?? Math.atan2(-obj.y, -obj.x);
+
+    if (state.showTrails && obj.trail.length > 1) {
+      tCtx.save();
+      for (let i = 1; i < obj.trail.length; i++) {
+        const p = obj.trail[i], pp = obj.trail[i - 1];
+        const alpha = (i / obj.trail.length) * 0.4;
+        const tc = dilationColor(p.df).replace('rgb','rgba').replace(')',`,${alpha.toFixed(2)})`);
+        tCtx.beginPath();
+        const [lx, ly] = worldToScreen(pp.x, pp.y);
+        const [nx, ny] = worldToScreen(p.x, p.y);
+        tCtx.moveTo(lx, ly);
+        tCtx.lineTo(nx, ny);
+        tCtx.strokeStyle = tc;
+        tCtx.lineWidth = 1.5 * state.zoom;
+        tCtx.stroke();
+      }
+      tCtx.restore();
+    }
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    if (insideHorizon) ctx.globalAlpha = Math.max(0, 1 - depth * 0.88);
+
+    if (stretchX !== 1 || stretchY !== 1) {
+      ctx.rotate(fallAngle);
+      ctx.scale(stretchX, stretchY);
+      ctx.rotate(-fallAngle);
+    }
+
+    const redAlpha = Math.min(0.6, (1 - df) * 0.7);
+    if (redAlpha > 0.01) {
+      const glow = ctx.createRadialGradient(0, 0, sz * 0.2, 0, 0, sz * 2.5);
+      glow.addColorStop(0, `rgba(255,40,0,${redAlpha})`);
+      glow.addColorStop(0.5, `rgba(255,80,0,${redAlpha * 0.4})`);
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, sz * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const fontSize = Math.max(8, sz * 1.4);
+    const tintAlpha = Math.min(0.82, (1 - df) * 1.2);
+
+    // Optimized Offscreen Canvas Tinting
+    const pad = Math.ceil(fontSize * 1.1);
+    const offW = pad * 2, offH = pad * 2;
+    if (offCanvas.width !== offW || offCanvas.height !== offH) {
+        offCanvas.width = offW;
+        offCanvas.height = offH;
+    } else {
+        offCtx.clearRect(0, 0, offW, offH);
+    }
+
+    offCtx.font = `${fontSize}px serif`;
+    offCtx.textAlign = 'center';
+    offCtx.textBaseline = 'middle';
+    offCtx.fillText(obj.emoji, pad, pad);
+
+    if (tintAlpha > 0.02) {
+      offCtx.globalAlpha = tintAlpha;
+      offCtx.globalCompositeOperation = 'source-atop';
+      offCtx.fillStyle = `rgb(255, ${Math.round(50 * df)}, ${Math.round(20 * df)})`;
+      offCtx.fillRect(0, 0, offW, offH);
+    }
+
+    ctx.drawImage(offCanvas, -pad, -pad);
+
+    if (state.showLabels && !insideHorizon) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      if (stretchX !== 1 || stretchY !== 1) {
+        ctx.rotate(fallAngle);
+        ctx.scale(1 / stretchX, 1 / stretchY);
+        ctx.rotate(-fallAngle);
+      }
+      ctx.font = `${Math.max(9, sz * 0.52)}px "Space Mono"`;
+      ctx.fillStyle = dilationColor(df).replace('rgb','rgba').replace(')',',0.9)');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`×${df.toFixed(2)}`, 0, sz * 0.85);
+      ctx.restore();
+    }
+
+    if (insideHorizon && depth > 0.45) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = Math.min(0.75, (depth - 0.45) * 1.5);
+      ctx.rotate(fallAngle);
+      ctx.scale(1 / stretchX, 1 / stretchY);
+      ctx.rotate(-fallAngle);
+      ctx.font = `${Math.max(9, sz * 0.75)}px "Space Mono"`;
+      ctx.fillStyle = 'rgba(255,70,20,0.85)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('∞', 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Ghost emoji
+  if (state.placingEmoji) {
+    ctx.save();
+    ctx.globalAlpha = 0.65;
+    ctx.font = `${32}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(state.placingEmoji, state.placingGhostX, state.placingGhostY);
+    ctx.font = '12px Rubik';
+    ctx.fillStyle = 'rgba(150,220,255,0.9)';
+    ctx.textBaseline = 'top';
+    ctx.fillText('קליק להנחה · Esc לביטול', state.placingGhostX, state.placingGhostY + 22);
+    ctx.restore();
+  }
+}
+
+// ── GPS Mode ──
+function drawGPSMode(ctx) {
+  const W = simCanvas.width, H = simCanvas.height;
+  const cx = W / 2, cy = H / 2;
+  const earthR = Math.min(W, H) * 0.12;
+  const orbitR = Math.min(W, H) * 0.38;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(80, 160, 255, 0.15)';
+  ctx.lineWidth = 1 * state.gpsZoom;
+  ctx.setLineDash([5 * state.gpsZoom, 10 * state.gpsZoom]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const atmos = ctx.createRadialGradient(cx, cy, earthR * 0.8, cx, cy, earthR * 1.5);
+  atmos.addColorStop(0, 'rgba(40, 120, 255, 1)');
+  atmos.addColorStop(0.5, 'rgba(20, 80, 200, 0.4)');
+  atmos.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = atmos;
+  ctx.beginPath();
+  ctx.arc(cx, cy, earthR * 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  const earthG = ctx.createRadialGradient(cx - earthR*0.3, cy - earthR*0.3, 0, cx, cy, earthR);
+  earthG.addColorStop(0, '#3a7bd5');
+  earthG.addColorStop(1, '#001528');
+  ctx.fillStyle = earthG;
+  ctx.beginPath();
+  ctx.arc(cx, cy, earthR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, earthR, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(50, 180, 100, 0.5)';
+  ctx.beginPath(); ctx.ellipse(cx - earthR*0.2, cy, earthR*0.5, earthR*0.8, 0.2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + earthR*0.4, cy - earthR*0.3, earthR*0.4, earthR*0.3, -0.4, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 4 * state.gpsZoom;
+  ctx.beginPath(); ctx.arc(cx, cy, earthR*0.7, 0, Math.PI); ctx.stroke();
+  ctx.restore();
+
+  for (const sat of state.gpsSatellites) {
+    const sx = cx + Math.cos(sat.angle) * orbitR;
+    const sy = cy + Math.sin(sat.angle) * orbitR;
+
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(cx, cy);
+    ctx.strokeStyle = `rgba(100,200,100,${0.05 + 0.05 * Math.abs(Math.sin(state.simTime + sat.id))})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    if (sat.pingRing > 0) {
+       ctx.beginPath();
+       ctx.arc(sx, sy, sat.pingRing * orbitR * 0.5, 0, Math.PI*2);
+       ctx.strokeStyle = `rgba(100, 255, 150, ${1 - sat.pingRing})`;
+       ctx.lineWidth = 2 * state.gpsZoom;
+       ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(sat.angle);
+    const ss = 8 * state.gpsZoom;
+
+    ctx.fillStyle = '#4facfe';
+    ctx.fillRect(-ss * 3, -ss * 0.5, ss * 6, ss);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(-ss, -ss, ss * 2, ss * 2);
+    ctx.beginPath();
+    ctx.arc(0, -ss*1.5, ss, 0, Math.PI, true);
+    ctx.fillStyle = '#ccc';
+    ctx.fill();
+    ctx.restore();
+
+    if (sat.id % 2 === 0) {
+      const clockR = 26;
+      const clkX = sx + Math.cos(sat.angle + 0.2) * (ss * 5);
+      const clkY = sy + Math.sin(sat.angle + 0.2) * (ss * 5);
+      // Ensure we draw the clock using its local absolute position
+      drawClock(ctx, (clkX-W/2-state.gpsPanX)/state.gpsZoom, (clkY-H/2-state.gpsPanY)/state.gpsZoom, clockR, sat.localTime * 60, 1.08, `GPS-${sat.id + 1}`, false);
+    }
+  }
+
+  // Draw main Earth surface clock overlay
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, earthR * 0.88, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(5,10,25,0.62)';
+  ctx.fill();
+  ctx.restore();
+  drawClock(ctx, (cx-W/2-state.gpsPanX)/state.gpsZoom, (cy-H/2-state.gpsPanY)/state.gpsZoom, earthR * 0.82, state.earthTime * 60, 0.92, 'כדור הארץ', true);
+
+  const drift = state.gpsElapsed * GPS_NET_US / 86400; 
+  const barPct = Math.min(100, Math.abs(drift) * 5);
+  document.getElementById('gpsBarFill').style.width = barPct + '%';
+  document.getElementById('gpsBarLabel').textContent = `+${drift.toFixed(3)} μs פער נצבר`;
+}
+
+
+// ═══════════════════════════════════════════
+// MAIN RENDER
+// ═══════════════════════════════════════════
+function render() {
+  sCtx.clearRect(0, 0, simCanvas.width, simCanvas.height);
+
+  if (state.mode === 'gps') {
+    drawBackground(sCtx); // Using unified background
+    
+    sCtx.save();
+    sCtx.translate(state.gpsPanX, state.gpsPanY);
+    sCtx.scale(state.gpsZoom, state.gpsZoom);
+    drawGPSMode(sCtx);
+    
+    // GPS Clocks
+    for (const clk of state.gpsClocks) {
+      const df = clk.df ?? 1.0;
+      drawClock(sCtx, clk.x, clk.y, clk.radius, clk.localTime, df, clk.altitude, false);
+    }
+    sCtx.restore();
+
+    sCtx.save();
+    drawDroppables(sCtx);
+    sCtx.restore();
+
+    sCtx.font = '12px Rubik';
+    sCtx.fillStyle = 'rgba(120,180,255,0.6)';
+    sCtx.textAlign = 'right';
+    sCtx.direction = 'rtl';
+    sCtx.fillText('דאבל-קליק: שעון גובה | גרור: שעון | Alt+גרור: מפה | גלגל: זום', simCanvas.width - 20, simCanvas.height - 20);
+    return;
+  }
+
+  drawBackground(sCtx);
+  drawBlackHole(sCtx);
+
+  for (const clk of state.clocks) {
+    const r = Math.sqrt(clk.x * clk.x + clk.y * clk.y);
+    const df = dilationFactor(r);
+    drawClock(sCtx, clk.x, clk.y, clk.radius, clk.localTime, df, `שעון ${clk.id + 1}`, false);
+  }
+
+  drawAstronaut(sCtx);
+  drawDroppables(sCtx);
+
+  drawClock(sCtx, simCanvas.width - 100, 100, 65, state.simTime * 60, 1.0, 'זמן ייחוס (∞)', true);
+
+  if (state.showLabels) {
+    sCtx.font = '12px Rubik';
+    sCtx.textAlign = 'right';
+    sCtx.direction = 'rtl';
+    if (state.chaosMode) {
+      sCtx.fillStyle = 'rgba(255,120,40,0.8)';
+      sCtx.fillText('🌀 מצב שיגועים פעיל — קליק ימני → זרוק לחור לעצירה', simCanvas.width - 20, simCanvas.height - 20);
+    } else {
+      sCtx.fillStyle = 'rgba(120,180,255,0.6)';
+      sCtx.fillText('דאבל-קליק: שעון | גרור: אובייקטים | קליק ימני: תפריט ראשי | Space: איפוס', simCanvas.width - 20, simCanvas.height - 20);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ═══════════════════════════════════════════
+// INTERACTION & UI
+// ═══════════════════════════════════════════
+let altDown = false;
+let panStart = {x:0, y:0}, panOrig = {x:0, y:0};
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Alt') altDown = true;
+  if (e.code === 'Space') { e.preventDefault(); initAstronaut(); }
+  if (e.key === 'Escape') {
+    state.placingEmoji = null;
+    simCanvas.style.cursor = 'crosshair';
+    document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('placing'));
+  }
+});
+window.addEventListener('keyup', e => { if (e.key === 'Alt') altDown = false; });
+
+// Context Menu
+simCanvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const menu = document.getElementById('ctxMenu');
+  menu.classList.add('active');
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 220) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - 250) + 'px';
+});
+
+document.addEventListener('click', e => {
+  const menu = document.getElementById('ctxMenu');
+  if (!menu.contains(e.target)) menu.classList.remove('active');
+});
+
+function showPlaceFlash(sx, sy, emoji = '+') {
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;left:${sx}px;top:${sy}px;transform:translate(-50%,-50%);
+    color:rgba(100,220,255,0.9);font-family:'Space Mono',monospace;font-size:24px;
+    pointer-events:none;z-index:500;transition:all 0.5s cubic-bezier(0.1,0.8,0.2,1);`;
+  el.textContent = emoji === '+' ? '+ נוסף' : emoji;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%,-150%) scale(1.5)';
+  });
+  setTimeout(() => el.remove(), 600);
+}
+
+simCanvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const [wx, wy] = screenToWorld(e.clientX, e.clientY);
+
+  if (state.placingEmoji) {
+    const rs = getRS();
+    const cx = 0, cy = 0; // World center is 0,0
+    state.droppables.push({
+      emoji: state.placingEmoji,
+      x: wx, y: wy,
+      vx: 0, vy: 0,
+      size: 26,
+      df: dilationFactor(Math.sqrt((wx-cx)**2+(wy-cy)**2)),
+      fallAngle: Math.atan2(cy - wy, cx - wx),
+      trail: [],
+      dragging: false
+    });
+    showPlaceFlash(e.clientX, e.clientY, state.placingEmoji);
+    return;
+  }
+
+  if (altDown) {
+    state.isPanning = true;
+    panStart = {x: e.clientX, y: e.clientY};
+    panOrig = state.mode === 'gps' ? {x: state.gpsPanX, y: state.gpsPanY} : {x: state.panX, y: state.panY};
+    document.body.style.cursor = 'grabbing';
+    return;
+  }
+
+  if (state.mode === 'gps') {
+    for (const clk of state.gpsClocks) {
+      const [sx2, sy2] = worldToScreen(clk.x, clk.y);
+      const d = Math.sqrt((e.clientX - sx2) ** 2 + (e.clientY - sy2) ** 2);
+      if (d < clk.radius * state.gpsZoom + 15) {
+        state.isDragging = true;
+        state.dragClock = clk;
+        state.dragOffX = wx - clk.x;
+        state.dragOffY = wy - clk.y;
+        clk.dragging = true;
+        return;
+      }
+    }
+    return; 
+  }
+
+  for (const obj of state.droppables) {
+    const [osx, osy] = worldToScreen(obj.x, obj.y);
+    const d = Math.sqrt((e.clientX - osx) ** 2 + (e.clientY - osy) ** 2);
+    if (d < obj.size * state.zoom * 2.0 + 15) {
+      state.isDraggingDroppable = true;
+      state.dragDroppable = obj;
+      state.dragDropOffX = wx - obj.x;
+      state.dragDropOffY = wy - obj.y;
+      obj.vx = 0; obj.vy = 0;
+      obj.dragging = true;
+      return;
+    }
+  }
+
+  if (state.showAstronaut && state.astronaut) {
+    const ast = state.astronaut;
+    const [asx, asy] = worldToScreen(ast.x, ast.y);
+    const da = Math.sqrt((e.clientX - asx) ** 2 + (e.clientY - asy) ** 2);
+    if (da < ast.size * state.zoom * 3.0 + 15) {
+      state.isDraggingAstronaut = true;
+      state.astDragOffX = wx - ast.x;
+      state.astDragOffY = wy - ast.y;
+      ast.vx = 0; ast.vy = 0;
+      return;
+    }
+  }
+
+  for (const clk of state.clocks) {
+    const [sx, sy] = worldToScreen(clk.x, clk.y);
+    const d = Math.sqrt((e.clientX - sx) ** 2 + (e.clientY - sy) ** 2);
+    if (d < clk.radius * state.zoom + 15) {
+      state.isDragging = true;
+      state.dragClock = clk;
+      state.dragOffX = wx - clk.x;
+      state.dragOffY = wy - clk.y;
+      return;
+    }
+  }
+});
+
+simCanvas.addEventListener('mousemove', e => {
+  if (state.isPanning) {
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+    if (state.mode === 'gps') {
+      state.gpsPanX = panOrig.x + dx;
+      state.gpsPanY = panOrig.y + dy;
+    } else {
+      state.panX = panOrig.x + dx;
+      state.panY = panOrig.y + dy;
+    }
+    return;
+  }
+  
+  if (state.isDraggingAstronaut && state.astronaut) {
+    const [wx, wy] = screenToWorld(e.clientX, e.clientY);
+    state.astronaut.x = wx - state.astDragOffX;
+    state.astronaut.y = wy - state.astDragOffY;
+    return;
+  }
+  
+  if (state.isDraggingDroppable && state.dragDroppable) {
+    const [wx, wy] = screenToWorld(e.clientX, e.clientY);
+    state.dragDroppable.x = wx - state.dragDropOffX;
+    state.dragDroppable.y = wy - state.dragDropOffY;
+    return;
+  }
+  
+  if (state.isDragging && state.dragClock) {
+    const [wx, wy] = screenToWorld(e.clientX, e.clientY);
+    state.dragClock.x = wx - state.dragOffX;
+    state.dragClock.y = wy - state.dragOffY;
+    return;
+  }
+
+  state.placingGhostX = e.clientX;
+  state.placingGhostY = e.clientY;
+
+  if (!state.isDragging && !state.isDraggingAstronaut && !state.isPanning) {
+    let overDraggable = false;
+    if (state.mode === 'gps') {
+      for (const clk of state.gpsClocks) {
+        const [sx2, sy2] = worldToScreen(clk.x, clk.y);
+        if (Math.sqrt((e.clientX - sx2) ** 2 + (e.clientY - sy2) ** 2) < clk.radius * state.gpsZoom + 10)
+          overDraggable = true;
+      }
+    } else {
+      if (state.showAstronaut && state.astronaut) {
+        const [asx, asy] = worldToScreen(state.astronaut.x, state.astronaut.y);
+        if (Math.sqrt((e.clientX - asx) ** 2 + (e.clientY - asy) ** 2) < state.astronaut.size * state.zoom * 3)
+          overDraggable = true;
+      }
+      for (const clk of state.clocks) {
+        const [sx, sy] = worldToScreen(clk.x, clk.y);
+        if (Math.sqrt((e.clientX - sx) ** 2 + (e.clientY - sy) ** 2) < clk.radius * state.zoom + 10)
+          overDraggable = true;
+      }
+      for (const obj of state.droppables) {
+        const [osx, osy] = worldToScreen(obj.x, obj.y);
+        if (Math.sqrt((e.clientX - osx) ** 2 + (e.clientY - osy) ** 2) < obj.size * state.zoom * 2)
+          overDraggable = true;
+      }
+    }
+    simCanvas.style.cursor = state.placingEmoji ? 'none' : (overDraggable ? 'grab' : (altDown ? 'move' : 'crosshair'));
+  }
+});
+
+simCanvas.addEventListener('mouseup', () => {
+  state.isDragging = false;
+  state.isPanning = false;
+  if (state.dragClock) { state.dragClock.dragging = false; state.dragClock = null; }
+  state.isDraggingAstronaut = false;
+  if (state.dragDroppable) { state.dragDroppable.dragging = false; state.dragDroppable = null; }
+  state.isDraggingDroppable = false;
+  document.body.style.cursor = state.placingEmoji ? 'none' : 'crosshair';
+});
+
+simCanvas.addEventListener('dblclick', e => {
+  const [wx, wy] = screenToWorld(e.clientX, e.clientY);
+
+  if (state.mode === 'gps') {
+    for (const clk of state.gpsClocks) {
+      if (Math.sqrt((wx - clk.x) ** 2 + (wy - clk.y) ** 2) < clk.radius + 20) return;
+    }
+    const earthR = Math.min(simCanvas.width, simCanvas.height) * 0.12;
+    const dist = Math.sqrt(wx*wx + wy*wy);
+    const altMultiple = (dist / earthR).toFixed(1);
+    state.gpsClocks.push({
+      x: wx, y: wy,
+      altitude: `×${altMultiple} rE`,
+      localTime: 0, df: 1.0,
+      radius: 34, id: `alt_${Date.now()}`, dragging: false
+    });
+    showPlaceFlash(e.clientX, e.clientY, '🕐');
+    return;
+  }
+
+  for (const clk of state.clocks) {
+    if (Math.sqrt((wx - clk.x) ** 2 + (wy - clk.y) ** 2) < clk.radius + 20) return;
+  }
+
+  state.clocks.push({
+    x: wx, y: wy,
+    localTime: 0, coordTime: 0,
+    id: state.clocks.length,
+    radius: 34, dragging: false
+  });
+  showPlaceFlash(e.clientX, e.clientY, '🕐');
+});
+
+simCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+  const [wxBefore, wyBefore] = screenToWorld(e.clientX, e.clientY);
+  
+  if (state.mode === 'gps') {
+    state.gpsZoom *= zoomFactor;
+    state.gpsZoom = Math.max(0.3, Math.min(4, state.gpsZoom));
+    const [wxAfter, wyAfter] = screenToWorld(e.clientX, e.clientY);
+    state.gpsPanX += (wxAfter - wxBefore) * state.gpsZoom;
+    state.gpsPanY += (wyAfter - wyBefore) * state.gpsZoom;
+  } else {
+    state.zoom *= zoomFactor;
+    state.zoom = Math.max(0.3, Math.min(4, state.zoom));
+    const [wxAfter, wyAfter] = screenToWorld(e.clientX, e.clientY);
+    state.panX += (wxAfter - wxBefore) * state.zoom;
+    state.panY += (wyAfter - wyBefore) * state.zoom;
+  }
+}, { passive: false });
+
+// ═══════════════════════════════════════════
+// UI & DIALOGUE MANAGEMENT
+// ═══════════════════════════════════════════
+function toggleDlg(id) {
+  const el = document.getElementById(id);
+  if(!el.classList.contains('active')) {
+      el.style.display = 'block';
+      setTimeout(() => el.classList.add('active'), 10);
+  } else {
+      el.classList.remove('active');
+      setTimeout(() => el.style.display = 'none', 300);
+  }
+  document.getElementById('ctxMenu').classList.remove('active');
+}
+function closeDlg(id) { toggleDlg(id); }
+
+function setMode(mode) {
+  state.mode = mode;
+  document.getElementById('btnBH').classList.toggle('active', mode === 'blackhole');
+  document.getElementById('btnGPS').classList.toggle('active', mode === 'gps');
+  
+  state.panX = 0; state.panY = 0; state.zoom = 1;
+  if (mode === 'gps') {
+    state.gpsElapsed = 0;
+    state.chaosMode = false;
+    const btn = document.getElementById('btnChaos');
+    if (btn) { btn.classList.remove('active'); btn.textContent = '🌀 מצב שיגועים (Chaos)'; }
+    tCtx.clearRect(0,0,trailCanvas.width,trailCanvas.height);
+  } else {
+    tCtx.fillStyle = '#000002';
+    tCtx.fillRect(0,0,trailCanvas.width,trailCanvas.height);
+  }
+}
+
+function startPlacing(emoji) {
+  state.placingEmoji = emoji;
+  simCanvas.style.cursor = 'none';
+  document.querySelectorAll('.emoji-btn').forEach(b => {
+    b.classList.toggle('placing', b.textContent.trim() === emoji);
+  });
+}
+
+function toggleChaos() {
+  state.chaosMode = !state.chaosMode;
+  state.chaosTimer = 0;
+  const btn = document.getElementById('btnChaos');
+  if (btn) {
+    btn.classList.toggle('active', state.chaosMode);
+    btn.textContent = state.chaosMode ? '⏹ עצור שיגועים' : '🌀 מצב שיגועים (Chaos)';
+  }
+}
+
+function onMassChange(val) {
+  state.bhMass = parseFloat(val);
+  document.getElementById('valMass').textContent = parseFloat(val).toFixed(1);
+  initClocks(state.clocks.length);
+  tCtx.fillStyle = '#000002'; tCtx.fillRect(0,0,trailCanvas.width,trailCanvas.height);
+}
+
+function onClocksChange(val) {
+  initClocks(parseInt(val));
+}
+
+function toggleCheck(id) {
+  const el = document.getElementById(id);
+  el.checked = !el.checked;
+  el.dispatchEvent(new Event('change'));
+}
+
+document.querySelectorAll('.dialogue').forEach(dlg => {
+  const header = dlg.querySelector('.dialogue-header');
+  let dx = 0, dy = 0, dragging = false;
+
+  header.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('dialogue-close')) return;
+    dragging = true;
+    
+    const rect = dlg.getBoundingClientRect();
+    dlg.style.right = 'auto';
+    dlg.style.bottom = 'auto';
+    dlg.style.transform = 'none';
+    dlg.style.left = rect.left + 'px';
+    dlg.style.top = rect.top + 'px';
+    
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+    
+    document.querySelectorAll('.dialogue').forEach(d => d.style.zIndex = 150);
+    dlg.style.zIndex = 151;
+    e.stopPropagation();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    dlg.style.left = (e.clientX - dx) + 'px';
+    dlg.style.top = (e.clientY - dy) + 'px';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+  
+  dlg.addEventListener('mousedown', e => e.stopPropagation());
+  dlg.addEventListener('wheel', e => e.stopPropagation());
+});
+
+</script>
+</body>
+</html>
