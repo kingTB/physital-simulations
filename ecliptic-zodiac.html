@@ -1,0 +1,2335 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhysiTal — The Ecliptic & Zodiac Constellations</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 2: CSS STYLES
+     ═══════════════════════════════════════════════════════════════ -->
+<style>
+    /* ── CSS Variables ── */
+    :root {
+        --glass-bg: rgba(18, 18, 24, 0.90);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --accent: #60a5fa;
+        --accent-glow: rgba(96, 165, 250, 0.4);
+        --text-main: #e2e8f0;
+        --text-dim: #94a3b8;
+        --bg-dark: #050510;
+        --rec-red: #dc2626;
+    }
+
+    /* ── Base ── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        background: var(--bg-dark);
+        color: var(--text-main);
+        font-family: 'Rubik', 'Assistant', sans-serif;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+        cursor: default;
+        user-select: none;
+    }
+
+    /* ── Canvas Layers ── */
+    #canvas-container {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+    }
+    #trailCanvas, #simCanvas {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+    }
+    #trailCanvas { z-index: 0; }
+    #simCanvas { z-index: 1; }
+
+    /* ── Context Menu ── */
+    #context-menu {
+        position: absolute;
+        display: none;
+        flex-direction: column;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 8px 0;
+        min-width: 200px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        z-index: 1000;
+    }
+    .menu-item {
+        padding: 10px 20px;
+        cursor: pointer;
+        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+    .menu-item:hover { background: rgba(255,255,255,0.1); }
+    .menu-divider {
+        height: 1px;
+        background: rgba(255,255,255,0.1);
+        margin: 4px 0;
+    }
+    [dir="rtl"] .menu-item { justify-content: flex-end; flex-direction: row-reverse; }
+    [dir="ltr"] .menu-item { justify-content: flex-start; }
+
+    /* ── Dialogues ── */
+    .dialogue {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 380px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        display: none;
+        flex-direction: column;
+        z-index: 500;
+        overflow: hidden;
+        transition: opacity 0.2s;
+    }
+    .dialogue.wide { width: 480px; }
+    .dialogue-header {
+        padding: 16px;
+        background: rgba(255,255,255,0.05);
+        cursor: grab;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 500;
+        font-size: 1rem;
+    }
+    .dialogue-header:active { cursor: grabbing; }
+    .close-btn {
+        cursor: pointer;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        font-size: 1.1rem;
+    }
+    .close-btn:hover { opacity: 1; }
+    .dialogue-content {
+        padding: 20px;
+        max-height: 70vh;
+        overflow-y: auto;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    .dialogue-content::-webkit-scrollbar { width: 6px; }
+    .dialogue-content::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.15);
+        border-radius: 3px;
+    }
+
+    /* ── Desmos-style Slider ── */
+    .physi-slider {
+        margin-bottom: 16px;
+        direction: ltr;
+    }
+    .physi-slider-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+        direction: rtl;
+    }
+    .physi-slider-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .ps-play {
+        width: 20px; height: 20px;
+        border-radius: 50%;
+        border: 1.5px solid var(--text-dim);
+        background: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.55rem;
+        padding: 0;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+    .ps-play:hover { border-color: var(--accent); color: var(--accent); }
+    .ps-play.playing { border-color: var(--accent); color: var(--accent); background: rgba(96,165,250,0.15); }
+    .ps-value {
+        color: var(--accent);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        cursor: pointer;
+        padding: 1px 4px;
+        border-radius: 4px;
+        border: 1px solid transparent;
+        transition: border-color 0.2s;
+        min-width: 36px;
+        text-align: center;
+        direction: ltr;
+    }
+    .ps-value:hover { border-color: rgba(96,165,250,0.3); }
+    .ps-value-input {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid var(--accent);
+        border-radius: 4px;
+        color: var(--accent);
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 500;
+        width: 60px;
+        text-align: center;
+        padding: 1px 4px;
+        direction: ltr;
+        -moz-appearance: textfield;
+    }
+    .ps-value-input::-webkit-inner-spin-button,
+    .ps-value-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .ps-value-input:focus { outline: none; }
+    .ps-track-wrap {
+        position: relative;
+        height: 20px;
+        display: flex;
+        align-items: center;
+    }
+    .ps-track {
+        -webkit-appearance: none;
+        width: 100%;
+        background: transparent;
+        margin: 0;
+    }
+    .ps-track::-webkit-slider-runnable-track {
+        width: 100%; height: 4px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+        cursor: pointer;
+    }
+    .ps-track::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 14px; width: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        margin-top: -5px;
+        transition: box-shadow 0.15s;
+    }
+    .ps-track::-webkit-slider-thumb:hover {
+        box-shadow: 0 0 0 4px rgba(96,165,250,0.2);
+    }
+    .ps-track::-moz-range-track {
+        width: 100%; height: 4px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+    }
+    .ps-track::-moz-range-thumb {
+        height: 14px; width: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        border: none;
+        cursor: pointer;
+    }
+    .ps-expand {
+        background: none; border: none; color: var(--text-dim);
+        cursor: pointer; font-size: 0.65rem; padding: 2px;
+        opacity: 0.5; transition: opacity 0.2s;
+    }
+    .ps-expand:hover { opacity: 1; }
+    .ps-expand.open { transform: rotate(180deg); }
+    .ps-settings {
+        display: none;
+        background: rgba(0,0,0,0.25);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: var(--text-dim);
+    }
+    .ps-settings.open { display: block; }
+    .ps-settings-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .ps-settings-row:last-child { margin-bottom: 0; }
+    .ps-settings-row label {
+        min-width: 48px;
+        text-align: right;
+        direction: rtl;
+    }
+    .ps-mini-input {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid var(--glass-border);
+        border-radius: 4px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 0.78rem;
+        width: 56px;
+        text-align: center;
+        padding: 3px 4px;
+        direction: ltr;
+        -moz-appearance: textfield;
+    }
+    .ps-mini-input::-webkit-inner-spin-button,
+    .ps-mini-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .ps-mini-input:focus { outline: none; border-color: var(--accent); }
+    .ps-loop-btns {
+        display: flex;
+        gap: 2px;
+    }
+    .ps-loop-btn {
+        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: 0.72rem;
+        padding: 3px 7px;
+        transition: all 0.15s;
+    }
+    .ps-loop-btn:first-child { border-radius: 4px 0 0 4px; }
+    .ps-loop-btn:last-child { border-radius: 0 4px 4px 0; }
+    .ps-loop-btn.active { background: rgba(96,165,250,0.2); border-color: var(--accent); color: var(--accent); }
+    .ps-reset {
+        background: none; border: 1px solid var(--glass-border);
+        border-radius: 4px; color: var(--text-dim);
+        cursor: pointer; font-size: 0.72rem;
+        padding: 3px 8px; transition: all 0.15s;
+        margin-right: auto;
+    }
+    .ps-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Legacy control elements ── */
+    .control-group { margin-bottom: 16px; }
+    .control-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+    }
+    .control-value {
+        color: var(--accent);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+    }
+    .toggle-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        font-size: 0.85rem;
+    }
+    select {
+        background: rgba(255,255,255,0.1);
+        color: var(--text-main);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        cursor: pointer;
+        direction: ltr;
+    }
+    select option { background: #1a1a2e; }
+
+    /* ── Info & Math ── */
+    .info-text {
+        color: var(--text-dim);
+        font-size: 0.85rem;
+        line-height: 1.6;
+    }
+    .math-block {
+        background: rgba(0,0,0,0.3);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 10px 0;
+        font-family: 'Rubik', monospace;
+        direction: ltr;
+        text-align: center;
+        font-size: 1.1rem;
+        color: var(--accent);
+    }
+
+    /* ── Recording Frame ── */
+    #rec-frame {
+        position: fixed;
+        inset: 0;
+        z-index: 400;
+        display: none;
+        pointer-events: none;
+    }
+    #rec-frame.active { display: block; }
+    #rec-frame-border {
+        position: absolute;
+        border: 2px solid var(--accent);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+        pointer-events: auto;
+        cursor: move;
+        transition: border-color 0.3s;
+    }
+    #rec-frame-border.recording {
+        border-color: var(--rec-red);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(220,38,38,0.3);
+    }
+    #rec-frame-border.paused {
+        border-color: #f59e0b;
+        animation: pulse-border 1.2s ease-in-out infinite;
+    }
+    .rec-handle {
+        position: absolute;
+        width: 12px; height: 12px;
+        background: var(--accent);
+        border-radius: 2px;
+        pointer-events: auto;
+        z-index: 2;
+    }
+    .rec-handle-nw { top: -6px; left: -6px; cursor: nw-resize; }
+    .rec-handle-ne { top: -6px; right: -6px; cursor: ne-resize; }
+    .rec-handle-sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+    .rec-handle-se { bottom: -6px; right: -6px; cursor: se-resize; }
+    .rec-handle-n  { top: -6px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+    .rec-handle-s  { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+    .rec-handle-e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+    .rec-handle-w  { left: -6px; top: 50%; transform: translateY(-50%); cursor: w-resize; }
+    #rec-frame-dims {
+        position: absolute;
+        top: -28px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.7);
+        padding: 2px 10px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+    }
+    #rec-controls {
+        position: fixed;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 8px 14px;
+        pointer-events: auto;
+        white-space: nowrap;
+        z-index: 401;
+    }
+    #rec-controls select {
+        padding: 4px 6px;
+        font-size: 0.78rem;
+        border-radius: 6px;
+    }
+    .rc-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px; height: 34px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s;
+        color: white;
+        background: rgba(255,255,255,0.1);
+    }
+    .rc-btn:hover { background: rgba(255,255,255,0.2); }
+    .rc-btn.rec-active {
+        background: var(--rec-red);
+        animation: pulse-rec 1.5s ease-in-out infinite;
+    }
+    .rc-btn.paused-active { background: #f59e0b; }
+    #rc-timer {
+        font-size: 0.82rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-dim);
+        min-width: 42px;
+        text-align: center;
+    }
+    .rc-sep {
+        width: 1px;
+        height: 20px;
+        background: rgba(255,255,255,0.1);
+    }
+    #rc-close {
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: 1rem;
+    }
+    #rc-close:hover { opacity: 1; }
+
+    @keyframes pulse-rec {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    @keyframes pulse-border {
+        0%, 100% { border-color: #f59e0b; }
+        50% { border-color: rgba(245,158,11,0.4); }
+    }
+
+    /* Download dialog */
+    #rec-download-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 800;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.6);
+    }
+    #rec-download-dialog {
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 24px;
+        min-width: 340px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    #rec-download-dialog h3 {
+        font-size: 1rem;
+        font-weight: 500;
+        margin-bottom: 14px;
+    }
+    #rec-filename {
+        width: 100%;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 0.9rem;
+        direction: ltr;
+        margin-bottom: 14px;
+    }
+    #rec-filename:focus { outline: none; border-color: var(--accent); }
+    #rec-download-dialog .dl-btns {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+    .dl-btn {
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.85rem;
+        color: white;
+        transition: background 0.2s;
+    }
+    .dl-btn-primary { background: var(--accent); }
+    .dl-btn-primary:hover { background: #3b82f6; }
+    .dl-btn-secondary { background: rgba(255,255,255,0.1); }
+    .dl-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── Attribution ── */
+    .attribution {
+        color: var(--text-dim);
+        font-size: 0.8rem;
+        line-height: 1.8;
+    }
+    .attribution a {
+        color: var(--accent);
+        text-decoration: none;
+    }
+</style>
+</head>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 3: HTML BODY
+     ═══════════════════════════════════════════════════════════════ -->
+<body>
+
+<!-- 3a: Canvas Container -->
+<div id="canvas-container">
+    <canvas id="trailCanvas"></canvas>
+    <canvas id="simCanvas"></canvas>
+</div>
+
+<!-- 3b: Context Menu -->
+<div id="context-menu">
+    <div class="menu-item" onclick="app.ui.toggleDialogue('instructions')">
+        <span>📖</span>
+        <span data-he="הוראות" data-en="Instructions">הוראות</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('controls')">
+        <span>⚙️</span>
+        <span data-he="בקרים" data-en="Controls">בקרים</span>
+    </div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('view')">
+        <span>👁️</span>
+        <span data-he="תצוגה" data-en="View">תצוגה</span>
+    </div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('camera')">
+        <span>🎥</span>
+        <span data-he="מצלמה" data-en="Camera">מצלמה</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('graphs')">
+        <span>📊</span>
+        <span data-he="גרפים" data-en="Graphs">גרפים</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleRecFrame()">
+        <span>🔴</span>
+        <span data-he="הקלטה" data-en="Recording">הקלטה</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('settings')">
+        <span>⚙️</span>
+        <span data-he="הגדרות" data-en="Settings">הגדרות</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('docs')">
+        <span>📄</span>
+        <span data-he="תיעוד" data-en="Documentation">תיעוד</span>
+    </div>
+</div>
+
+<!-- 3c: Dialogues -->
+
+<!-- Instructions -->
+<div id="dialogue-instructions" class="dialogue wide">
+    <div class="dialogue-header">
+        <span data-he="הוראות שימוש" data-en="Instructions">הוראות שימוש</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('instructions')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="info-text mb-4" data-he="סימולציה זו מציגה מבט מלמעלה על מערכת השמש, עם 12 מזלות גלגל המזלות מסודרים לאורך המישור האקליפטי." data-en="This simulation shows a top-down view of the solar system, with the 12 zodiac constellations arranged along the ecliptic plane.">
+            סימולציה זו מציגה מבט מלמעלה על מערכת השמש, עם 12 מזלות גלגל המזלות מסודרים לאורך המישור האקליפטי.
+        </p>
+        <p class="info-text mb-4" data-he="כדור הארץ מקיף את השמש נגד כיוון השעון. בכל רגע נתון, המזל שמאחורי השמש הוא 'מזל השמש' — המזל שבו השמש נמצאת מנקודת מבטנו מכדור הארץ." data-en="Earth orbits the Sun counterclockwise. At any given moment, the zodiac behind the Sun is the 'Sun sign' — the constellation in which the Sun appears from Earth's perspective.">
+            כדור הארץ מקיף את השמש נגד כיוון השעון. בכל רגע נתון, המזל שמאחורי השמש הוא 'מזל השמש' — המזל שבו השמש נמצאת מנקודת מבטנו מכדור הארץ.
+        </p>
+        <p class="info-text mb-4" data-he="המזלות הנראים בשמי הלילה נמצאים בכיוון ההפוך מהשמש — הם אלו שנראים כשהשמש מתחת לאופק." data-en="The visible night sky constellations are in the opposite direction from the Sun — they're the ones visible when the Sun is below the horizon.">
+            המזלות הנראים בשמי הלילה נמצאים בכיוון ההפוך מהשמש — הם אלו שנראים כשהשמש מתחת לאופק.
+        </p>
+        <div class="math-block">
+            Earth orbital period = 365.25 days<br>
+            Zodiac spacing = 360° / 12 = 30° each
+        </div>
+        <p class="info-text" data-he="לחצו על לחצן ימני בעכבר לתפריט בקרים." data-en="Right-click for controls menu.">
+            לחצו על לחצן ימני בעכבר לתפריט בקרים.
+        </p>
+    </div>
+</div>
+
+<!-- Controls -->
+<div id="dialogue-controls" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="בקרים" data-en="Controls">בקרים</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('controls')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="physi-slider" data-param="speed" data-min="0.1" data-max="10" data-step="0.1" data-default="1"
+             data-label-he="מהירות" data-label-en="Speed"></div>
+        <div class="physi-slider" data-param="dayOfYear" data-min="0" data-max="365" data-step="1" data-default="80"
+             data-label-he="יום בשנה" data-label-en="Day of Year"></div>
+        <div class="physi-slider" data-param="earthSize" data-min="5" data-max="30" data-step="1" data-default="12"
+             data-label-he="גודל כדור הארץ" data-label-en="Earth Size"></div>
+    </div>
+</div>
+
+<!-- View -->
+<div id="dialogue-view" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="תצוגה" data-en="View">תצוגה</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('view')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="toggle-row">
+            <span data-he="הצג שמי לילה" data-en="Show Night Sky">הצג שמי לילה</span>
+            <input type="checkbox" checked onchange="app.params.showNightSky = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="הצג מזל השמש" data-en="Show Sun Sign">הצג מזל השמש</span>
+            <input type="checkbox" checked onchange="app.params.showSunSign = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="הצג חודשים" data-en="Show Months">הצג חודשים</span>
+            <input type="checkbox" checked onchange="app.params.showMonths = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="הצג מסלול" data-en="Show Orbital Path">הצג מסלול</span>
+            <input type="checkbox" checked onchange="app.params.showOrbitalPath = this.checked;">
+        </div>
+    </div>
+</div>
+
+<!-- Camera -->
+<div id="dialogue-camera" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="מצלמה" data-en="Camera">מצלמה</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('camera')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="physi-slider" data-param="zoom" data-min="0.3" data-max="3" data-step="0.05" data-default="1.0"
+             data-label-he="זום" data-label-en="Zoom"></div>
+    </div>
+</div>
+
+<!-- Graphs -->
+<div id="dialogue-graphs" class="dialogue wide">
+    <div class="dialogue-header">
+        <span data-he="גרפים" data-en="Graphs">גרפים</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('graphs')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="info-text" data-he="אין גרפים זמינים." data-en="No graphs available.">אין גרפים זמינים.</p>
+    </div>
+</div>
+
+<!-- Settings -->
+<div id="dialogue-settings" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="הגדרות" data-en="Settings">הגדרות</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('settings')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="toggle-row">
+            <span data-he="שפה" data-en="Language">שפה</span>
+            <select id="setting-lang" onchange="app.ui.setLanguage(this.value);">
+                <option value="he" selected>עברית</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Documentation -->
+<div id="dialogue-docs" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="תיעוד" data-en="Documentation">תיעוד</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('docs')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="attribution" data-he="נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי." data-en="Created by PhysiTal for physics lovers in the universe and is provided under a permissive free use license.">
+            נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי.
+        </p>
+        <p class="attribution" style="margin-top:8px;" data-he="סימולציה: האקליפטיקה ומזלות גלגל המזלות" data-en="Simulation: The Ecliptic & Zodiac Constellations">
+            סימולציה: האקליפטיקה ומזלות גלגל המזלות
+        </p>
+        <p class="attribution" style="margin-top:12px;">
+            Tech Stack: Vanilla JS, Canvas API, TailwindCSS
+        </p>
+    </div>
+</div>
+
+<!-- 3d: Recording Frame Overlay -->
+<div id="rec-frame">
+    <div id="rec-frame-border">
+        <div class="rec-handle rec-handle-nw" data-dir="nw"></div>
+        <div class="rec-handle rec-handle-n"  data-dir="n"></div>
+        <div class="rec-handle rec-handle-ne" data-dir="ne"></div>
+        <div class="rec-handle rec-handle-e"  data-dir="e"></div>
+        <div class="rec-handle rec-handle-se" data-dir="se"></div>
+        <div class="rec-handle rec-handle-s"  data-dir="s"></div>
+        <div class="rec-handle rec-handle-sw" data-dir="sw"></div>
+        <div class="rec-handle rec-handle-w"  data-dir="w"></div>
+        <div id="rec-frame-dims">1920 × 1080</div>
+    </div>
+    <div id="rec-controls">
+        <button class="rc-btn" id="rc-rec" title="Record">⏺</button>
+        <button class="rc-btn" id="rc-pause" title="Pause" style="display:none;">⏸</button>
+        <span id="rc-timer">0:00</span>
+        <div class="rc-sep"></div>
+        <button class="rc-btn" id="rc-screenshot" title="Screenshot">📷</button>
+        <div class="rc-sep"></div>
+        <select id="rc-aspect">
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="21:9">21:9</option>
+            <option value="free">חופשי</option>
+        </select>
+        <select id="rc-resolution">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="3840x2160">4K</option>
+        </select>
+        <select id="rc-fps">
+            <option value="30" selected>30fps</option>
+            <option value="24">24fps</option>
+            <option value="60">60fps</option>
+        </select>
+        <div class="rc-sep"></div>
+        <button id="rc-close" title="Close">✕</button>
+    </div>
+</div>
+
+<!-- 3e: Download Dialog -->
+<div id="rec-download-overlay">
+    <div id="rec-download-dialog">
+        <h3 data-he="שמירת הקלטה" data-en="Save Recording">שמירת הקלטה</h3>
+        <input type="text" id="rec-filename" placeholder="filename" dir="ltr">
+        <div class="dl-btns">
+            <button class="dl-btn dl-btn-secondary" id="dl-cancel" data-he="ביטול" data-en="Cancel">ביטול</button>
+            <button class="dl-btn dl-btn-primary" id="dl-confirm" data-he="הורדה" data-en="Download">הורדה</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 4: JAVASCRIPT
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+// ═══════════════════════════════════════════════
+// 4a: App Object Skeleton
+// ═══════════════════════════════════════════════
+
+const app = {
+    meta: {
+        name: 'ecliptic-zodiac',
+        version: '2.0',
+    },
+
+    params: {
+        speed: 1,
+        dayOfYear: 80,
+        showNightSky: true,
+        showSunSign: true,
+        showMonths: true,
+        showOrbitalPath: true,
+        earthSize: 12,
+        zoom: 1.0,
+    },
+
+    state: {
+        paused: false,
+        frameCount: 0,
+        seed: null,
+        animFrame: 0,
+        language: 'he',
+        theme: 'dark',
+    },
+
+    canvas: {},
+    math: {},
+    render: {},
+    ui: {},
+    recording: {},
+};
+
+
+// ═══════════════════════════════════════════════
+// 4b: Math Module
+// ═══════════════════════════════════════════════
+
+// Mulberry32 seeded PRNG
+app.math._createPRNG = function(seed) {
+    let t = seed | 0;
+    return function() {
+        t = (t + 0x6D2B79F5) | 0;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+};
+
+app.math._prng = null;
+
+app.math.random = function() {
+    if (app.math._prng) return app.math._prng();
+    return Math.random();
+};
+
+app.math.gaussianRandom = function() {
+    let u = 0, v = 0;
+    while (u === 0) u = app.math.random();
+    while (v === 0) v = app.math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+};
+
+// ── Zodiac Data ──
+app.math.zodiac = [
+    { symbol: '\u2648', en: 'Aries',       he: '\u05D8\u05DC\u05D4',     startDay: 80  },
+    { symbol: '\u2649', en: 'Taurus',      he: '\u05E9\u05D5\u05E8',     startDay: 111 },
+    { symbol: '\u264A', en: 'Gemini',      he: '\u05EA\u05D0\u05D5\u05DE\u05D9\u05DD', startDay: 142 },
+    { symbol: '\u264B', en: 'Cancer',      he: '\u05E1\u05E8\u05D8\u05DF',    startDay: 172 },
+    { symbol: '\u264C', en: 'Leo',         he: '\u05D0\u05E8\u05D9\u05D4',    startDay: 203 },
+    { symbol: '\u264D', en: 'Virgo',       he: '\u05D1\u05EA\u05D5\u05DC\u05D4',  startDay: 234 },
+    { symbol: '\u264E', en: 'Libra',       he: '\u05DE\u05D0\u05D6\u05E0\u05D9\u05D9\u05DD', startDay: 265 },
+    { symbol: '\u264F', en: 'Scorpio',     he: '\u05E2\u05E7\u05E8\u05D1',    startDay: 295 },
+    { symbol: '\u2650', en: 'Sagittarius', he: '\u05E7\u05E9\u05EA',     startDay: 326 },
+    { symbol: '\u2651', en: 'Capricorn',   he: '\u05D2\u05D3\u05D9',     startDay: 356 },
+    { symbol: '\u2652', en: 'Aquarius',    he: '\u05D3\u05DC\u05D9',     startDay: 21  },
+    { symbol: '\u2653', en: 'Pisces',      he: '\u05D3\u05D2\u05D9\u05DD',    startDay: 50  },
+];
+
+app.math.months = [
+    { name_he: '\u05D9\u05E0\u05D5\u05D0\u05E8', name_en: 'Jan', day: 15 },
+    { name_he: '\u05E4\u05D1\u05E8\u05D5\u05D0\u05E8', name_en: 'Feb', day: 46 },
+    { name_he: '\u05DE\u05E8\u05E5', name_en: 'Mar', day: 74 },
+    { name_he: '\u05D0\u05E4\u05E8\u05D9\u05DC', name_en: 'Apr', day: 105 },
+    { name_he: '\u05DE\u05D0\u05D9', name_en: 'May', day: 135 },
+    { name_he: '\u05D9\u05D5\u05E0\u05D9', name_en: 'Jun', day: 166 },
+    { name_he: '\u05D9\u05D5\u05DC\u05D9', name_en: 'Jul', day: 196 },
+    { name_he: '\u05D0\u05D5\u05D2\u05D5\u05E1\u05D8', name_en: 'Aug', day: 227 },
+    { name_he: '\u05E1\u05E4\u05D8\u05DE\u05D1\u05E8', name_en: 'Sep', day: 258 },
+    { name_he: '\u05D0\u05D5\u05E7\u05D8\u05D5\u05D1\u05E8', name_en: 'Oct', day: 288 },
+    { name_he: '\u05E0\u05D5\u05D1\u05DE\u05D1\u05E8', name_en: 'Nov', day: 319 },
+    { name_he: '\u05D3\u05E6\u05DE\u05D1\u05E8', name_en: 'Dec', day: 349 },
+];
+
+// Background stars (generated once)
+app.math.bgStars = [];
+
+app.math.initState = function() {
+    // Generate background stars using seeded PRNG
+    app.math.bgStars = [];
+    for (let i = 0; i < 300; i++) {
+        app.math.bgStars.push({
+            angle: app.math.random() * Math.PI * 2,
+            dist: 0.15 + app.math.random() * 0.85,
+            size: 0.3 + app.math.random() * 1.5,
+            brightness: 0.2 + app.math.random() * 0.6,
+            twinkleSpeed: 0.5 + app.math.random() * 2,
+            twinklePhase: app.math.random() * Math.PI * 2,
+        });
+    }
+
+    // Generate small constellation star patterns around each zodiac
+    app.math.constellationStars = [];
+    for (let i = 0; i < 12; i++) {
+        const baseAngle = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const stars = [];
+        const count = 4 + Math.floor(app.math.random() * 5);
+        for (let j = 0; j < count; j++) {
+            stars.push({
+                offsetAngle: (app.math.random() - 0.5) * 0.15,
+                offsetDist: (app.math.random() - 0.5) * 0.06,
+                size: 1 + app.math.random() * 2,
+            });
+        }
+        app.math.constellationStars.push(stars);
+    }
+};
+
+app.math.tick = function() {
+    // Advance day of year based on speed
+    app.params.dayOfYear += app.params.speed * 0.3;
+    if (app.params.dayOfYear > 365) app.params.dayOfYear -= 365;
+    if (app.params.dayOfYear < 0) app.params.dayOfYear += 365;
+
+    // Sync the slider UI
+    if (app.sliders.dayOfYear) {
+        app.sliders.dayOfYear.els.track.value = app.params.dayOfYear;
+        app.sliders.dayOfYear.els.value.textContent = Math.round(app.params.dayOfYear);
+    }
+};
+
+// Get the Earth angle on its orbit (radians, 0 = spring equinox ~day 80, CCW)
+app.math.getEarthAngle = function(day) {
+    // Day 80 = spring equinox = angle 0 (3 o'clock position)
+    // Earth moves counterclockwise
+    return ((day - 80) / 365.25) * Math.PI * 2;
+};
+
+// Get which zodiac index the Sun is in
+app.math.getSunZodiacIndex = function(day) {
+    const d = ((day % 365) + 365) % 365;
+    // Check each zodiac
+    for (let i = 0; i < 12; i++) {
+        const start = app.math.zodiac[i].startDay;
+        const nextI = (i + 1) % 12;
+        const end = app.math.zodiac[nextI].startDay;
+
+        if (start < end) {
+            if (d >= start && d < end) return i;
+        } else {
+            // Wraps around year boundary (e.g., Capricorn: 356 to 21)
+            if (d >= start || d < end) return i;
+        }
+    }
+    return 0;
+};
+
+
+// ═══════════════════════════════════════════════
+// 4c: Canvas Module
+// ═══════════════════════════════════════════════
+
+app.canvas.init = function() {
+    app.canvas.trail = document.getElementById('trailCanvas');
+    app.canvas.sim = document.getElementById('simCanvas');
+    app.canvas.trailCtx = app.canvas.trail.getContext('2d');
+    app.canvas.simCtx = app.canvas.sim.getContext('2d');
+    app.canvas.dpr = window.devicePixelRatio || 1;
+    app.canvas.resize();
+};
+
+app.canvas.resize = function() {
+    const dpr = app.canvas.dpr;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    app.canvas.width = w;
+    app.canvas.height = h;
+
+    [app.canvas.trail, app.canvas.sim].forEach(cvs => {
+        cvs.width = w * dpr;
+        cvs.height = h * dpr;
+        cvs.style.width = w + 'px';
+        cvs.style.height = h + 'px';
+        cvs.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+    });
+};
+
+app.canvas.compositeOnto = function(targetCtx, targetW, targetH, region) {
+    const r = region || { x: 0, y: 0, w: app.canvas.width, h: app.canvas.height };
+    const dpr = app.canvas.dpr;
+    const sx = r.x * dpr, sy = r.y * dpr;
+    const sw = r.w * dpr, sh = r.h * dpr;
+
+    targetCtx.clearRect(0, 0, targetW, targetH);
+    targetCtx.drawImage(app.canvas.trail, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    targetCtx.drawImage(app.canvas.sim, sx, sy, sw, sh, 0, 0, targetW, targetH);
+};
+
+app.canvas.captureFrame = function(options) {
+    const opts = options || {};
+    const w = opts.width || app.canvas.width;
+    const h = opts.height || app.canvas.height;
+    const format = opts.format || 'image/png';
+    const quality = opts.quality || 0.95;
+    const region = opts.region || null;
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d');
+    app.canvas.compositeOnto(ctx, w, h, region);
+    return offscreen.toDataURL(format, quality);
+};
+
+
+// ═══════════════════════════════════════════════
+// 4d: Render Module
+// ═══════════════════════════════════════════════
+
+app.render.init = function() {};
+
+app.render.drawFrame = function() {
+    const W = app.canvas.width;
+    const H = app.canvas.height;
+    const trailCtx = app.canvas.trailCtx;
+    const simCtx = app.canvas.simCtx;
+
+    // Clear both canvases each frame (no persistent trails for this sim)
+    simCtx.clearRect(0, 0, W, H);
+    trailCtx.clearRect(0, 0, W, H);
+
+    // Tick physics
+    if (!app.state.paused) {
+        app.math.tick();
+    }
+
+    const cx = W / 2;
+    const cy = H / 2;
+    const baseRadius = Math.min(W, H) * 0.28;
+    const zoom = app.params.zoom;
+    const orbitRadius = baseRadius * zoom;
+    const zodiacRadius = orbitRadius * 1.55;
+    const monthRadius = orbitRadius * 1.18;
+    const day = app.params.dayOfYear;
+    const earthAngle = app.math.getEarthAngle(day);
+    const sunZodiacIdx = app.math.getSunZodiacIndex(day);
+    const lang = app.state.language;
+
+    // ── Background fill ──
+    trailCtx.fillStyle = '#050510';
+    trailCtx.fillRect(0, 0, W, H);
+
+    // ── Background stars ──
+    const t = app.state.frameCount * 0.016;
+    for (const star of app.math.bgStars) {
+        const sx = cx + Math.cos(star.angle) * (zodiacRadius * 1.3 * star.dist + orbitRadius * 0.3);
+        const sy = cy + Math.sin(star.angle) * (zodiacRadius * 1.3 * star.dist + orbitRadius * 0.3);
+        const twinkle = 0.5 + 0.5 * Math.sin(t * star.twinkleSpeed + star.twinklePhase);
+        const alpha = star.brightness * (0.4 + 0.6 * twinkle);
+        trailCtx.fillStyle = 'rgba(255, 255, 255, ' + alpha + ')';
+        trailCtx.beginPath();
+        trailCtx.arc(sx, sy, star.size * zoom * 0.5, 0, Math.PI * 2);
+        trailCtx.fill();
+    }
+
+    // ── Ecliptic ring (subtle) ──
+    simCtx.strokeStyle = 'rgba(255, 215, 0, 0.08)';
+    simCtx.lineWidth = zodiacRadius * 0.35;
+    simCtx.beginPath();
+    simCtx.arc(cx, cy, zodiacRadius, 0, Math.PI * 2);
+    simCtx.stroke();
+
+    // ── Orbital path ──
+    if (app.params.showOrbitalPath) {
+        simCtx.setLineDash([6, 8]);
+        simCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        simCtx.lineWidth = 1;
+        simCtx.beginPath();
+        simCtx.arc(cx, cy, orbitRadius, 0, Math.PI * 2);
+        simCtx.stroke();
+        simCtx.setLineDash([]);
+    }
+
+    // ── Sun sign line (Earth → Sun → zodiac behind Sun) ──
+    // The zodiac "behind" the Sun is in the direction FROM Earth THROUGH the Sun
+    // i.e., the direction from Earth to the Sun, extended
+    const sunDirAngle = earthAngle + Math.PI; // direction from Earth to Sun = center - earth pos reversed
+    // Actually: Earth is at angle earthAngle from center. Sun is at center.
+    // Direction from Earth through Sun = from earthPos toward center and beyond
+    // = angle earthAngle + PI (pointing from Earth to Sun and beyond)
+    // But the zodiac behind the Sun as seen from Earth is in the direction Earth→Sun extended
+    // That direction points at angle (earthAngle + PI) from center.
+    // Wait — let's think clearly:
+    // Earth position angle = earthAngle (measured from center)
+    // The Sun is at center. From Earth, the Sun appears at direction (center - earthPos),
+    // which from center is angle (earthAngle + PI).
+    // The zodiac behind the Sun (from Earth's view) is the one at that angle on the zodiac circle.
+    // So the "Sun sign direction" from center = earthAngle + PI
+
+    const sunSignAngle = earthAngle + Math.PI;
+
+    if (app.params.showSunSign) {
+        // Golden dashed line from Earth through Sun to zodiac
+        const earthX = cx + Math.cos(earthAngle) * orbitRadius;
+        const earthY = cy + Math.sin(earthAngle) * orbitRadius;
+        const zodiacX = cx + Math.cos(sunSignAngle) * zodiacRadius * 1.12;
+        const zodiacY = cy + Math.sin(sunSignAngle) * zodiacRadius * 1.12;
+
+        simCtx.setLineDash([8, 6]);
+        simCtx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
+        simCtx.lineWidth = 2;
+        simCtx.beginPath();
+        simCtx.moveTo(earthX, earthY);
+        simCtx.lineTo(zodiacX, zodiacY);
+        simCtx.stroke();
+        simCtx.setLineDash([]);
+
+        // Small arrowhead at the zodiac end
+        const arrowLen = 10;
+        const arrowAng = Math.atan2(zodiacY - cy, zodiacX - cx);
+        simCtx.fillStyle = 'rgba(255, 215, 0, 0.7)';
+        simCtx.beginPath();
+        simCtx.moveTo(zodiacX, zodiacY);
+        simCtx.lineTo(zodiacX - arrowLen * Math.cos(arrowAng - 0.3), zodiacY - arrowLen * Math.sin(arrowAng - 0.3));
+        simCtx.lineTo(zodiacX - arrowLen * Math.cos(arrowAng + 0.3), zodiacY - arrowLen * Math.sin(arrowAng + 0.3));
+        simCtx.closePath();
+        simCtx.fill();
+    }
+
+    // ── Night sky cone ──
+    if (app.params.showNightSky) {
+        const nightAngle = earthAngle; // night side faces away from sun = same direction as Earth from center
+        const earthX = cx + Math.cos(earthAngle) * orbitRadius;
+        const earthY = cy + Math.sin(earthAngle) * orbitRadius;
+
+        // Draw a cyan cone/arc from Earth outward
+        const coneHalf = Math.PI / 3; // 60 degree half-angle for the visible night sky
+        simCtx.fillStyle = 'rgba(96, 200, 250, 0.06)';
+        simCtx.beginPath();
+        simCtx.moveTo(earthX, earthY);
+        simCtx.arc(earthX, earthY, zodiacRadius * 0.8, nightAngle - coneHalf, nightAngle + coneHalf);
+        simCtx.closePath();
+        simCtx.fill();
+
+        // Cyan direction arrow
+        const nightEndX = earthX + Math.cos(nightAngle) * zodiacRadius * 0.5;
+        const nightEndY = earthY + Math.sin(nightAngle) * zodiacRadius * 0.5;
+        simCtx.setLineDash([4, 4]);
+        simCtx.strokeStyle = 'rgba(96, 200, 250, 0.5)';
+        simCtx.lineWidth = 1.5;
+        simCtx.beginPath();
+        simCtx.moveTo(earthX, earthY);
+        simCtx.lineTo(nightEndX, nightEndY);
+        simCtx.stroke();
+        simCtx.setLineDash([]);
+
+        // Night sky label
+        const labelX = earthX + Math.cos(nightAngle) * zodiacRadius * 0.35;
+        const labelY = earthY + Math.sin(nightAngle) * zodiacRadius * 0.35;
+        simCtx.fillStyle = 'rgba(96, 200, 250, 0.7)';
+        simCtx.font = (11 * zoom) + 'px Rubik';
+        simCtx.textAlign = 'center';
+        simCtx.textBaseline = 'middle';
+        const nightLabel = lang === 'he' ? '\u05E9\u05DE\u05D9 \u05DC\u05D9\u05DC\u05D4' : 'Night Sky';
+        simCtx.fillText(nightLabel, labelX, labelY - 10 * zoom);
+    }
+
+    // ── Zodiac constellations ──
+    for (let i = 0; i < 12; i++) {
+        const z = app.math.zodiac[i];
+        // Position: zodiac i at angle offset. Aries starts at spring equinox direction.
+        // The Sun is "in" Aries around day 80 (spring equinox). From the top-down view,
+        // when Earth is at angle 0 (day 80), the Sun sign direction = angle PI.
+        // So Aries should be at angle PI on the zodiac circle (for day 80).
+        // Each subsequent zodiac is 30 degrees further counterclockwise.
+        const zodiacAngle = Math.PI + (i / 12) * Math.PI * 2;
+
+        const zx = cx + Math.cos(zodiacAngle) * zodiacRadius;
+        const zy = cy + Math.sin(zodiacAngle) * zodiacRadius;
+
+        // Determine if this zodiac is the Sun's current sign
+        const isSunSign = (i === sunZodiacIdx);
+
+        // Determine if this zodiac is visible at night
+        // Night-visible = angle difference from night direction (earthAngle) < ~90 degrees
+        let angleDiff = zodiacAngle - earthAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        const isNightVisible = Math.abs(angleDiff) < Math.PI / 2;
+
+        // Draw constellation stars
+        const cStars = app.math.constellationStars[i];
+        for (const cs of cStars) {
+            const starAngle = zodiacAngle + cs.offsetAngle;
+            const starDist = zodiacRadius + cs.offsetDist * zodiacRadius;
+            const starX = cx + Math.cos(starAngle) * starDist;
+            const starY = cy + Math.sin(starAngle) * starDist;
+            let starColor = 'rgba(200, 200, 220, 0.4)';
+            if (isSunSign && app.params.showSunSign) starColor = 'rgba(255, 215, 0, 0.6)';
+            else if (isNightVisible && app.params.showNightSky) starColor = 'rgba(96, 200, 250, 0.6)';
+
+            simCtx.fillStyle = starColor;
+            simCtx.beginPath();
+            simCtx.arc(starX, starY, cs.size * zoom * 0.6, 0, Math.PI * 2);
+            simCtx.fill();
+        }
+
+        // Zodiac symbol
+        let symbolColor = 'rgba(180, 180, 200, 0.6)';
+        let symbolSize = 18 * zoom;
+        if (isSunSign && app.params.showSunSign) {
+            symbolColor = '#ffd700';
+            symbolSize = 24 * zoom;
+        } else if (isNightVisible && app.params.showNightSky) {
+            symbolColor = '#60d8fa';
+            symbolSize = 20 * zoom;
+        }
+
+        simCtx.fillStyle = symbolColor;
+        simCtx.font = symbolSize + 'px Rubik';
+        simCtx.textAlign = 'center';
+        simCtx.textBaseline = 'middle';
+        simCtx.fillText(z.symbol, zx, zy - 12 * zoom);
+
+        // Zodiac name
+        const name = lang === 'he' ? z.he : z.en;
+        simCtx.font = (11 * zoom) + 'px Rubik';
+        simCtx.fillText(name, zx, zy + 10 * zoom);
+
+        // Glow behind active zodiac
+        if (isSunSign && app.params.showSunSign) {
+            simCtx.save();
+            simCtx.shadowColor = '#ffd700';
+            simCtx.shadowBlur = 25 * zoom;
+            simCtx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+            simCtx.beginPath();
+            simCtx.arc(zx, zy, 30 * zoom, 0, Math.PI * 2);
+            simCtx.fill();
+            simCtx.restore();
+        }
+    }
+
+    // ── Month labels around orbit ──
+    if (app.params.showMonths) {
+        for (const m of app.math.months) {
+            const mAngle = app.math.getEarthAngle(m.day);
+            const mx = cx + Math.cos(mAngle) * monthRadius;
+            const my = cy + Math.sin(mAngle) * monthRadius;
+
+            simCtx.fillStyle = 'rgba(148, 163, 184, 0.4)';
+            simCtx.font = (10 * zoom) + 'px Rubik';
+            simCtx.textAlign = 'center';
+            simCtx.textBaseline = 'middle';
+            const mName = lang === 'he' ? m.name_he : m.name_en;
+            simCtx.fillText(mName, mx, my);
+
+            // Small tick mark
+            const tickInner = orbitRadius * 1.02;
+            const tickOuter = orbitRadius * 1.06;
+            simCtx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+            simCtx.lineWidth = 1;
+            simCtx.beginPath();
+            simCtx.moveTo(cx + Math.cos(mAngle) * tickInner, cy + Math.sin(mAngle) * tickInner);
+            simCtx.lineTo(cx + Math.cos(mAngle) * tickOuter, cy + Math.sin(mAngle) * tickOuter);
+            simCtx.stroke();
+        }
+    }
+
+    // ── Sun (center) ──
+    // Glow layers
+    const sunGlowSizes = [60, 40, 25, 15];
+    const sunGlowAlphas = [0.03, 0.06, 0.1, 0.2];
+    for (let i = 0; i < sunGlowSizes.length; i++) {
+        const grad = simCtx.createRadialGradient(cx, cy, 0, cx, cy, sunGlowSizes[i] * zoom);
+        grad.addColorStop(0, 'rgba(255, 220, 50, ' + sunGlowAlphas[i] + ')');
+        grad.addColorStop(1, 'rgba(255, 220, 50, 0)');
+        simCtx.fillStyle = grad;
+        simCtx.beginPath();
+        simCtx.arc(cx, cy, sunGlowSizes[i] * zoom, 0, Math.PI * 2);
+        simCtx.fill();
+    }
+
+    // Sun body
+    const sunRadius = 18 * zoom;
+    const sunGrad = simCtx.createRadialGradient(cx - 3 * zoom, cy - 3 * zoom, 0, cx, cy, sunRadius);
+    sunGrad.addColorStop(0, '#fff8e0');
+    sunGrad.addColorStop(0.5, '#ffd700');
+    sunGrad.addColorStop(1, '#ff9900');
+    simCtx.fillStyle = sunGrad;
+    simCtx.beginPath();
+    simCtx.arc(cx, cy, sunRadius, 0, Math.PI * 2);
+    simCtx.fill();
+
+    // Sun label
+    simCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    simCtx.font = (11 * zoom) + 'px Rubik';
+    simCtx.textAlign = 'center';
+    const sunLabel = lang === 'he' ? '\u05E9\u05DE\u05E9' : 'Sun';
+    simCtx.fillText(sunLabel, cx, cy + sunRadius + 14 * zoom);
+
+    // ── Earth ──
+    const earthX = cx + Math.cos(earthAngle) * orbitRadius;
+    const earthY = cy + Math.sin(earthAngle) * orbitRadius;
+    const eSize = app.params.earthSize * zoom;
+
+    // Earth glow
+    const earthGlow = simCtx.createRadialGradient(earthX, earthY, 0, earthX, earthY, eSize * 3);
+    earthGlow.addColorStop(0, 'rgba(96, 165, 250, 0.2)');
+    earthGlow.addColorStop(1, 'rgba(96, 165, 250, 0)');
+    simCtx.fillStyle = earthGlow;
+    simCtx.beginPath();
+    simCtx.arc(earthX, earthY, eSize * 3, 0, Math.PI * 2);
+    simCtx.fill();
+
+    // Earth body
+    const earthGrad = simCtx.createRadialGradient(earthX - 2 * zoom, earthY - 2 * zoom, 0, earthX, earthY, eSize);
+    earthGrad.addColorStop(0, '#a0d0ff');
+    earthGrad.addColorStop(0.6, '#4a9eff');
+    earthGrad.addColorStop(1, '#1a5abf');
+    simCtx.fillStyle = earthGrad;
+    simCtx.beginPath();
+    simCtx.arc(earthX, earthY, eSize, 0, Math.PI * 2);
+    simCtx.fill();
+
+    // Earth label
+    simCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    simCtx.font = (10 * zoom) + 'px Rubik';
+    simCtx.textAlign = 'center';
+    const earthLabel = lang === 'he' ? '\u05DB\u05D3\u05D5\u05E8 \u05D4\u05D0\u05E8\u05E5' : 'Earth';
+    simCtx.fillText(earthLabel, earthX, earthY + eSize + 12 * zoom);
+
+    // ── Sun sign info text (top-left) ──
+    if (app.params.showSunSign) {
+        const sunZ = app.math.zodiac[sunZodiacIdx];
+        const signText = lang === 'he'
+            ? '\u05DE\u05D6\u05DC \u05D4\u05E9\u05DE\u05E9: ' + sunZ.symbol + ' ' + sunZ.he
+            : 'Sun Sign: ' + sunZ.symbol + ' ' + sunZ.en;
+
+        simCtx.fillStyle = 'rgba(255, 215, 0, 0.85)';
+        simCtx.font = 'bold ' + (16 * zoom) + 'px Rubik';
+        simCtx.textAlign = lang === 'he' ? 'right' : 'left';
+        const infoX = lang === 'he' ? W - 24 : 24;
+        simCtx.fillText(signText, infoX, 36);
+
+        // Day info
+        const dayText = lang === 'he'
+            ? '\u05D9\u05D5\u05DD ' + Math.round(day) + ' \u05DE\u05EA\u05D5\u05DA 365'
+            : 'Day ' + Math.round(day) + ' of 365';
+        simCtx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+        simCtx.font = (12 * zoom) + 'px Rubik';
+        simCtx.fillText(dayText, infoX, 58);
+    }
+
+    // ── Orbital direction indicator (small arrow on orbit) ──
+    const arrowAngle = earthAngle + 0.15;
+    const arrowX = cx + Math.cos(arrowAngle) * orbitRadius;
+    const arrowY = cy + Math.sin(arrowAngle) * orbitRadius;
+    // Tangent direction (CCW = perpendicular, rotated 90 degrees CCW)
+    const tangentAngle = arrowAngle + Math.PI / 2;
+    const aLen = 8 * zoom;
+    simCtx.strokeStyle = 'rgba(96, 165, 250, 0.4)';
+    simCtx.lineWidth = 1.5;
+    simCtx.beginPath();
+    simCtx.moveTo(arrowX - Math.cos(tangentAngle) * aLen, arrowY - Math.sin(tangentAngle) * aLen);
+    simCtx.lineTo(arrowX + Math.cos(tangentAngle) * aLen, arrowY + Math.sin(tangentAngle) * aLen);
+    simCtx.stroke();
+    // Arrowhead
+    simCtx.fillStyle = 'rgba(96, 165, 250, 0.4)';
+    simCtx.beginPath();
+    simCtx.moveTo(arrowX + Math.cos(tangentAngle) * aLen, arrowY + Math.sin(tangentAngle) * aLen);
+    simCtx.lineTo(arrowX + Math.cos(tangentAngle) * aLen - 5 * zoom * Math.cos(tangentAngle - 0.5),
+                   arrowY + Math.sin(tangentAngle) * aLen - 5 * zoom * Math.sin(tangentAngle - 0.5));
+    simCtx.lineTo(arrowX + Math.cos(tangentAngle) * aLen - 5 * zoom * Math.cos(tangentAngle + 0.5),
+                   arrowY + Math.sin(tangentAngle) * aLen - 5 * zoom * Math.sin(tangentAngle + 0.5));
+    simCtx.closePath();
+    simCtx.fill();
+};
+
+// Animation loop
+app.render.frame = function() {
+    if (!app.state.paused) {
+        app.state.frameCount++;
+        app.render.drawFrame();
+    }
+
+    if (app.recording.isActive) {
+        app.recording.updateFrame();
+    }
+
+    app.state.animFrame = requestAnimationFrame(app.render.frame);
+};
+
+
+// ═══════════════════════════════════════════════
+// 4e: Recording Module
+// ═══════════════════════════════════════════════
+
+app.recording.isActive = false;
+app.recording.isPaused = false;
+app.recording.mediaRecorder = null;
+app.recording.chunks = [];
+app.recording.offscreenCanvas = null;
+app.recording.offscreenCtx = null;
+app.recording.stream = null;
+app.recording.startTimestamp = 0;
+app.recording.pausedElapsed = 0;
+app.recording.timerInterval = null;
+app.recording.lastBlob = null;
+
+app.recording.resolution = { w: 1920, h: 1080 };
+app.recording.fps = 30;
+app.recording.frame = { x: 0, y: 0, w: 0, h: 0 };
+app.recording.aspectRatio = 16 / 9;
+
+app.recording._domCache = null;
+app.recording._domCaptureActive = false;
+app.recording._lastDomCapture = 0;
+app.recording._domCaptureInterval = 120;
+
+app.recording.parseAspect = function(val) {
+    if (val === 'free') return null;
+    const [w, h] = val.split(':').map(Number);
+    return w / h;
+};
+
+app.recording.enforceAspect = function() {
+    if (!this.aspectRatio) return;
+    const border = document.getElementById('rec-frame-border');
+    const w = parseInt(border.style.width) || 0;
+    const newH = Math.round(w / this.aspectRatio);
+    border.style.height = newH + 'px';
+    this.syncFrameFromDOM();
+    this.positionControls();
+};
+
+app.recording.setupOffscreen = function() {
+    if (!this.offscreenCanvas) {
+        this.offscreenCanvas = document.createElement('canvas');
+    }
+    this.offscreenCanvas.width = this.resolution.w;
+    this.offscreenCanvas.height = this.resolution.h;
+    this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+};
+
+app.recording.updateFrame = function() {
+    if (!this.offscreenCtx) return;
+    const f = this.frame;
+    const region = { x: f.x, y: f.y, w: f.w, h: f.h };
+    app.canvas.compositeOnto(this.offscreenCtx, this.resolution.w, this.resolution.h, region);
+    if (this._domCache) {
+        this.offscreenCtx.drawImage(this._domCache, 0, 0);
+    }
+    const now = performance.now();
+    if (!this._domCaptureActive && now - this._lastDomCapture >= this._domCaptureInterval) {
+        this._lastDomCapture = now;
+        this._captureDomOverlay();
+    }
+};
+
+app.recording._captureDomOverlay = async function() {
+    if (typeof html2canvas === 'undefined') return;
+    this._domCaptureActive = true;
+    try {
+        const f = this.frame;
+        const scaleX = this.resolution.w / f.w;
+        const scaleY = this.resolution.h / f.h;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = this.resolution.w;
+        tempCanvas.height = this.resolution.h;
+        const tempCtx = tempCanvas.getContext('2d');
+        const dialogues = document.querySelectorAll('.dialogue');
+        let anyRendered = false;
+        for (const dlg of dialogues) {
+            if (dlg.style.display === 'none') continue;
+            const rect = dlg.getBoundingClientRect();
+            if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+            if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+            const rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+            const dx = (rect.left - f.x) * scaleX;
+            const dy = (rect.top - f.y) * scaleY;
+            const dw = rect.width * scaleX;
+            const dh = rect.height * scaleY;
+            tempCtx.drawImage(rendered, dx, dy, dw, dh);
+            anyRendered = true;
+        }
+        this._domCache = anyRendered ? tempCanvas : null;
+    } catch (e) {
+        console.warn('DOM overlay capture failed:', e);
+    }
+    this._domCaptureActive = false;
+};
+
+app.recording.start = function(options) {
+    const opts = options || {};
+    if (opts.width) this.resolution.w = opts.width;
+    if (opts.height) this.resolution.h = opts.height;
+    if (opts.fps) this.fps = opts.fps;
+    this.setupOffscreen();
+    this.chunks = [];
+    this.isPaused = false;
+    this.pausedElapsed = 0;
+    this.stream = this.offscreenCanvas.captureStream(this.fps);
+    const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    let mimeType = '';
+    for (const mt of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(mt)) { mimeType = mt; break; }
+    }
+    this.mediaRecorder = new MediaRecorder(this.stream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: this.resolution.w >= 3840 ? 20000000 : this.resolution.w >= 1920 ? 10000000 : 5000000,
+    });
+    this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) this.chunks.push(e.data);
+    };
+    this.mediaRecorder.start(1000);
+    this.isActive = true;
+    this.startTimestamp = Date.now();
+    this._startTimer();
+    const border = document.getElementById('rec-frame-border');
+    const recBtn = document.getElementById('rc-rec');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.add('recording');
+    recBtn.classList.add('rec-active');
+    recBtn.textContent = '\u23F9';
+    recBtn.title = 'Stop';
+    pauseBtn.style.display = 'inline-flex';
+};
+
+app.recording.stop = function() {
+    return new Promise((resolve) => {
+        if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') { resolve(null); return; }
+        if (this.mediaRecorder.state === 'paused') { this.mediaRecorder.resume(); }
+        this.mediaRecorder.onstop = () => {
+            const blob = new Blob(this.chunks, { type: this.mediaRecorder.mimeType });
+            this.isActive = false;
+            this.isPaused = false;
+            this._stopTimer();
+            this.lastBlob = blob;
+            this._domCache = null;
+            this._domCaptureActive = false;
+            const border = document.getElementById('rec-frame-border');
+            const recBtn = document.getElementById('rc-rec');
+            const pauseBtn = document.getElementById('rc-pause');
+            border.classList.remove('recording', 'paused');
+            recBtn.classList.remove('rec-active');
+            recBtn.textContent = '\u23FA';
+            recBtn.title = 'Record';
+            pauseBtn.style.display = 'none';
+            pauseBtn.classList.remove('paused-active');
+            pauseBtn.textContent = '\u23F8';
+            this._showDownloadDialog(blob);
+            resolve(blob);
+        };
+        this.mediaRecorder.stop();
+    });
+};
+
+app.recording.pause = function() {
+    if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+    this.mediaRecorder.pause();
+    this.isPaused = true;
+    this.pausedElapsed += Date.now() - this.startTimestamp;
+    const border = document.getElementById('rec-frame-border');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.add('paused');
+    pauseBtn.classList.add('paused-active');
+    pauseBtn.textContent = '\u25B6';
+    pauseBtn.title = 'Resume';
+};
+
+app.recording.resume = function() {
+    if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+    this.mediaRecorder.resume();
+    this.isPaused = false;
+    this.startTimestamp = Date.now();
+    const border = document.getElementById('rec-frame-border');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.remove('paused');
+    pauseBtn.classList.remove('paused-active');
+    pauseBtn.textContent = '\u23F8';
+    pauseBtn.title = 'Pause';
+};
+
+app.recording.screenshot = async function(options) {
+    const opts = options || {};
+    const w = opts.width || this.resolution.w;
+    const h = opts.height || this.resolution.h;
+    const f = this.frame;
+    const region = { x: f.x, y: f.y, w: f.w, h: f.h };
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d');
+    app.canvas.compositeOnto(ctx, w, h, region);
+    if (typeof html2canvas !== 'undefined') {
+        const scaleX = w / f.w;
+        const scaleY = h / f.h;
+        const dialogues = document.querySelectorAll('.dialogue');
+        for (const dlg of dialogues) {
+            if (dlg.style.display === 'none') continue;
+            const rect = dlg.getBoundingClientRect();
+            if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+            if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+            try {
+                const rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+                const dx = (rect.left - f.x) * scaleX;
+                const dy = (rect.top - f.y) * scaleY;
+                const dw = rect.width * scaleX;
+                const dh = rect.height * scaleY;
+                ctx.drawImage(rendered, dx, dy, dw, dh);
+            } catch (e) { console.warn('Screenshot DOM capture failed:', e); }
+        }
+    }
+    return offscreen.toDataURL(opts.format || 'image/png', opts.quality || 0.95);
+};
+
+app.recording.downloadBlob = function(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+app.recording.downloadDataURL = function(dataURL, filename) {
+    const a = document.createElement('a');
+    a.href = dataURL; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+};
+
+app.recording._startTimer = function() {
+    const el = document.getElementById('rc-timer');
+    this.timerInterval = setInterval(() => {
+        let elapsed;
+        if (this.isPaused) { elapsed = Math.floor(this.pausedElapsed / 1000); }
+        else { elapsed = Math.floor((this.pausedElapsed + Date.now() - this.startTimestamp) / 1000); }
+        const min = Math.floor(elapsed / 60);
+        const sec = String(elapsed % 60).padStart(2, '0');
+        el.textContent = min + ':' + sec;
+    }, 250);
+};
+
+app.recording._stopTimer = function() {
+    clearInterval(this.timerInterval);
+    document.getElementById('rc-timer').textContent = '0:00';
+};
+
+app.recording._showDownloadDialog = function(blob) {
+    const overlay = document.getElementById('rec-download-overlay');
+    const input = document.getElementById('rec-filename');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    input.value = 'physital-' + app.meta.name + '-' + ts;
+    overlay.style.display = 'flex';
+    input.focus(); input.select();
+    overlay._pendingBlob = blob;
+};
+
+app.recording._hideDownloadDialog = function() {
+    document.getElementById('rec-download-overlay').style.display = 'none';
+};
+
+app.recording.syncFrameFromDOM = function() {
+    const border = document.getElementById('rec-frame-border');
+    this.frame.x = parseInt(border.style.left) || 0;
+    this.frame.y = parseInt(border.style.top) || 0;
+    this.frame.w = parseInt(border.style.width) || app.canvas.width;
+    this.frame.h = parseInt(border.style.height) || app.canvas.height;
+    document.getElementById('rec-frame-dims').textContent = this.frame.w + ' \u00D7 ' + this.frame.h;
+};
+
+app.recording.positionControls = function() {
+    const border = document.getElementById('rec-frame-border');
+    const controls = document.getElementById('rec-controls');
+    const bLeft = parseInt(border.style.left) || 0;
+    const bWidth = parseInt(border.style.width) || 0;
+    const bTop = parseInt(border.style.top) || 0;
+    const bHeight = parseInt(border.style.height) || 0;
+    controls.style.left = (bLeft + bWidth / 2) + 'px';
+    controls.style.transform = 'translateX(-50%)';
+    controls.style.top = (bTop + bHeight + 12) + 'px';
+    controls.style.bottom = 'auto';
+};
+
+
+// ═══════════════════════════════════════════════
+// 4e2: Desmos-style Slider Engine
+// ═══════════════════════════════════════════════
+
+app.sliders = {};
+app._sliderAnimFrame = null;
+
+app.buildSliders = function() {
+    document.querySelectorAll('.physi-slider').forEach(container => {
+        const param   = container.dataset.param;
+        const min     = parseFloat(container.dataset.min) || 0;
+        const max     = parseFloat(container.dataset.max) || 100;
+        const step    = parseFloat(container.dataset.step) || 1;
+        const def     = parseFloat(container.dataset.default) || min;
+        const labelHe = container.dataset.labelHe || param;
+        const labelEn = container.dataset.labelEn || param;
+
+        if (!(param in app.params)) app.params[param] = def;
+
+        const slider = {
+            param, min, max, step, default: def,
+            animating: false, animSpeed: 1, loopMode: 'loop', animDir: 1,
+            container, els: {},
+        };
+
+        container.innerHTML = '';
+
+        const header = document.createElement('div');
+        header.className = 'physi-slider-header';
+        const labelWrap = document.createElement('div');
+        labelWrap.className = 'physi-slider-label';
+        const playBtn = document.createElement('button');
+        playBtn.className = 'ps-play';
+        playBtn.innerHTML = '\u25B6';
+        playBtn.title = 'Animate';
+        slider.els.playBtn = playBtn;
+        const labelSpan = document.createElement('span');
+        labelSpan.setAttribute('data-he', labelHe);
+        labelSpan.setAttribute('data-en', labelEn);
+        labelSpan.textContent = app.state.language === 'en' ? labelEn : labelHe;
+        slider.els.label = labelSpan;
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'ps-expand';
+        expandBtn.innerHTML = '\u25BC';
+        expandBtn.title = 'Settings';
+        slider.els.expandBtn = expandBtn;
+        labelWrap.appendChild(playBtn);
+        labelWrap.appendChild(labelSpan);
+        labelWrap.appendChild(expandBtn);
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'ps-value';
+        valueSpan.textContent = app.params[param];
+        slider.els.value = valueSpan;
+        header.appendChild(labelWrap);
+        header.appendChild(valueSpan);
+
+        const trackWrap = document.createElement('div');
+        trackWrap.className = 'ps-track-wrap';
+        const track = document.createElement('input');
+        track.type = 'range';
+        track.className = 'ps-track';
+        track.min = min; track.max = max; track.step = step;
+        track.value = app.params[param];
+        slider.els.track = track;
+        trackWrap.appendChild(track);
+
+        const settings = document.createElement('div');
+        settings.className = 'ps-settings';
+        slider.els.settings = settings;
+
+        const rowBounds = document.createElement('div');
+        rowBounds.className = 'ps-settings-row';
+        const lblMin = document.createElement('label'); lblMin.textContent = 'Min';
+        const inputMin = document.createElement('input');
+        inputMin.className = 'ps-mini-input'; inputMin.type = 'number'; inputMin.value = min; inputMin.step = 'any';
+        slider.els.inputMin = inputMin;
+        const lblMax = document.createElement('label'); lblMax.textContent = 'Max';
+        const inputMax = document.createElement('input');
+        inputMax.className = 'ps-mini-input'; inputMax.type = 'number'; inputMax.value = max; inputMax.step = 'any';
+        slider.els.inputMax = inputMax;
+        rowBounds.append(lblMin, inputMin, lblMax, inputMax);
+
+        const rowStep = document.createElement('div');
+        rowStep.className = 'ps-settings-row';
+        const lblStep = document.createElement('label'); lblStep.textContent = 'Step';
+        const inputStep = document.createElement('input');
+        inputStep.className = 'ps-mini-input'; inputStep.type = 'number'; inputStep.value = step; inputStep.step = 'any'; inputStep.min = '0';
+        slider.els.inputStep = inputStep;
+        const lblSpeed = document.createElement('label'); lblSpeed.textContent = 'Speed';
+        const inputSpeed = document.createElement('input');
+        inputSpeed.className = 'ps-mini-input'; inputSpeed.type = 'number'; inputSpeed.value = 1; inputSpeed.step = '0.1'; inputSpeed.min = '0.1';
+        slider.els.inputSpeed = inputSpeed;
+        rowStep.append(lblStep, inputStep, lblSpeed, inputSpeed);
+
+        const rowLoop = document.createElement('div');
+        rowLoop.className = 'ps-settings-row';
+        const lblLoop = document.createElement('label');
+        lblLoop.setAttribute('data-he', '\u05DC\u05D5\u05DC\u05D0\u05D4');
+        lblLoop.setAttribute('data-en', 'Loop');
+        lblLoop.textContent = app.state.language === 'en' ? 'Loop' : '\u05DC\u05D5\u05DC\u05D0\u05D4';
+        const loopBtns = document.createElement('div');
+        loopBtns.className = 'ps-loop-btns';
+        ['loop', 'bounce', 'once'].forEach(mode => {
+            const btn = document.createElement('button');
+            btn.className = 'ps-loop-btn' + (mode === 'loop' ? ' active' : '');
+            btn.dataset.mode = mode;
+            btn.textContent = mode === 'loop' ? '\u21BB' : mode === 'bounce' ? '\u21C4' : '\u2192';
+            btn.title = mode;
+            loopBtns.appendChild(btn);
+        });
+        slider.els.loopBtns = loopBtns;
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'ps-reset';
+        resetBtn.setAttribute('data-he', '\u05D0\u05D9\u05E4\u05D5\u05E1');
+        resetBtn.setAttribute('data-en', 'Reset');
+        resetBtn.textContent = app.state.language === 'en' ? 'Reset' : '\u05D0\u05D9\u05E4\u05D5\u05E1';
+        slider.els.resetBtn = resetBtn;
+        rowLoop.append(lblLoop, loopBtns, resetBtn);
+
+        settings.append(rowBounds, rowStep, rowLoop);
+        container.append(header, trackWrap, settings);
+
+        // ── Events ──
+        track.addEventListener('input', () => {
+            const v = parseFloat(track.value);
+            app.params[param] = v;
+            valueSpan.textContent = app._formatSliderValue(v, step);
+        });
+
+        valueSpan.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.className = 'ps-value-input'; input.type = 'number';
+            input.value = app.params[param]; input.step = slider.step;
+            valueSpan.replaceWith(input);
+            input.focus(); input.select();
+            const commit = () => {
+                let v = parseFloat(input.value);
+                if (isNaN(v)) v = slider.default;
+                v = Math.max(slider.min, Math.min(slider.max, v));
+                app.params[param] = v;
+                track.value = v;
+                valueSpan.textContent = app._formatSliderValue(v, slider.step);
+                input.replaceWith(valueSpan);
+            };
+            input.addEventListener('blur', commit);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') { input.value = app.params[param]; commit(); }
+            });
+        });
+
+        playBtn.addEventListener('click', () => {
+            slider.animating = !slider.animating;
+            playBtn.innerHTML = slider.animating ? '\u23F8' : '\u25B6';
+            playBtn.classList.toggle('playing', slider.animating);
+            if (slider.animating) app._startSliderAnimLoop();
+        });
+
+        expandBtn.addEventListener('click', () => {
+            const open = settings.classList.toggle('open');
+            expandBtn.classList.toggle('open', open);
+        });
+
+        inputMin.addEventListener('change', () => { slider.min = parseFloat(inputMin.value); track.min = slider.min; });
+        inputMax.addEventListener('change', () => { slider.max = parseFloat(inputMax.value); track.max = slider.max; });
+        inputStep.addEventListener('change', () => { slider.step = parseFloat(inputStep.value) || 0.01; track.step = slider.step; });
+        inputSpeed.addEventListener('change', () => { slider.animSpeed = parseFloat(inputSpeed.value) || 1; });
+
+        loopBtns.querySelectorAll('.ps-loop-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                loopBtns.querySelectorAll('.ps-loop-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                slider.loopMode = btn.dataset.mode;
+            });
+        });
+
+        resetBtn.addEventListener('click', () => {
+            app.params[param] = slider.default;
+            track.value = slider.default;
+            valueSpan.textContent = app._formatSliderValue(slider.default, slider.step);
+            slider.animating = false;
+            playBtn.innerHTML = '\u25B6';
+            playBtn.classList.remove('playing');
+            slider.animDir = 1;
+            slider.min = parseFloat(container.dataset.min) || 0;
+            slider.max = parseFloat(container.dataset.max) || 100;
+            slider.step = parseFloat(container.dataset.step) || 1;
+            slider.animSpeed = 1;
+            track.min = slider.min; track.max = slider.max; track.step = slider.step;
+            inputMin.value = slider.min; inputMax.value = slider.max;
+            inputStep.value = slider.step; inputSpeed.value = 1;
+        });
+
+        container.addEventListener('mousedown', (e) => e.stopPropagation());
+        app.sliders[param] = slider;
+    });
+};
+
+app._formatSliderValue = function(val, step) {
+    if (step >= 1) return String(Math.round(val));
+    const decimals = Math.max(0, Math.ceil(-Math.log10(step)));
+    return val.toFixed(decimals);
+};
+
+app._startSliderAnimLoop = function() {
+    if (app._sliderAnimFrame) return;
+    function tick() {
+        let anyActive = false;
+        for (const key in app.sliders) {
+            const s = app.sliders[key];
+            if (!s.animating) continue;
+            anyActive = true;
+            let v = app.params[s.param];
+            const delta = s.step * s.animSpeed * s.animDir;
+            v += delta;
+            if (v > s.max) {
+                if (s.loopMode === 'loop') { v = s.min; }
+                else if (s.loopMode === 'bounce') { v = s.max; s.animDir = -1; }
+                else { v = s.max; s.animating = false; s.els.playBtn.innerHTML = '\u25B6'; s.els.playBtn.classList.remove('playing'); }
+            } else if (v < s.min) {
+                if (s.loopMode === 'loop') { v = s.max; }
+                else if (s.loopMode === 'bounce') { v = s.min; s.animDir = 1; }
+                else { v = s.min; s.animating = false; s.els.playBtn.innerHTML = '\u25B6'; s.els.playBtn.classList.remove('playing'); }
+            }
+            app.params[s.param] = v;
+            s.els.track.value = v;
+            s.els.value.textContent = app._formatSliderValue(v, s.step);
+        }
+        if (anyActive) { app._sliderAnimFrame = requestAnimationFrame(tick); }
+        else { app._sliderAnimFrame = null; }
+    }
+    app._sliderAnimFrame = requestAnimationFrame(tick);
+};
+
+app.syncSlidersFromParams = function() {
+    for (const key in app.sliders) {
+        const s = app.sliders[key];
+        const v = app.params[s.param];
+        s.els.track.value = v;
+        s.els.value.textContent = app._formatSliderValue(v, s.step);
+    }
+};
+
+
+// ═══════════════════════════════════════════════
+// 4f: UI Module
+// ═══════════════════════════════════════════════
+
+app.ui.init = function() {
+    document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'flex';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) { menu.style.left = (window.innerWidth - rect.width - 8) + 'px'; }
+            if (rect.bottom > window.innerHeight) { menu.style.top = (window.innerHeight - rect.height - 8) + 'px'; }
+        });
+    });
+
+    document.addEventListener('click', () => {
+        document.getElementById('context-menu').style.display = 'none';
+    });
+
+    document.querySelectorAll('.dialogue-header').forEach(header => {
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('close-btn')) return;
+            const dialogue = header.parentElement;
+            const rect = dialogue.getBoundingClientRect();
+            dialogue.style.transform = 'none';
+            dialogue.style.right = 'auto';
+            dialogue.style.bottom = 'auto';
+            dialogue.style.left = rect.left + 'px';
+            dialogue.style.top = rect.top + 'px';
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+            function onMouseMove(ev) {
+                dialogue.style.left = (ev.clientX - offsetX) + 'px';
+                dialogue.style.top = (ev.clientY - offsetY) + 'px';
+            }
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
+
+    document.querySelectorAll('.dialogue').forEach(d => {
+        ['mousedown', 'click', 'wheel'].forEach(evt => {
+            d.addEventListener(evt, (e) => e.stopPropagation());
+        });
+    });
+
+    // Recording UI bindings
+    document.getElementById('rc-rec').addEventListener('click', () => {
+        if (app.recording.isActive) { app.recording.stop(); } else { app.recording.start(); }
+    });
+    document.getElementById('rc-pause').addEventListener('click', () => {
+        if (app.recording.isPaused) { app.recording.resume(); } else { app.recording.pause(); }
+    });
+    document.getElementById('rc-screenshot').addEventListener('click', async () => {
+        const dataURL = await app.recording.screenshot();
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        app.recording.downloadDataURL(dataURL, 'physital-' + app.meta.name + '-' + ts + '.png');
+    });
+    document.getElementById('rc-aspect').addEventListener('change', (e) => {
+        app.recording.aspectRatio = app.recording.parseAspect(e.target.value);
+        app.recording.enforceAspect();
+    });
+    document.getElementById('rc-resolution').addEventListener('change', (e) => {
+        const [w, h] = e.target.value.split('x').map(Number);
+        app.recording.resolution = { w, h };
+    });
+    document.getElementById('rc-fps').addEventListener('change', (e) => {
+        app.recording.fps = parseInt(e.target.value);
+    });
+    document.getElementById('rc-close').addEventListener('click', () => {
+        if (app.recording.isActive) return;
+        app.ui.toggleRecFrame();
+    });
+    document.getElementById('dl-confirm').addEventListener('click', () => {
+        const overlay = document.getElementById('rec-download-overlay');
+        const filename = document.getElementById('rec-filename').value.trim() || 'recording';
+        const blob = overlay._pendingBlob;
+        if (blob) { app.recording.downloadBlob(blob, filename + '.webm'); }
+        app.recording._hideDownloadDialog();
+    });
+    document.getElementById('dl-cancel').addEventListener('click', () => { app.recording._hideDownloadDialog(); });
+    document.getElementById('rec-filename').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('dl-confirm').click();
+        if (e.key === 'Escape') app.recording._hideDownloadDialog();
+    });
+
+    // Frame drag
+    document.getElementById('rec-frame-border').addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('rec-handle')) return;
+        e.preventDefault();
+        const border = document.getElementById('rec-frame-border');
+        const startX = e.clientX - (parseInt(border.style.left) || 0);
+        const startY = e.clientY - (parseInt(border.style.top) || 0);
+        function onMove(ev) {
+            border.style.left = (ev.clientX - startX) + 'px';
+            border.style.top = (ev.clientY - startY) + 'px';
+            app.recording.syncFrameFromDOM();
+            app.recording.positionControls();
+        }
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+
+    // Frame resize handles
+    document.querySelectorAll('.rec-handle').forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const dir = handle.dataset.dir;
+            const border = document.getElementById('rec-frame-border');
+            const startMouseX = e.clientX; const startMouseY = e.clientY;
+            const startLeft = parseInt(border.style.left) || 0;
+            const startTop = parseInt(border.style.top) || 0;
+            const startW = parseInt(border.style.width) || 0;
+            const startH = parseInt(border.style.height) || 0;
+            const MIN = 100;
+            function onMove(ev) {
+                const dx = ev.clientX - startMouseX; const dy = ev.clientY - startMouseY;
+                let l = startLeft, t = startTop, w = startW, h = startH;
+                const ar = app.recording.aspectRatio;
+                if (dir.includes('e')) { w = Math.max(MIN, startW + dx); }
+                if (dir.includes('w')) { w = Math.max(MIN, startW - dx); l = startLeft + (startW - w); }
+                if (dir.includes('s')) { h = Math.max(MIN, startH + dy); }
+                if (dir.includes('n')) { h = Math.max(MIN, startH - dy); t = startTop + (startH - h); }
+                if (ar) {
+                    if (dir === 'e' || dir === 'w') { h = Math.round(w / ar); }
+                    else if (dir === 'n' || dir === 's') { w = Math.round(h * ar); }
+                    else {
+                        const dw = Math.abs(w - startW); const dh = Math.abs(h - startH);
+                        if (dw >= dh) { h = Math.round(w / ar); } else { w = Math.round(h * ar); }
+                    }
+                    if (w < MIN) { w = MIN; h = Math.round(w / ar); }
+                    if (h < MIN) { h = MIN; w = Math.round(h * ar); }
+                    if (dir.includes('n')) { t = startTop + startH - h; }
+                    if (dir.includes('w')) { l = startLeft + startW - w; }
+                }
+                border.style.left = l + 'px'; border.style.top = t + 'px';
+                border.style.width = w + 'px'; border.style.height = h + 'px';
+                app.recording.syncFrameFromDOM();
+                app.recording.positionControls();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    });
+
+    // Scroll zoom
+    document.getElementById('simCanvas').addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        app.params.zoom = Math.max(0.3, Math.min(3, app.params.zoom + delta));
+        app.syncSlidersFromParams();
+    });
+
+    // Space to pause/resume
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !e.target.closest('input, select, textarea')) {
+            e.preventDefault();
+            app.state.paused = !app.state.paused;
+        }
+    });
+};
+
+app.ui.toggleDialogue = function(name) {
+    const el = document.getElementById('dialogue-' + name);
+    if (!el) return;
+    document.querySelectorAll('.dialogue').forEach(d => {
+        if (d !== el) d.style.display = 'none';
+    });
+    el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+    document.getElementById('context-menu').style.display = 'none';
+};
+
+app.ui.closeDialogue = function(name) {
+    const el = document.getElementById('dialogue-' + name);
+    if (el) el.style.display = 'none';
+};
+
+app.ui.toggleRecFrame = function() {
+    const frame = document.getElementById('rec-frame');
+    const isVisible = frame.classList.contains('active');
+    document.getElementById('context-menu').style.display = 'none';
+    if (isVisible) {
+        if (app.recording.isActive) return;
+        frame.classList.remove('active');
+    } else {
+        frame.classList.add('active');
+        const border = document.getElementById('rec-frame-border');
+        const pad = 60;
+        const maxW = window.innerWidth - pad * 2;
+        const maxH = window.innerHeight - pad * 2 - 60;
+        const ar = app.recording.aspectRatio;
+        let fw, fh;
+        if (ar) {
+            if (maxW / maxH > ar) { fh = maxH; fw = Math.round(fh * ar); }
+            else { fw = maxW; fh = Math.round(fw / ar); }
+        } else { fw = maxW; fh = maxH; }
+        const offsetX = pad + Math.round((maxW - fw) / 2);
+        const offsetY = pad + Math.round((maxH - fh) / 2);
+        border.style.left = offsetX + 'px';
+        border.style.top = offsetY + 'px';
+        border.style.width = fw + 'px';
+        border.style.height = fh + 'px';
+        app.recording.syncFrameFromDOM();
+        app.recording.positionControls();
+    }
+};
+
+app.ui.setLanguage = function(lang) {
+    app.state.language = lang;
+    const dir = lang === 'he' ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dir;
+    document.querySelectorAll('[data-he][data-en]').forEach(el => {
+        const text = el.getAttribute('data-' + lang);
+        if (text) el.textContent = text;
+    });
+    document.getElementById('setting-lang').value = lang;
+};
+
+app.ui.syncFromParams = function() {
+    app.syncSlidersFromParams();
+    // Sync view toggle checkboxes
+    const viewContent = document.querySelector('#dialogue-view .dialogue-content');
+    if (viewContent) {
+        const checkboxes = viewContent.querySelectorAll('input[type="checkbox"]');
+        const boolParams = ['showNightSky', 'showSunSign', 'showMonths', 'showOrbitalPath'];
+        checkboxes.forEach((cb, i) => {
+            if (boolParams[i] && boolParams[i] in app.params) {
+                cb.checked = app.params[boolParams[i]];
+            }
+        });
+    }
+};
+
+
+// ═══════════════════════════════════════════════
+// 4g: Bot Control API (window.physital)
+// ═══════════════════════════════════════════════
+
+window.physital = {
+    version: '2.0',
+    get name() { return app.meta.name; },
+    isReady: false,
+    _onReadyCallbacks: [],
+
+    getParams: function() { return JSON.parse(JSON.stringify(app.params)); },
+    setParams: function(params) {
+        Object.assign(app.params, params);
+        if (app.ui.syncFromParams) app.ui.syncFromParams();
+    },
+    getState: function() {
+        return { paused: app.state.paused, frameCount: app.state.frameCount, isRecording: app.recording.isActive, seed: app.state.seed };
+    },
+    play: function() { app.state.paused = false; },
+    pause: function() { app.state.paused = true; },
+    step: function(n) {
+        n = n || 1;
+        for (let i = 0; i < n; i++) { app.state.frameCount++; }
+        app.render.drawFrame();
+    },
+    reset: function() {
+        app.state.frameCount = 0;
+        app.params.dayOfYear = 80;
+        if (app.state.seed !== null) { app.math._prng = app.math._createPRNG(app.state.seed); }
+        app.canvas.trailCtx.clearRect(0, 0, app.canvas.width, app.canvas.height);
+        app.math.initState();
+    },
+    seekFrame: function(frameNumber) { this.reset(); this.step(frameNumber); },
+    getCurrentFrame: function() { return app.state.frameCount; },
+    captureFrame: function(options) { return app.canvas.captureFrame(options); },
+    captureRegion: function(x, y, w, h, options) {
+        const opts = Object.assign({}, options || {}, { region: { x, y, w, h } });
+        return app.canvas.captureFrame(opts);
+    },
+    startRecording: function(options) { app.recording.start(options); },
+    stopRecording: function() { return app.recording.stop(); },
+    setSeed: function(seed) {
+        app.state.seed = seed;
+        app.math._prng = app.math._createPRNG(seed);
+    },
+    set onReady(callback) {
+        if (this.isReady) callback();
+        else this._onReadyCallbacks.push(callback);
+    },
+    _notifyReady: function() {
+        this.isReady = true;
+        this._onReadyCallbacks.forEach(cb => cb());
+        this._onReadyCallbacks = [];
+        window.dispatchEvent(new CustomEvent('physital:ready', { detail: { name: app.meta.name, version: '2.0' } }));
+    },
+    getCanvas: function() { return app.canvas.sim; },
+    getTrailCanvas: function() { return app.canvas.trail; },
+};
+
+
+// ═══════════════════════════════════════════════
+// 4h: URL Parameter Parsing
+// ═══════════════════════════════════════════════
+
+app.parseURLParams = function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('seed')) {
+        const seed = parseInt(params.get('seed'));
+        if (!isNaN(seed)) { app.state.seed = seed; app.math._prng = app.math._createPRNG(seed); }
+    }
+    if (params.get('autoplay') === 'false') { app.state.paused = true; }
+    if (params.has('lang')) { app.state.language = params.get('lang'); }
+    for (const [key, value] of params.entries()) {
+        if (key in app.params) {
+            const num = parseFloat(value);
+            if (!isNaN(num)) app.params[key] = num;
+            else if (value === 'true') app.params[key] = true;
+            else if (value === 'false') app.params[key] = false;
+            else app.params[key] = value;
+        }
+    }
+};
+
+
+// ═══════════════════════════════════════════════
+// 4i: PostMessage Bridge
+// ═══════════════════════════════════════════════
+
+window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!data || data.type !== 'physital') return;
+    const { method, args, id } = data;
+    let result;
+    try {
+        if (method && typeof window.physital[method] === 'function') {
+            result = window.physital[method](...(args || []));
+        } else if (method && method in window.physital) {
+            result = window.physital[method];
+        }
+        if (result && typeof result.then === 'function') {
+            result.then(val => {
+                event.source.postMessage({ type: 'physital:response', id, result: val ? 'blob-ready' : null }, '*');
+            });
+        } else {
+            event.source.postMessage({ type: 'physital:response', id, result }, '*');
+        }
+    } catch (err) {
+        event.source.postMessage({ type: 'physital:error', id, error: err.message }, '*');
+    }
+});
+
+
+// ═══════════════════════════════════════════════
+// 4j: Initialization
+// ═══════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded', () => {
+    app.parseURLParams();
+    app.canvas.init();
+    app.render.init();
+    app.ui.init();
+    app.buildSliders();
+    app.ui.setLanguage(app.state.language);
+    app.math.initState();
+    app.render.frame();
+    window.addEventListener('resize', () => { app.canvas.resize(); });
+    window.physital._notifyReady();
+});
+
+</script>
+</body>
+</html>

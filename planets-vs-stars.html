@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CUSTOMIZE: Change title per simulation -->
+    <title>PhysiTal — כוכבי לכת מול כוכבים קבועים</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 2: CSS STYLES
+     ═══════════════════════════════════════════════════════════════ -->
+<style>
+    /* ── CSS Variables ── */
+    :root {
+        --glass-bg: rgba(18, 18, 24, 0.90);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --accent: #60a5fa;
+        --accent-glow: rgba(96, 165, 250, 0.4);
+        --text-main: #e2e8f0;
+        --text-dim: #94a3b8;
+        --bg-dark: #050510;
+        --rec-red: #dc2626;
+    }
+
+    /* ── Base ── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        background: var(--bg-dark);
+        color: var(--text-main);
+        font-family: 'Rubik', 'Assistant', sans-serif;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+        cursor: default;
+        user-select: none;
+    }
+
+    /* ── Canvas Layers ── */
+    #canvas-container {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+    }
+    #trailCanvas, #simCanvas {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+    }
+    #trailCanvas { z-index: 0; }
+    #simCanvas { z-index: 1; }
+
+    /* ── Context Menu ── */
+    #context-menu {
+        position: absolute;
+        display: none;
+        flex-direction: column;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 8px 0;
+        min-width: 200px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        z-index: 1000;
+    }
+    .menu-item {
+        padding: 10px 20px;
+        cursor: pointer;
+        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+    .menu-item:hover { background: rgba(255,255,255,0.1); }
+    .menu-divider {
+        height: 1px;
+        background: rgba(255,255,255,0.1);
+        margin: 4px 0;
+    }
+    [dir="rtl"] .menu-item { justify-content: flex-end; flex-direction: row-reverse; }
+    [dir="ltr"] .menu-item { justify-content: flex-start; }
+
+    /* ── Dialogues ── */
+    .dialogue {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 380px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        display: none;
+        flex-direction: column;
+        z-index: 500;
+        overflow: hidden;
+        transition: opacity 0.2s;
+    }
+    .dialogue.wide { width: 480px; }
+    .dialogue-header {
+        padding: 16px;
+        background: rgba(255,255,255,0.05);
+        cursor: grab;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 500;
+        font-size: 1rem;
+    }
+    .dialogue-header:active { cursor: grabbing; }
+    .close-btn {
+        cursor: pointer;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        font-size: 1.1rem;
+    }
+    .close-btn:hover { opacity: 1; }
+    .dialogue-content {
+        padding: 20px;
+        max-height: 70vh;
+        overflow-y: auto;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    .dialogue-content::-webkit-scrollbar { width: 6px; }
+    .dialogue-content::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.15);
+        border-radius: 3px;
+    }
+
+    /* ── Desmos-style Slider ── */
+    .physi-slider {
+        margin-bottom: 16px;
+        direction: ltr;
+    }
+    .physi-slider-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+        direction: rtl;
+    }
+    .physi-slider-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    /* Play/pause button */
+    .ps-play {
+        width: 20px; height: 20px;
+        border-radius: 50%;
+        border: 1.5px solid var(--text-dim);
+        background: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.55rem;
+        padding: 0;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+    .ps-play:hover { border-color: var(--accent); color: var(--accent); }
+    .ps-play.playing { border-color: var(--accent); color: var(--accent); background: rgba(96,165,250,0.15); }
+    /* Editable value */
+    .ps-value {
+        color: var(--accent);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        cursor: pointer;
+        padding: 1px 4px;
+        border-radius: 4px;
+        border: 1px solid transparent;
+        transition: border-color 0.2s;
+        min-width: 36px;
+        text-align: center;
+        direction: ltr;
+    }
+    .ps-value:hover { border-color: rgba(96,165,250,0.3); }
+    .ps-value-input {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid var(--accent);
+        border-radius: 4px;
+        color: var(--accent);
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 500;
+        width: 60px;
+        text-align: center;
+        padding: 1px 4px;
+        direction: ltr;
+        -moz-appearance: textfield;
+    }
+    .ps-value-input::-webkit-inner-spin-button,
+    .ps-value-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .ps-value-input:focus { outline: none; }
+    /* Track */
+    .ps-track-wrap {
+        position: relative;
+        height: 20px;
+        display: flex;
+        align-items: center;
+    }
+    .ps-track {
+        -webkit-appearance: none;
+        width: 100%;
+        background: transparent;
+        margin: 0;
+    }
+    .ps-track::-webkit-slider-runnable-track {
+        width: 100%; height: 4px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+        cursor: pointer;
+    }
+    .ps-track::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 14px; width: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        margin-top: -5px;
+        transition: box-shadow 0.15s;
+    }
+    .ps-track::-webkit-slider-thumb:hover {
+        box-shadow: 0 0 0 4px rgba(96,165,250,0.2);
+    }
+    .ps-track::-moz-range-track {
+        width: 100%; height: 4px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+    }
+    .ps-track::-moz-range-thumb {
+        height: 14px; width: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        border: none;
+        cursor: pointer;
+    }
+    /* Expand arrow for settings panel */
+    .ps-expand {
+        background: none; border: none; color: var(--text-dim);
+        cursor: pointer; font-size: 0.65rem; padding: 2px;
+        opacity: 0.5; transition: opacity 0.2s;
+    }
+    .ps-expand:hover { opacity: 1; }
+    .ps-expand.open { transform: rotate(180deg); }
+    /* Settings panel (Desmos-style) */
+    .ps-settings {
+        display: none;
+        background: rgba(0,0,0,0.25);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: var(--text-dim);
+    }
+    .ps-settings.open { display: block; }
+    .ps-settings-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .ps-settings-row:last-child { margin-bottom: 0; }
+    .ps-settings-row label {
+        min-width: 48px;
+        text-align: right;
+        direction: rtl;
+    }
+    .ps-mini-input {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid var(--glass-border);
+        border-radius: 4px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 0.78rem;
+        width: 56px;
+        text-align: center;
+        padding: 3px 4px;
+        direction: ltr;
+        -moz-appearance: textfield;
+    }
+    .ps-mini-input::-webkit-inner-spin-button,
+    .ps-mini-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .ps-mini-input:focus { outline: none; border-color: var(--accent); }
+    /* Loop mode buttons */
+    .ps-loop-btns {
+        display: flex;
+        gap: 2px;
+    }
+    .ps-loop-btn {
+        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: 0.72rem;
+        padding: 3px 7px;
+        transition: all 0.15s;
+    }
+    .ps-loop-btn:first-child { border-radius: 4px 0 0 4px; }
+    .ps-loop-btn:last-child { border-radius: 0 4px 4px 0; }
+    .ps-loop-btn.active { background: rgba(96,165,250,0.2); border-color: var(--accent); color: var(--accent); }
+    /* Reset button */
+    .ps-reset {
+        background: none; border: 1px solid var(--glass-border);
+        border-radius: 4px; color: var(--text-dim);
+        cursor: pointer; font-size: 0.72rem;
+        padding: 3px 8px; transition: all 0.15s;
+        margin-right: auto;
+    }
+    .ps-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Legacy control elements (for custom non-slider controls) ── */
+    .control-group {
+        margin-bottom: 16px;
+    }
+    .control-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+    }
+    .control-value {
+        color: var(--accent);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+    }
+    .toggle-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        font-size: 0.85rem;
+    }
+    select {
+        background: rgba(255,255,255,0.1);
+        color: var(--text-main);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        cursor: pointer;
+        direction: ltr;
+    }
+    select option { background: #1a1a2e; }
+
+    /* ── Info & Math ── */
+    .info-text {
+        color: var(--text-dim);
+        font-size: 0.85rem;
+        line-height: 1.6;
+    }
+    .math-block {
+        background: rgba(0,0,0,0.3);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 10px 0;
+        font-family: 'Rubik', monospace;
+        direction: ltr;
+        text-align: center;
+        font-size: 1.1rem;
+        color: var(--accent);
+    }
+
+    /* ── Recording Frame ── */
+    #rec-frame {
+        position: fixed;
+        inset: 0;
+        z-index: 400;
+        display: none;
+        pointer-events: none;
+    }
+    #rec-frame.active { display: block; }
+
+    #rec-frame-border {
+        position: absolute;
+        border: 2px solid var(--accent);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+        pointer-events: auto;
+        cursor: move;
+        transition: border-color 0.3s;
+    }
+    #rec-frame-border.recording {
+        border-color: var(--rec-red);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(220,38,38,0.3);
+    }
+    #rec-frame-border.paused {
+        border-color: #f59e0b;
+        animation: pulse-border 1.2s ease-in-out infinite;
+    }
+
+    /* Resize handles */
+    .rec-handle {
+        position: absolute;
+        width: 12px; height: 12px;
+        background: var(--accent);
+        border-radius: 2px;
+        pointer-events: auto;
+        z-index: 2;
+    }
+    .rec-handle-nw { top: -6px; left: -6px; cursor: nw-resize; }
+    .rec-handle-ne { top: -6px; right: -6px; cursor: ne-resize; }
+    .rec-handle-sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+    .rec-handle-se { bottom: -6px; right: -6px; cursor: se-resize; }
+    .rec-handle-n  { top: -6px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+    .rec-handle-s  { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+    .rec-handle-e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+    .rec-handle-w  { left: -6px; top: 50%; transform: translateY(-50%); cursor: w-resize; }
+
+    /* Frame dimensions label */
+    #rec-frame-dims {
+        position: absolute;
+        top: -28px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.7);
+        padding: 2px 10px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+    }
+
+    /* Controls bar below frame */
+    #rec-controls {
+        position: fixed;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 8px 14px;
+        pointer-events: auto;
+        white-space: nowrap;
+        z-index: 401;
+    }
+    #rec-controls select {
+        padding: 4px 6px;
+        font-size: 0.78rem;
+        border-radius: 6px;
+    }
+    .rc-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px; height: 34px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s;
+        color: white;
+        background: rgba(255,255,255,0.1);
+    }
+    .rc-btn:hover { background: rgba(255,255,255,0.2); }
+    .rc-btn.rec-active {
+        background: var(--rec-red);
+        animation: pulse-rec 1.5s ease-in-out infinite;
+    }
+    .rc-btn.paused-active {
+        background: #f59e0b;
+    }
+    #rc-timer {
+        font-size: 0.82rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-dim);
+        min-width: 42px;
+        text-align: center;
+    }
+    .rc-sep {
+        width: 1px;
+        height: 20px;
+        background: rgba(255,255,255,0.1);
+    }
+    #rc-close {
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: 1rem;
+    }
+    #rc-close:hover { opacity: 1; }
+
+    @keyframes pulse-rec {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    @keyframes pulse-border {
+        0%, 100% { border-color: #f59e0b; }
+        50% { border-color: rgba(245,158,11,0.4); }
+    }
+
+    /* Download dialog */
+    #rec-download-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 800;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.6);
+    }
+    #rec-download-dialog {
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 24px;
+        min-width: 340px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    #rec-download-dialog h3 {
+        font-size: 1rem;
+        font-weight: 500;
+        margin-bottom: 14px;
+    }
+    #rec-filename {
+        width: 100%;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 0.9rem;
+        direction: ltr;
+        margin-bottom: 14px;
+    }
+    #rec-filename:focus { outline: none; border-color: var(--accent); }
+    #rec-download-dialog .dl-btns {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+    .dl-btn {
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.85rem;
+        color: white;
+        transition: background 0.2s;
+    }
+    .dl-btn-primary { background: var(--accent); }
+    .dl-btn-primary:hover { background: #3b82f6; }
+    .dl-btn-secondary { background: rgba(255,255,255,0.1); }
+    .dl-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── Attribution ── */
+    .attribution {
+        color: var(--text-dim);
+        font-size: 0.8rem;
+        line-height: 1.8;
+    }
+    .attribution a {
+        color: var(--accent);
+        text-decoration: none;
+    }
+</style>
+</head>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 3: HTML BODY
+     ═══════════════════════════════════════════════════════════════ -->
+<body>
+
+<!-- 3a: Canvas Container -->
+<div id="canvas-container">
+    <canvas id="trailCanvas"></canvas>
+    <canvas id="simCanvas"></canvas>
+</div>
+
+<!-- 3b: Context Menu -->
+<div id="context-menu">
+    <div class="menu-item" onclick="app.ui.toggleDialogue('instructions')">
+        <span>📖</span>
+        <span data-he="הוראות" data-en="Instructions">הוראות</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('controls')">
+        <span>⚙️</span>
+        <span data-he="בקרים" data-en="Controls">בקרים</span>
+    </div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('view')">
+        <span>👁️</span>
+        <span data-he="תצוגה" data-en="View">תצוגה</span>
+    </div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('camera')">
+        <span>🎥</span>
+        <span data-he="מצלמה" data-en="Camera">מצלמה</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('graphs')">
+        <span>📊</span>
+        <span data-he="גרפים" data-en="Graphs">גרפים</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleRecFrame()">
+        <span>🔴</span>
+        <span data-he="הקלטה" data-en="Recording">הקלטה</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('settings')">
+        <span>⚙️</span>
+        <span data-he="הגדרות" data-en="Settings">הגדרות</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('docs')">
+        <span>📄</span>
+        <span data-he="תיעוד" data-en="Documentation">תיעוד</span>
+    </div>
+</div>
+
+<!-- 3c: Dialogues -->
+
+<!-- Instructions -->
+<div id="dialogue-instructions" class="dialogue wide">
+    <div class="dialogue-header">
+        <span data-he="הוראות שימוש" data-en="Instructions">הוראות שימוש</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('instructions')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="info-text mb-4" data-he="סימולציה זו מציגה את ההבדל בין כוכבים קבועים לכוכבי לכת כפי שהם נראים לצופה מכדור הארץ." data-en="This simulation shows the difference between fixed stars and planets as seen by an observer on Earth.">
+            סימולציה זו מציגה את ההבדל בין כוכבים קבועים לכוכבי לכת כפי שהם נראים לצופה מכדור הארץ.
+        </p>
+        <p class="info-text mb-4" data-he="כוכבים קבועים: רחוקים כל כך שתנועתם בלתי נראית — הם שומרים על מבנה הכוכביות לאורך חיי אדם." data-en="Fixed stars: so distant that their motion is invisible — they maintain constellation patterns over a human lifetime.">
+            כוכבים קבועים: רחוקים כל כך שתנועתם בלתי נראית — הם שומרים על מבנה הכוכביות לאורך חיי אדם.
+        </p>
+        <p class="info-text mb-4" data-he="כוכבי לכת (Planetes = נודדים ביוונית): נעים ביחס לכוכבים הקבועים לאורך פס צר בשמיים — המישור האקליפטי." data-en="Planets (Planetes = wanderers in Greek): move relative to fixed stars along a narrow band — the ecliptic plane.">
+            כוכבי לכת (Planetes = נודדים ביוונית): נעים ביחס לכוכבים הקבועים לאורך פס צר בשמיים — המישור האקליפטי.
+        </p>
+        <p class="info-text mb-4" data-he="תנועה רטרוגרדית: כאשר כדור הארץ עוקף כוכב לכת חיצוני (או כוכב לכת פנימי עוקף אותנו), הכוכב נראה כאילו הוא נע אחורה — תופעה שהדהימה את האסטרונומים הקדומים." data-en="Retrograde motion: when Earth overtakes an outer planet (or an inner planet overtakes us), the planet appears to move backward — a phenomenon that puzzled ancient astronomers.">
+            תנועה רטרוגרדית: כאשר כדור הארץ עוקף כוכב לכת חיצוני (או כוכב לכת פנימי עוקף אותנו), הכוכב נראה כאילו הוא נע אחורה — תופעה שהדהימה את האסטרונומים הקדומים.
+        </p>
+        <div class="math-block">
+            Apparent longitude = atan2(y_planet - y_earth, x_planet - x_earth)
+        </div>
+        <p class="info-text" data-he="לחצו על לחצן ימני בעכבר לתפריט." data-en="Right-click for menu.">
+            לחצו על לחצן ימני בעכבר לתפריט.
+        </p>
+    </div>
+</div>
+
+<!-- Controls -->
+<div id="dialogue-controls" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="בקרים" data-en="Controls">בקרים</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('controls')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="physi-slider" data-param="speed" data-min="0.1" data-max="50" data-step="0.1" data-default="5"
+             data-label-he="מהירות זמן" data-label-en="Time Speed"></div>
+        <div class="physi-slider" data-param="trailLength" data-min="10" data-max="2000" data-step="10" data-default="500"
+             data-label-he="אורך שובל" data-label-en="Trail Length"></div>
+        <div class="physi-slider" data-param="planetScale" data-min="1" data-max="5" data-step="0.5" data-default="2"
+             data-label-he="גודל כוכבי לכת" data-label-en="Planet Scale"></div>
+    </div>
+</div>
+
+<!-- View -->
+<div id="dialogue-view" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="תצוגה" data-en="View">תצוגה</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('view')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="toggle-row">
+            <span data-he="הצג שבילי כוכבי לכת" data-en="Show Planet Trails">הצג שבילי כוכבי לכת</span>
+            <input type="checkbox" checked onchange="app.params.showTrails = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="הצג תוויות" data-en="Show Labels">הצג תוויות</span>
+            <input type="checkbox" checked onchange="app.params.showLabels = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="הצג מישור אקליפטי" data-en="Show Ecliptic">הצג מישור אקליפטי</span>
+            <input type="checkbox" checked onchange="app.params.showEcliptic = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="הצג כוכביות" data-en="Show Constellations">הצג כוכביות</span>
+            <input type="checkbox" checked onchange="app.params.showConstellations = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="סמן תנועה רטרוגרדית" data-en="Highlight Retrograde">סמן תנועה רטרוגרדית</span>
+            <input type="checkbox" checked onchange="app.params.showRetrograde = this.checked;">
+        </div>
+    </div>
+</div>
+
+<!-- Camera -->
+<div id="dialogue-camera" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="מצלמה" data-en="Camera">מצלמה</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('camera')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="info-text" data-he="תצוגת שמיים קבועה — מבט כלפי מעלה מכדור הארץ." data-en="Fixed sky view — looking up from Earth.">
+            תצוגת שמיים קבועה — מבט כלפי מעלה מכדור הארץ.
+        </p>
+    </div>
+</div>
+
+<!-- Graphs -->
+<div id="dialogue-graphs" class="dialogue wide">
+    <div class="dialogue-header">
+        <span data-he="גרפים" data-en="Graphs">גרפים</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('graphs')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="info-text" data-he="אין גרפים זמינים." data-en="No graphs available.">אין גרפים זמינים.</p>
+    </div>
+</div>
+
+<!-- Recording is NOT a dialogue — it's a frame overlay (toggled from context menu) -->
+
+<!-- Settings -->
+<div id="dialogue-settings" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="הגדרות" data-en="Settings">הגדרות</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('settings')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="toggle-row">
+            <span data-he="שפה" data-en="Language">שפה</span>
+            <select id="setting-lang" onchange="app.ui.setLanguage(this.value);">
+                <option value="he" selected>עברית</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Documentation -->
+<div id="dialogue-docs" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="תיעוד" data-en="Documentation">תיעוד</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('docs')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="attribution" data-he="נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי." data-en="Created by PhysiTal for physics lovers in the universe and is provided under a permissive free use license.">
+            נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי.
+        </p>
+        <p class="attribution" style="margin-top:12px;">
+            Tech Stack: Vanilla JS, Canvas API, TailwindCSS
+        </p>
+        <p class="attribution" style="margin-top:8px;" data-he="סימולציה: כוכבי לכת מול כוכבים קבועים — נודדים בשמיים" data-en="Simulation: Planets vs Fixed Stars — Wanderers in the Sky">
+            סימולציה: כוכבי לכת מול כוכבים קבועים — נודדים בשמיים
+        </p>
+    </div>
+</div>
+
+<!-- 3d: Recording Frame Overlay (toggled from context menu) -->
+<div id="rec-frame">
+    <div id="rec-frame-border">
+        <!-- Resize handles (8 directions) -->
+        <div class="rec-handle rec-handle-nw" data-dir="nw"></div>
+        <div class="rec-handle rec-handle-n"  data-dir="n"></div>
+        <div class="rec-handle rec-handle-ne" data-dir="ne"></div>
+        <div class="rec-handle rec-handle-e"  data-dir="e"></div>
+        <div class="rec-handle rec-handle-se" data-dir="se"></div>
+        <div class="rec-handle rec-handle-s"  data-dir="s"></div>
+        <div class="rec-handle rec-handle-sw" data-dir="sw"></div>
+        <div class="rec-handle rec-handle-w"  data-dir="w"></div>
+
+        <!-- Dimensions label above frame -->
+        <div id="rec-frame-dims">1920 × 1080</div>
+    </div>
+
+    <!-- Controls bar below frame -->
+    <div id="rec-controls">
+        <!-- Record / Stop -->
+        <button class="rc-btn" id="rc-rec" title="Record">⏺</button>
+        <!-- Pause / Resume -->
+        <button class="rc-btn" id="rc-pause" title="Pause" style="display:none;">⏸</button>
+        <!-- Timer -->
+        <span id="rc-timer">0:00</span>
+        <div class="rc-sep"></div>
+        <!-- Screenshot -->
+        <button class="rc-btn" id="rc-screenshot" title="Screenshot">📷</button>
+        <div class="rc-sep"></div>
+        <!-- Aspect Ratio -->
+        <select id="rc-aspect">
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="21:9">21:9</option>
+            <option value="free">חופשי</option>
+        </select>
+        <!-- Resolution -->
+        <select id="rc-resolution">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="3840x2160">4K</option>
+        </select>
+        <!-- FPS -->
+        <select id="rc-fps">
+            <option value="30" selected>30fps</option>
+            <option value="24">24fps</option>
+            <option value="60">60fps</option>
+        </select>
+        <div class="rc-sep"></div>
+        <!-- Close frame -->
+        <button id="rc-close" title="Close">✕</button>
+    </div>
+</div>
+
+<!-- 3e: Download Dialog (appears after recording stops) -->
+<div id="rec-download-overlay">
+    <div id="rec-download-dialog">
+        <h3 data-he="שמירת הקלטה" data-en="Save Recording">שמירת הקלטה</h3>
+        <input type="text" id="rec-filename" placeholder="filename" dir="ltr">
+        <div class="dl-btns">
+            <button class="dl-btn dl-btn-secondary" id="dl-cancel" data-he="ביטול" data-en="Cancel">ביטול</button>
+            <button class="dl-btn dl-btn-primary" id="dl-confirm" data-he="הורדה" data-en="Download">הורדה</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 4: JAVASCRIPT
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+// ═══════════════════════════════════════════════
+// 4a: App Object Skeleton
+// ═══════════════════════════════════════════════
+
+const app = {
+    meta: {
+        name: 'planets-vs-stars',  // CUSTOMIZE
+        version: '2.0',
+    },
+
+    params: {
+        // CUSTOMIZE: Simulation-specific parameters
+        speed: 5,
+        trailLength: 500,
+        showLabels: true,
+        showEcliptic: true,
+        showConstellations: true,
+        showTrails: true,
+        showRetrograde: true,
+        planetScale: 2,
+    },
+
+    state: {
+        paused: false,
+        frameCount: 0,
+        seed: null,
+        animFrame: 0,
+        language: 'he',
+        theme: 'dark',
+    },
+
+    canvas: {},
+    math: {},
+    render: {},
+    ui: {},
+    recording: {},
+};
+
+
+// ═══════════════════════════════════════════════
+// 4b: Math Module
+// ═══════════════════════════════════════════════
+
+// Mulberry32 seeded PRNG
+app.math._createPRNG = function(seed) {
+    let t = seed | 0;
+    return function() {
+        t = (t + 0x6D2B79F5) | 0;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+};
+
+app.math._prng = null;
+
+// Use this instead of Math.random() in simulation code for determinism
+app.math.random = function() {
+    if (app.math._prng) return app.math._prng();
+    return Math.random();
+};
+
+// Gaussian random (Box-Muller)
+app.math.gaussianRandom = function() {
+    let u = 0, v = 0;
+    while (u === 0) u = app.math.random();
+    while (v === 0) v = app.math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+};
+
+// ═══════════════════════════════════════════════
+// CUSTOMIZE: Simulation-specific math
+// ═══════════════════════════════════════════════
+
+// Planet data: orbital periods in days, distance from Sun in AU, color, names
+app.math.planets = [
+    {
+        name: 'Venus', nameHe: 'נוגה',
+        period: 224.7, distance: 0.723,
+        color: '#ffffff', glowColor: 'rgba(255,255,255,0.4)',
+        size: 3, initialAngle: 0.8,
+    },
+    {
+        name: 'Mars', nameHe: 'מאדים',
+        period: 686.97, distance: 1.524,
+        color: '#ff4444', glowColor: 'rgba(255,68,68,0.4)',
+        size: 2.5, initialAngle: 2.1,
+    },
+    {
+        name: 'Jupiter', nameHe: 'צדק',
+        period: 4332.59, distance: 5.203,
+        color: '#ffcc88', glowColor: 'rgba(255,204,136,0.4)',
+        size: 3.5, initialAngle: 4.5,
+    },
+    {
+        name: 'Saturn', nameHe: 'שבתאי',
+        period: 10759.22, distance: 9.537,
+        color: '#ffdd66', glowColor: 'rgba(255,221,102,0.4)',
+        size: 3, initialAngle: 1.2,
+    },
+];
+
+// Earth orbital data
+app.math.earthPeriod = 365.25;
+app.math.earthDistance = 1.0;
+
+// Fixed stars data (generated at init)
+app.math.stars = [];
+
+// Constellation line data (simplified zodiac belt constellations)
+app.math.constellationLines = [];
+app.math.constellationLabels = [];
+
+// Planet trail histories: array of {x, y, retrograde} per planet
+app.math.trails = [];
+
+// Simulation time in days
+app.math.simTime = 0;
+
+// Previous apparent longitudes for retrograde detection
+app.math.prevLongitudes = [];
+
+app.math.initState = function() {
+    const rng = app.math.random;
+    app.math.simTime = 0;
+    app.math.trails = app.math.planets.map(() => []);
+    app.math.prevLongitudes = app.math.planets.map(() => null);
+
+    // Generate fixed stars
+    app.math.stars = [];
+    const numStars = 400;
+    for (let i = 0; i < numStars; i++) {
+        // Distribute stars across the sky view (longitude, latitude -> x, y mapping)
+        const lon = rng() * Math.PI * 2;
+        const lat = (rng() - 0.5) * Math.PI * 0.8; // mostly near ecliptic viewing area
+        const brightness = 0.15 + rng() * 0.85;
+        const size = 0.5 + rng() * 1.5;
+        const twinklePhase = rng() * Math.PI * 2;
+        const twinkleSpeed = 0.5 + rng() * 2.0;
+        // Color temperature: blue-white to warm white
+        const temp = rng();
+        let r, g, b;
+        if (temp < 0.3) {
+            // Blue-white
+            r = 180 + rng() * 75;
+            g = 200 + rng() * 55;
+            b = 255;
+        } else if (temp < 0.7) {
+            // White
+            r = 230 + rng() * 25;
+            g = 230 + rng() * 25;
+            b = 230 + rng() * 25;
+        } else {
+            // Warm white / yellowish
+            r = 255;
+            g = 220 + rng() * 35;
+            b = 180 + rng() * 50;
+        }
+        app.math.stars.push({ lon, lat, brightness, size, twinklePhase, twinkleSpeed, r, g, b });
+    }
+
+    // Generate constellation patterns along the ecliptic (zodiac constellations)
+    // Each constellation is a set of star indices that we connect with lines
+    // We'll create simplified constellation-like patterns
+    app.math.constellationStars = [];
+    app.math.constellationLines = [];
+    app.math.constellationLabels = [];
+
+    const constellations = [
+        { name: 'Aries', nameHe: 'טלה', lonCenter: 0.0 },
+        { name: 'Taurus', nameHe: 'שור', lonCenter: Math.PI / 6 },
+        { name: 'Gemini', nameHe: 'תאומים', lonCenter: Math.PI / 3 },
+        { name: 'Cancer', nameHe: 'סרטן', lonCenter: Math.PI / 2 },
+        { name: 'Leo', nameHe: 'אריה', lonCenter: 2 * Math.PI / 3 },
+        { name: 'Virgo', nameHe: 'בתולה', lonCenter: 5 * Math.PI / 6 },
+        { name: 'Libra', nameHe: 'מאזניים', lonCenter: Math.PI },
+        { name: 'Scorpio', nameHe: 'עקרב', lonCenter: 7 * Math.PI / 6 },
+        { name: 'Sagittarius', nameHe: 'קשת', lonCenter: 4 * Math.PI / 3 },
+        { name: 'Capricorn', nameHe: 'גדי', lonCenter: 3 * Math.PI / 2 },
+        { name: 'Aquarius', nameHe: 'דלי', lonCenter: 5 * Math.PI / 3 },
+        { name: 'Pisces', nameHe: 'דגים', lonCenter: 11 * Math.PI / 6 },
+    ];
+
+    constellations.forEach(con => {
+        // Create 4-6 bright stars per constellation
+        const numConStars = 4 + Math.floor(rng() * 3);
+        const starIndices = [];
+        for (let i = 0; i < numConStars; i++) {
+            const slon = con.lonCenter + (rng() - 0.5) * 0.35;
+            const slat = (rng() - 0.5) * 0.4;
+            const star = {
+                lon: slon, lat: slat,
+                brightness: 0.7 + rng() * 0.3,
+                size: 1.2 + rng() * 1.0,
+                twinklePhase: rng() * Math.PI * 2,
+                twinkleSpeed: 0.5 + rng() * 1.5,
+                r: 220 + rng() * 35, g: 225 + rng() * 30, b: 240 + rng() * 15,
+            };
+            starIndices.push(app.math.constellationStars.length);
+            app.math.constellationStars.push(star);
+        }
+
+        // Connect stars with lines (simple chain + one cross-link)
+        for (let i = 0; i < starIndices.length - 1; i++) {
+            app.math.constellationLines.push([starIndices[i], starIndices[i + 1]]);
+        }
+        // Add one cross-link for visual interest
+        if (starIndices.length > 3) {
+            app.math.constellationLines.push([starIndices[0], starIndices[Math.floor(starIndices.length / 2)]]);
+        }
+
+        // Label position
+        app.math.constellationLabels.push({
+            name: con.name, nameHe: con.nameHe,
+            lon: con.lonCenter, lat: 0.25,
+        });
+    });
+};
+
+// Convert ecliptic longitude/latitude to screen coordinates
+// This creates a cylindrical projection: longitude maps to X, latitude maps to Y
+app.math.eclipticToScreen = function(lon, lat, W, H) {
+    // Normalize longitude to [0, 2*PI]
+    const normalizedLon = ((lon % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    // Map longitude to x: full width = 2*PI
+    const x = (normalizedLon / (2 * Math.PI)) * W;
+    // Map latitude to y: center of screen = 0 latitude
+    const y = H / 2 - (lat / (Math.PI * 0.5)) * (H * 0.4);
+    return { x, y };
+};
+
+// Calculate heliocentric position of a body given orbital params
+app.math.heliocentricPos = function(distance, period, initialAngle, time) {
+    const angle = initialAngle + (2 * Math.PI * time) / period;
+    return {
+        x: distance * Math.cos(angle),
+        y: distance * Math.sin(angle),
+    };
+};
+
+// Calculate geocentric ecliptic longitude (apparent position from Earth)
+app.math.geocentricLongitude = function(planetDist, planetPeriod, planetInitAngle, time) {
+    const earth = app.math.heliocentricPos(app.math.earthDistance, app.math.earthPeriod, 0, time);
+    const planet = app.math.heliocentricPos(planetDist, planetPeriod, planetInitAngle, time);
+    // Vector from Earth to planet
+    const dx = planet.x - earth.x;
+    const dy = planet.y - earth.y;
+    return Math.atan2(dy, dx);
+};
+
+app.math.tick = function(dt) {
+    // Advance simulation time
+    // dt is in frames, speed is in days-per-frame
+    app.math.simTime += app.params.speed * 0.5; // 0.5 day per frame at speed=1
+
+    const time = app.math.simTime;
+    const W = app.canvas.width;
+    const H = app.canvas.height;
+
+    // Update planet positions and trails
+    app.math.planets.forEach((planet, i) => {
+        const lon = app.math.geocentricLongitude(planet.distance, planet.period, planet.initialAngle, time);
+
+        // Detect retrograde: negative change in longitude
+        let isRetrograde = false;
+        if (app.math.prevLongitudes[i] !== null) {
+            let dLon = lon - app.math.prevLongitudes[i];
+            // Handle wrapping
+            if (dLon > Math.PI) dLon -= 2 * Math.PI;
+            if (dLon < -Math.PI) dLon += 2 * Math.PI;
+            // For outer planets, positive = prograde (eastward), negative = retrograde
+            // For Venus (inner planet), retrograde is when moving westward relative to typical motion
+            isRetrograde = dLon < 0;
+        }
+        app.math.prevLongitudes[i] = lon;
+
+        // Planet latitude: slight oscillation to simulate orbital inclination
+        const lat = Math.sin(lon * 1.3 + planet.initialAngle) * 0.05;
+
+        const pos = app.math.eclipticToScreen(lon, lat, W, H);
+
+        // Store trail point
+        const trail = app.math.trails[i];
+        trail.push({ x: pos.x, y: pos.y, retrograde: isRetrograde, lon: lon });
+        // Cap trail length
+        const maxTrail = Math.min(app.params.trailLength, 2000);
+        while (trail.length > maxTrail) {
+            trail.shift();
+        }
+    });
+};
+
+
+// ═══════════════════════════════════════════════
+// 4c: Canvas Module
+// ═══════════════════════════════════════════════
+
+app.canvas.init = function() {
+    app.canvas.trail = document.getElementById('trailCanvas');
+    app.canvas.sim = document.getElementById('simCanvas');
+    app.canvas.trailCtx = app.canvas.trail.getContext('2d');
+    app.canvas.simCtx = app.canvas.sim.getContext('2d');
+    app.canvas.dpr = window.devicePixelRatio || 1;
+    app.canvas.resize();
+};
+
+app.canvas.resize = function() {
+    const dpr = app.canvas.dpr;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    app.canvas.width = w;
+    app.canvas.height = h;
+
+    [app.canvas.trail, app.canvas.sim].forEach(cvs => {
+        cvs.width = w * dpr;
+        cvs.height = h * dpr;
+        cvs.style.width = w + 'px';
+        cvs.style.height = h + 'px';
+        cvs.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+    });
+};
+
+// Composite trail + sim canvases onto a target canvas at any resolution/crop
+app.canvas.compositeOnto = function(targetCtx, targetW, targetH, region) {
+    const r = region || { x: 0, y: 0, w: app.canvas.width, h: app.canvas.height };
+    const dpr = app.canvas.dpr;
+    const sx = r.x * dpr, sy = r.y * dpr;
+    const sw = r.w * dpr, sh = r.h * dpr;
+
+    targetCtx.clearRect(0, 0, targetW, targetH);
+    targetCtx.drawImage(app.canvas.trail, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    targetCtx.drawImage(app.canvas.sim, sx, sy, sw, sh, 0, 0, targetW, targetH);
+};
+
+// Capture a single frame as data URL
+app.canvas.captureFrame = function(options) {
+    const opts = options || {};
+    const w = opts.width || app.canvas.width;
+    const h = opts.height || app.canvas.height;
+    const format = opts.format || 'image/png';
+    const quality = opts.quality || 0.95;
+    const region = opts.region || null;
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d');
+    app.canvas.compositeOnto(ctx, w, h, region);
+    return offscreen.toDataURL(format, quality);
+};
+
+
+// ═══════════════════════════════════════════════
+// 4d: Render Module
+// ═══════════════════════════════════════════════
+
+app.render.init = function() {
+    // CUSTOMIZE: Any one-time render initialization
+};
+
+// Called once per frame
+app.render.drawFrame = function() {
+    const W = app.canvas.width;
+    const H = app.canvas.height;
+    const trailCtx = app.canvas.trailCtx;
+    const simCtx = app.canvas.simCtx;
+
+    // Clear both canvases
+    simCtx.clearRect(0, 0, W, H);
+    trailCtx.clearRect(0, 0, W, H);
+
+    // ── Background: dark sky ──
+    simCtx.fillStyle = '#050510';
+    simCtx.fillRect(0, 0, W, H);
+
+    // Subtle gradient for depth
+    const grad = simCtx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.7);
+    grad.addColorStop(0, 'rgba(10, 15, 40, 0.3)');
+    grad.addColorStop(1, 'rgba(5, 5, 16, 0)');
+    simCtx.fillStyle = grad;
+    simCtx.fillRect(0, 0, W, H);
+
+    const time = app.state.frameCount * 0.01;
+
+    // ── Draw ecliptic line ──
+    if (app.params.showEcliptic) {
+        simCtx.strokeStyle = 'rgba(255, 220, 100, 0.15)';
+        simCtx.lineWidth = 1;
+        simCtx.setLineDash([8, 8]);
+        simCtx.beginPath();
+        simCtx.moveTo(0, H / 2);
+        simCtx.lineTo(W, H / 2);
+        simCtx.stroke();
+        simCtx.setLineDash([]);
+
+        // Ecliptic label
+        simCtx.fillStyle = 'rgba(255, 220, 100, 0.25)';
+        simCtx.font = '11px Rubik';
+        simCtx.textAlign = 'left';
+        const eclipticLabel = app.state.language === 'en' ? 'Ecliptic' : 'מישור אקליפטי';
+        simCtx.fillText(eclipticLabel, 10, H / 2 - 8);
+    }
+
+    // ── Draw constellation lines ──
+    if (app.params.showConstellations) {
+        simCtx.strokeStyle = 'rgba(100, 200, 255, 0.08)';
+        simCtx.lineWidth = 0.8;
+        app.math.constellationLines.forEach(line => {
+            const s1 = app.math.constellationStars[line[0]];
+            const s2 = app.math.constellationStars[line[1]];
+            const p1 = app.math.eclipticToScreen(s1.lon, s1.lat, W, H);
+            const p2 = app.math.eclipticToScreen(s2.lon, s2.lat, W, H);
+
+            // Don't draw lines that wrap around the screen
+            if (Math.abs(p1.x - p2.x) < W * 0.3) {
+                simCtx.beginPath();
+                simCtx.moveTo(p1.x, p1.y);
+                simCtx.lineTo(p2.x, p2.y);
+                simCtx.stroke();
+            }
+        });
+
+        // Constellation labels
+        simCtx.fillStyle = 'rgba(100, 200, 255, 0.15)';
+        simCtx.font = '10px Rubik';
+        simCtx.textAlign = 'center';
+        app.math.constellationLabels.forEach(label => {
+            const pos = app.math.eclipticToScreen(label.lon, label.lat, W, H);
+            const text = app.state.language === 'en' ? label.name : label.nameHe;
+            simCtx.fillText(text, pos.x, pos.y);
+        });
+
+        // Draw constellation stars
+        app.math.constellationStars.forEach(star => {
+            const pos = app.math.eclipticToScreen(star.lon, star.lat, W, H);
+            const twinkle = 0.7 + 0.3 * Math.sin(time * star.twinkleSpeed + star.twinklePhase);
+            const alpha = star.brightness * twinkle;
+            simCtx.fillStyle = `rgba(${Math.round(star.r)}, ${Math.round(star.g)}, ${Math.round(star.b)}, ${alpha})`;
+            simCtx.beginPath();
+            simCtx.arc(pos.x, pos.y, star.size, 0, Math.PI * 2);
+            simCtx.fill();
+        });
+    }
+
+    // ── Draw fixed stars ──
+    app.math.stars.forEach(star => {
+        const pos = app.math.eclipticToScreen(star.lon, star.lat, W, H);
+        const twinkle = 0.6 + 0.4 * Math.sin(time * star.twinkleSpeed + star.twinklePhase);
+        const alpha = star.brightness * twinkle;
+        simCtx.fillStyle = `rgba(${Math.round(star.r)}, ${Math.round(star.g)}, ${Math.round(star.b)}, ${alpha})`;
+        simCtx.beginPath();
+        simCtx.arc(pos.x, pos.y, star.size * 0.6, 0, Math.PI * 2);
+        simCtx.fill();
+    });
+
+    // ── Helper: hex color to rgba ──
+    const hexToRgba = (hex, a) => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${a})`;
+    };
+
+    // ── Draw planet trails on trail canvas ──
+    if (app.params.showTrails) {
+        app.math.planets.forEach((planet, i) => {
+            const trail = app.math.trails[i];
+            if (trail.length < 2) return;
+
+            for (let j = 1; j < trail.length; j++) {
+                const p0 = trail[j - 1];
+                const p1 = trail[j];
+
+                // Don't draw segments that wrap around the screen
+                if (Math.abs(p0.x - p1.x) > W * 0.3) continue;
+
+                const progress = j / trail.length;
+                // Alpha fades from 0.08 (oldest) to 0.85 (newest)
+                const alpha = 0.08 + progress * 0.77;
+
+                if (app.params.showRetrograde && p1.retrograde) {
+                    // Retrograde: dotted brighter line
+                    trailCtx.strokeStyle = hexToRgba(planet.color, Math.min(1, alpha * 1.4));
+                    trailCtx.lineWidth = 3;
+                    trailCtx.setLineDash([4, 4]);
+                } else {
+                    trailCtx.strokeStyle = hexToRgba(planet.color, alpha);
+                    trailCtx.lineWidth = 2;
+                    trailCtx.setLineDash([]);
+                }
+
+                trailCtx.beginPath();
+                trailCtx.moveTo(p0.x, p0.y);
+                trailCtx.lineTo(p1.x, p1.y);
+                trailCtx.stroke();
+            }
+            trailCtx.setLineDash([]);
+        });
+    }
+
+    // ── Draw planets ──
+    app.math.planets.forEach((planet, i) => {
+        const trail = app.math.trails[i];
+        if (trail.length === 0) return;
+
+        const pos = trail[trail.length - 1];
+        const scale = app.params.planetScale;
+        const radius = planet.size * scale;
+
+        // Outer glow
+        const glowGrad = simCtx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, radius * 4);
+        glowGrad.addColorStop(0, planet.glowColor);
+        glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        simCtx.fillStyle = glowGrad;
+        simCtx.beginPath();
+        simCtx.arc(pos.x, pos.y, radius * 4, 0, Math.PI * 2);
+        simCtx.fill();
+
+        // Planet body
+        simCtx.fillStyle = planet.color;
+        simCtx.shadowColor = planet.color;
+        simCtx.shadowBlur = 12;
+        simCtx.beginPath();
+        simCtx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        simCtx.fill();
+        simCtx.shadowBlur = 0;
+
+        // Retrograde indicator ring
+        if (app.params.showRetrograde && trail.length > 0 && trail[trail.length - 1].retrograde) {
+            simCtx.strokeStyle = planet.color;
+            simCtx.lineWidth = 1;
+            simCtx.setLineDash([2, 2]);
+            simCtx.beginPath();
+            simCtx.arc(pos.x, pos.y, radius + 6, 0, Math.PI * 2);
+            simCtx.stroke();
+            simCtx.setLineDash([]);
+
+            // "R" label for retrograde
+            simCtx.fillStyle = planet.color;
+            simCtx.font = '9px Rubik';
+            simCtx.textAlign = 'center';
+            simCtx.fillText('R', pos.x, pos.y - radius - 10);
+        }
+
+        // Labels
+        if (app.params.showLabels) {
+            simCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            simCtx.font = '12px Rubik';
+            simCtx.textAlign = 'center';
+            const labelText = app.state.language === 'en'
+                ? planet.name
+                : planet.nameHe;
+            simCtx.fillText(labelText, pos.x, pos.y + radius + 16);
+
+            // Secondary name (smaller, other language)
+            simCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            simCtx.font = '9px Rubik';
+            const subText = app.state.language === 'en'
+                ? planet.nameHe
+                : planet.name;
+            simCtx.fillText(subText, pos.x, pos.y + radius + 28);
+        }
+    });
+
+    // ── Time/date display (top-left) ──
+    const days = Math.floor(app.math.simTime);
+    const months = (days / 30.44).toFixed(1);
+    const years = (days / 365.25).toFixed(2);
+    simCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    simCtx.font = '12px Rubik';
+    simCtx.textAlign = 'left';
+    if (app.state.language === 'en') {
+        simCtx.fillText(`Day ${days}  (~${months} months, ~${years} years)`, 10, 24);
+    } else {
+        simCtx.textAlign = 'right';
+        simCtx.fillText(`יום ${days}  (~${months} חודשים, ~${years} שנים)`, W - 10, 24);
+    }
+
+    // ── Legend (bottom) ──
+    const legendY = H - 20;
+    const legendStartX = W / 2 - 180;
+    simCtx.font = '11px Rubik';
+    simCtx.textAlign = 'left';
+    app.math.planets.forEach((planet, i) => {
+        const lx = legendStartX + i * 95;
+        simCtx.fillStyle = planet.color;
+        simCtx.beginPath();
+        simCtx.arc(lx, legendY, 4, 0, Math.PI * 2);
+        simCtx.fill();
+
+        simCtx.fillStyle = 'rgba(255,255,255,0.5)';
+        const name = app.state.language === 'en' ? planet.name : planet.nameHe;
+        simCtx.fillText(name, lx + 8, legendY + 4);
+    });
+};
+
+// Animation loop
+app.render.frame = function() {
+    if (!app.state.paused) {
+        app.state.frameCount++;
+        app.math.tick();
+        app.render.drawFrame();
+    }
+
+    // Update recording canvas if active
+    if (app.recording.isActive) {
+        app.recording.updateFrame();
+    }
+
+    app.state.animFrame = requestAnimationFrame(app.render.frame);
+};
+
+
+// ═══════════════════════════════════════════════
+// 4e: Recording Module
+// ═══════════════════════════════════════════════
+
+app.recording.isActive = false;
+app.recording.isPaused = false;
+app.recording.mediaRecorder = null;
+app.recording.chunks = [];
+app.recording.offscreenCanvas = null;
+app.recording.offscreenCtx = null;
+app.recording.stream = null;
+app.recording.startTimestamp = 0;
+app.recording.pausedElapsed = 0;
+app.recording.timerInterval = null;
+app.recording.lastBlob = null;
+
+app.recording.resolution = { w: 1920, h: 1080 };
+app.recording.fps = 30;
+
+app.recording.frame = { x: 0, y: 0, w: 0, h: 0 };
+app.recording.aspectRatio = 16 / 9;
+
+app.recording._domCache = null;
+app.recording._domCaptureActive = false;
+app.recording._lastDomCapture = 0;
+app.recording._domCaptureInterval = 120;
+
+app.recording.parseAspect = function(val) {
+    if (val === 'free') return null;
+    const [w, h] = val.split(':').map(Number);
+    return w / h;
+};
+
+app.recording.enforceAspect = function() {
+    if (!this.aspectRatio) return;
+    const border = document.getElementById('rec-frame-border');
+    const w = parseInt(border.style.width) || 0;
+    const newH = Math.round(w / this.aspectRatio);
+    border.style.height = newH + 'px';
+    this.syncFrameFromDOM();
+    this.positionControls();
+};
+
+app.recording.setupOffscreen = function() {
+    if (!this.offscreenCanvas) {
+        this.offscreenCanvas = document.createElement('canvas');
+    }
+    this.offscreenCanvas.width = this.resolution.w;
+    this.offscreenCanvas.height = this.resolution.h;
+    this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+};
+
+app.recording.updateFrame = function() {
+    if (!this.offscreenCtx) return;
+    const f = this.frame;
+    const region = { x: f.x, y: f.y, w: f.w, h: f.h };
+    app.canvas.compositeOnto(this.offscreenCtx, this.resolution.w, this.resolution.h, region);
+    if (this._domCache) {
+        this.offscreenCtx.drawImage(this._domCache, 0, 0);
+    }
+    const now = performance.now();
+    if (!this._domCaptureActive && now - this._lastDomCapture >= this._domCaptureInterval) {
+        this._lastDomCapture = now;
+        this._captureDomOverlay();
+    }
+};
+
+app.recording._captureDomOverlay = async function() {
+    if (typeof html2canvas === 'undefined') return;
+    this._domCaptureActive = true;
+    try {
+        const f = this.frame;
+        const scaleX = this.resolution.w / f.w;
+        const scaleY = this.resolution.h / f.h;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = this.resolution.w;
+        tempCanvas.height = this.resolution.h;
+        const tempCtx = tempCanvas.getContext('2d');
+        const dialogues = document.querySelectorAll('.dialogue');
+        let anyRendered = false;
+        for (const dlg of dialogues) {
+            if (dlg.style.display === 'none') continue;
+            const rect = dlg.getBoundingClientRect();
+            if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+            if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+            const rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+            const dx = (rect.left - f.x) * scaleX;
+            const dy = (rect.top - f.y) * scaleY;
+            const dw = rect.width * scaleX;
+            const dh = rect.height * scaleY;
+            tempCtx.drawImage(rendered, dx, dy, dw, dh);
+            anyRendered = true;
+        }
+        this._domCache = anyRendered ? tempCanvas : null;
+    } catch (e) {
+        console.warn('DOM overlay capture failed:', e);
+    }
+    this._domCaptureActive = false;
+};
+
+app.recording.start = function(options) {
+    const opts = options || {};
+    if (opts.width) this.resolution.w = opts.width;
+    if (opts.height) this.resolution.h = opts.height;
+    if (opts.fps) this.fps = opts.fps;
+    this.setupOffscreen();
+    this.chunks = [];
+    this.isPaused = false;
+    this.pausedElapsed = 0;
+    this.stream = this.offscreenCanvas.captureStream(this.fps);
+    const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    let mimeType = '';
+    for (const mt of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(mt)) { mimeType = mt; break; }
+    }
+    this.mediaRecorder = new MediaRecorder(this.stream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: this.resolution.w >= 3840 ? 20000000 : this.resolution.w >= 1920 ? 10000000 : 5000000,
+    });
+    this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) this.chunks.push(e.data);
+    };
+    this.mediaRecorder.start(1000);
+    this.isActive = true;
+    this.startTimestamp = Date.now();
+    this._startTimer();
+    const border = document.getElementById('rec-frame-border');
+    const recBtn = document.getElementById('rc-rec');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.add('recording');
+    recBtn.classList.add('rec-active');
+    recBtn.textContent = '⏹';
+    recBtn.title = 'Stop';
+    pauseBtn.style.display = 'inline-flex';
+};
+
+app.recording.stop = function() {
+    return new Promise((resolve) => {
+        if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') { resolve(null); return; }
+        if (this.mediaRecorder.state === 'paused') { this.mediaRecorder.resume(); }
+        this.mediaRecorder.onstop = () => {
+            const blob = new Blob(this.chunks, { type: this.mediaRecorder.mimeType });
+            this.isActive = false;
+            this.isPaused = false;
+            this._stopTimer();
+            this.lastBlob = blob;
+            this._domCache = null;
+            this._domCaptureActive = false;
+            const border = document.getElementById('rec-frame-border');
+            const recBtn = document.getElementById('rc-rec');
+            const pauseBtn = document.getElementById('rc-pause');
+            border.classList.remove('recording', 'paused');
+            recBtn.classList.remove('rec-active');
+            recBtn.textContent = '⏺';
+            recBtn.title = 'Record';
+            pauseBtn.style.display = 'none';
+            pauseBtn.classList.remove('paused-active');
+            pauseBtn.textContent = '⏸';
+            this._showDownloadDialog(blob);
+            resolve(blob);
+        };
+        this.mediaRecorder.stop();
+    });
+};
+
+app.recording.pause = function() {
+    if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+    this.mediaRecorder.pause();
+    this.isPaused = true;
+    this.pausedElapsed += Date.now() - this.startTimestamp;
+    const border = document.getElementById('rec-frame-border');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.add('paused');
+    pauseBtn.classList.add('paused-active');
+    pauseBtn.textContent = '▶';
+    pauseBtn.title = 'Resume';
+};
+
+app.recording.resume = function() {
+    if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+    this.mediaRecorder.resume();
+    this.isPaused = false;
+    this.startTimestamp = Date.now();
+    const border = document.getElementById('rec-frame-border');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.remove('paused');
+    pauseBtn.classList.remove('paused-active');
+    pauseBtn.textContent = '⏸';
+    pauseBtn.title = 'Pause';
+};
+
+app.recording.screenshot = async function(options) {
+    const opts = options || {};
+    const w = opts.width || this.resolution.w;
+    const h = opts.height || this.resolution.h;
+    const f = this.frame;
+    const region = { x: f.x, y: f.y, w: f.w, h: f.h };
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d');
+    app.canvas.compositeOnto(ctx, w, h, region);
+    if (typeof html2canvas !== 'undefined') {
+        const scaleX = w / f.w;
+        const scaleY = h / f.h;
+        const dialogues = document.querySelectorAll('.dialogue');
+        for (const dlg of dialogues) {
+            if (dlg.style.display === 'none') continue;
+            const rect = dlg.getBoundingClientRect();
+            if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+            if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+            try {
+                const rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+                const dx = (rect.left - f.x) * scaleX;
+                const dy = (rect.top - f.y) * scaleY;
+                const dw = rect.width * scaleX;
+                const dh = rect.height * scaleY;
+                ctx.drawImage(rendered, dx, dy, dw, dh);
+            } catch (e) { console.warn('Screenshot DOM capture failed:', e); }
+        }
+    }
+    return offscreen.toDataURL(opts.format || 'image/png', opts.quality || 0.95);
+};
+
+app.recording.downloadBlob = function(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+app.recording.downloadDataURL = function(dataURL, filename) {
+    const a = document.createElement('a');
+    a.href = dataURL; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+};
+
+app.recording._startTimer = function() {
+    const el = document.getElementById('rc-timer');
+    this.timerInterval = setInterval(() => {
+        let elapsed;
+        if (this.isPaused) { elapsed = Math.floor(this.pausedElapsed / 1000); }
+        else { elapsed = Math.floor((this.pausedElapsed + Date.now() - this.startTimestamp) / 1000); }
+        const min = Math.floor(elapsed / 60);
+        const sec = String(elapsed % 60).padStart(2, '0');
+        el.textContent = min + ':' + sec;
+    }, 250);
+};
+
+app.recording._stopTimer = function() {
+    clearInterval(this.timerInterval);
+    document.getElementById('rc-timer').textContent = '0:00';
+};
+
+app.recording._showDownloadDialog = function(blob) {
+    const overlay = document.getElementById('rec-download-overlay');
+    const input = document.getElementById('rec-filename');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    input.value = 'physital-' + app.meta.name + '-' + ts;
+    overlay.style.display = 'flex';
+    input.focus(); input.select();
+    overlay._pendingBlob = blob;
+};
+
+app.recording._hideDownloadDialog = function() {
+    document.getElementById('rec-download-overlay').style.display = 'none';
+};
+
+app.recording.syncFrameFromDOM = function() {
+    const border = document.getElementById('rec-frame-border');
+    this.frame.x = parseInt(border.style.left) || 0;
+    this.frame.y = parseInt(border.style.top) || 0;
+    this.frame.w = parseInt(border.style.width) || app.canvas.width;
+    this.frame.h = parseInt(border.style.height) || app.canvas.height;
+    document.getElementById('rec-frame-dims').textContent = this.frame.w + ' × ' + this.frame.h;
+};
+
+app.recording.positionControls = function() {
+    const border = document.getElementById('rec-frame-border');
+    const controls = document.getElementById('rec-controls');
+    const bLeft = parseInt(border.style.left) || 0;
+    const bWidth = parseInt(border.style.width) || 0;
+    const bTop = parseInt(border.style.top) || 0;
+    const bHeight = parseInt(border.style.height) || 0;
+    controls.style.left = (bLeft + bWidth / 2) + 'px';
+    controls.style.transform = 'translateX(-50%)';
+    controls.style.top = (bTop + bHeight + 12) + 'px';
+    controls.style.bottom = 'auto';
+};
+
+
+// ═══════════════════════════════════════════════
+// 4e2: Desmos-style Slider Engine
+// ═══════════════════════════════════════════════
+
+app.sliders = {};
+app._sliderAnimFrame = null;
+
+app.buildSliders = function() {
+    document.querySelectorAll('.physi-slider').forEach(container => {
+        const param   = container.dataset.param;
+        const min     = parseFloat(container.dataset.min) || 0;
+        const max     = parseFloat(container.dataset.max) || 100;
+        const step    = parseFloat(container.dataset.step) || 1;
+        const def     = parseFloat(container.dataset.default) || min;
+        const labelHe = container.dataset.labelHe || param;
+        const labelEn = container.dataset.labelEn || param;
+
+        if (!(param in app.params)) app.params[param] = def;
+
+        const slider = {
+            param, min, max, step, default: def,
+            animating: false, animSpeed: 1, loopMode: 'loop', animDir: 1,
+            container, els: {},
+        };
+
+        container.innerHTML = '';
+
+        const header = document.createElement('div');
+        header.className = 'physi-slider-header';
+
+        const labelWrap = document.createElement('div');
+        labelWrap.className = 'physi-slider-label';
+
+        const playBtn = document.createElement('button');
+        playBtn.className = 'ps-play';
+        playBtn.innerHTML = '▶';
+        playBtn.title = 'Animate';
+        slider.els.playBtn = playBtn;
+
+        const labelSpan = document.createElement('span');
+        labelSpan.setAttribute('data-he', labelHe);
+        labelSpan.setAttribute('data-en', labelEn);
+        labelSpan.textContent = app.state.language === 'en' ? labelEn : labelHe;
+        slider.els.label = labelSpan;
+
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'ps-expand';
+        expandBtn.innerHTML = '▼';
+        expandBtn.title = 'Settings';
+        slider.els.expandBtn = expandBtn;
+
+        labelWrap.appendChild(playBtn);
+        labelWrap.appendChild(labelSpan);
+        labelWrap.appendChild(expandBtn);
+
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'ps-value';
+        valueSpan.textContent = app.params[param];
+        slider.els.value = valueSpan;
+
+        header.appendChild(labelWrap);
+        header.appendChild(valueSpan);
+
+        const trackWrap = document.createElement('div');
+        trackWrap.className = 'ps-track-wrap';
+
+        const track = document.createElement('input');
+        track.type = 'range';
+        track.className = 'ps-track';
+        track.min = min; track.max = max; track.step = step;
+        track.value = app.params[param];
+        slider.els.track = track;
+        trackWrap.appendChild(track);
+
+        const settings = document.createElement('div');
+        settings.className = 'ps-settings';
+        slider.els.settings = settings;
+
+        const rowBounds = document.createElement('div');
+        rowBounds.className = 'ps-settings-row';
+        const lblMin = document.createElement('label'); lblMin.textContent = 'Min';
+        const inputMin = document.createElement('input');
+        inputMin.className = 'ps-mini-input'; inputMin.type = 'number'; inputMin.value = min; inputMin.step = 'any';
+        slider.els.inputMin = inputMin;
+        const lblMax = document.createElement('label'); lblMax.textContent = 'Max';
+        const inputMax = document.createElement('input');
+        inputMax.className = 'ps-mini-input'; inputMax.type = 'number'; inputMax.value = max; inputMax.step = 'any';
+        slider.els.inputMax = inputMax;
+        rowBounds.append(lblMin, inputMin, lblMax, inputMax);
+
+        const rowStep = document.createElement('div');
+        rowStep.className = 'ps-settings-row';
+        const lblStep = document.createElement('label'); lblStep.textContent = 'Step';
+        const inputStep = document.createElement('input');
+        inputStep.className = 'ps-mini-input'; inputStep.type = 'number'; inputStep.value = step; inputStep.step = 'any'; inputStep.min = '0';
+        slider.els.inputStep = inputStep;
+        const lblSpeed = document.createElement('label'); lblSpeed.textContent = 'Speed';
+        const inputSpeed = document.createElement('input');
+        inputSpeed.className = 'ps-mini-input'; inputSpeed.type = 'number'; inputSpeed.value = 1; inputSpeed.step = '0.1'; inputSpeed.min = '0.1';
+        slider.els.inputSpeed = inputSpeed;
+        rowStep.append(lblStep, inputStep, lblSpeed, inputSpeed);
+
+        const rowLoop = document.createElement('div');
+        rowLoop.className = 'ps-settings-row';
+        const lblLoop = document.createElement('label');
+        lblLoop.setAttribute('data-he', 'לולאה'); lblLoop.setAttribute('data-en', 'Loop');
+        lblLoop.textContent = app.state.language === 'en' ? 'Loop' : 'לולאה';
+        const loopBtns = document.createElement('div');
+        loopBtns.className = 'ps-loop-btns';
+        ['loop', 'bounce', 'once'].forEach(mode => {
+            const btn = document.createElement('button');
+            btn.className = 'ps-loop-btn' + (mode === 'loop' ? ' active' : '');
+            btn.dataset.mode = mode;
+            btn.textContent = mode === 'loop' ? '↻' : mode === 'bounce' ? '⇄' : '→';
+            btn.title = mode;
+            loopBtns.appendChild(btn);
+        });
+        slider.els.loopBtns = loopBtns;
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'ps-reset';
+        resetBtn.setAttribute('data-he', 'איפוס'); resetBtn.setAttribute('data-en', 'Reset');
+        resetBtn.textContent = app.state.language === 'en' ? 'Reset' : 'איפוס';
+        slider.els.resetBtn = resetBtn;
+        rowLoop.append(lblLoop, loopBtns, resetBtn);
+
+        settings.append(rowBounds, rowStep, rowLoop);
+        container.append(header, trackWrap, settings);
+
+        // Events
+        track.addEventListener('input', () => {
+            const v = parseFloat(track.value);
+            app.params[param] = v;
+            valueSpan.textContent = app._formatSliderValue(v, step);
+        });
+
+        valueSpan.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.className = 'ps-value-input'; input.type = 'number';
+            input.value = app.params[param]; input.step = slider.step;
+            valueSpan.replaceWith(input); input.focus(); input.select();
+            const commit = () => {
+                let v = parseFloat(input.value);
+                if (isNaN(v)) v = slider.default;
+                v = Math.max(slider.min, Math.min(slider.max, v));
+                app.params[param] = v; track.value = v;
+                valueSpan.textContent = app._formatSliderValue(v, slider.step);
+                input.replaceWith(valueSpan);
+            };
+            input.addEventListener('blur', commit);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') { input.value = app.params[param]; commit(); }
+            });
+        });
+
+        playBtn.addEventListener('click', () => {
+            slider.animating = !slider.animating;
+            playBtn.innerHTML = slider.animating ? '⏸' : '▶';
+            playBtn.classList.toggle('playing', slider.animating);
+            if (slider.animating) app._startSliderAnimLoop();
+        });
+
+        expandBtn.addEventListener('click', () => {
+            const open = settings.classList.toggle('open');
+            expandBtn.classList.toggle('open', open);
+        });
+
+        inputMin.addEventListener('change', () => { slider.min = parseFloat(inputMin.value); track.min = slider.min; });
+        inputMax.addEventListener('change', () => { slider.max = parseFloat(inputMax.value); track.max = slider.max; });
+        inputStep.addEventListener('change', () => { slider.step = parseFloat(inputStep.value) || 0.01; track.step = slider.step; });
+        inputSpeed.addEventListener('change', () => { slider.animSpeed = parseFloat(inputSpeed.value) || 1; });
+
+        loopBtns.querySelectorAll('.ps-loop-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                loopBtns.querySelectorAll('.ps-loop-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                slider.loopMode = btn.dataset.mode;
+            });
+        });
+
+        resetBtn.addEventListener('click', () => {
+            app.params[param] = slider.default; track.value = slider.default;
+            valueSpan.textContent = app._formatSliderValue(slider.default, slider.step);
+            slider.animating = false; playBtn.innerHTML = '▶'; playBtn.classList.remove('playing');
+            slider.animDir = 1;
+            slider.min = parseFloat(container.dataset.min) || 0;
+            slider.max = parseFloat(container.dataset.max) || 100;
+            slider.step = parseFloat(container.dataset.step) || 1;
+            slider.animSpeed = 1;
+            track.min = slider.min; track.max = slider.max; track.step = slider.step;
+            inputMin.value = slider.min; inputMax.value = slider.max;
+            inputStep.value = slider.step; inputSpeed.value = 1;
+        });
+
+        container.addEventListener('mousedown', (e) => e.stopPropagation());
+        app.sliders[param] = slider;
+    });
+};
+
+app._formatSliderValue = function(val, step) {
+    if (step >= 1) return String(Math.round(val));
+    const decimals = Math.max(0, Math.ceil(-Math.log10(step)));
+    return val.toFixed(decimals);
+};
+
+app._startSliderAnimLoop = function() {
+    if (app._sliderAnimFrame) return;
+    function tick() {
+        let anyActive = false;
+        for (const key in app.sliders) {
+            const s = app.sliders[key];
+            if (!s.animating) continue;
+            anyActive = true;
+            let v = app.params[s.param];
+            const delta = s.step * s.animSpeed * s.animDir;
+            v += delta;
+            if (v > s.max) {
+                if (s.loopMode === 'loop') { v = s.min; }
+                else if (s.loopMode === 'bounce') { v = s.max; s.animDir = -1; }
+                else { v = s.max; s.animating = false; s.els.playBtn.innerHTML = '▶'; s.els.playBtn.classList.remove('playing'); }
+            } else if (v < s.min) {
+                if (s.loopMode === 'loop') { v = s.max; }
+                else if (s.loopMode === 'bounce') { v = s.min; s.animDir = 1; }
+                else { v = s.min; s.animating = false; s.els.playBtn.innerHTML = '▶'; s.els.playBtn.classList.remove('playing'); }
+            }
+            app.params[s.param] = v;
+            s.els.track.value = v;
+            s.els.value.textContent = app._formatSliderValue(v, s.step);
+        }
+        if (anyActive) { app._sliderAnimFrame = requestAnimationFrame(tick); }
+        else { app._sliderAnimFrame = null; }
+    }
+    app._sliderAnimFrame = requestAnimationFrame(tick);
+};
+
+app.syncSlidersFromParams = function() {
+    for (const key in app.sliders) {
+        const s = app.sliders[key];
+        const v = app.params[s.param];
+        s.els.track.value = v;
+        s.els.value.textContent = app._formatSliderValue(v, s.step);
+    }
+};
+
+
+// ═══════════════════════════════════════════════
+// 4f: UI Module
+// ═══════════════════════════════════════════════
+
+app.ui.init = function() {
+    // Context menu
+    document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'flex';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) { menu.style.left = (window.innerWidth - rect.width - 8) + 'px'; }
+            if (rect.bottom > window.innerHeight) { menu.style.top = (window.innerHeight - rect.height - 8) + 'px'; }
+        });
+    });
+
+    document.addEventListener('click', () => {
+        document.getElementById('context-menu').style.display = 'none';
+    });
+
+    // Draggable dialogues
+    document.querySelectorAll('.dialogue-header').forEach(header => {
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('close-btn')) return;
+            const dialogue = header.parentElement;
+            const rect = dialogue.getBoundingClientRect();
+            dialogue.style.transform = 'none';
+            dialogue.style.right = 'auto';
+            dialogue.style.bottom = 'auto';
+            dialogue.style.left = rect.left + 'px';
+            dialogue.style.top = rect.top + 'px';
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+            function onMouseMove(ev) {
+                dialogue.style.left = (ev.clientX - offsetX) + 'px';
+                dialogue.style.top = (ev.clientY - offsetY) + 'px';
+            }
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
+
+    // Block canvas events on dialogues
+    document.querySelectorAll('.dialogue').forEach(d => {
+        ['mousedown', 'click', 'wheel'].forEach(evt => {
+            d.addEventListener(evt, (e) => e.stopPropagation());
+        });
+    });
+
+    // Recording frame UI bindings
+    document.getElementById('rc-rec').addEventListener('click', () => {
+        if (app.recording.isActive) { app.recording.stop(); }
+        else { app.recording.start(); }
+    });
+    document.getElementById('rc-pause').addEventListener('click', () => {
+        if (app.recording.isPaused) { app.recording.resume(); }
+        else { app.recording.pause(); }
+    });
+    document.getElementById('rc-screenshot').addEventListener('click', async () => {
+        const dataURL = await app.recording.screenshot();
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        app.recording.downloadDataURL(dataURL, 'physital-' + app.meta.name + '-' + ts + '.png');
+    });
+    document.getElementById('rc-aspect').addEventListener('change', (e) => {
+        app.recording.aspectRatio = app.recording.parseAspect(e.target.value);
+        app.recording.enforceAspect();
+    });
+    document.getElementById('rc-resolution').addEventListener('change', (e) => {
+        const [w, h] = e.target.value.split('x').map(Number);
+        app.recording.resolution = { w, h };
+    });
+    document.getElementById('rc-fps').addEventListener('change', (e) => {
+        app.recording.fps = parseInt(e.target.value);
+    });
+    document.getElementById('rc-close').addEventListener('click', () => {
+        if (app.recording.isActive) return;
+        app.ui.toggleRecFrame();
+    });
+    document.getElementById('dl-confirm').addEventListener('click', () => {
+        const overlay = document.getElementById('rec-download-overlay');
+        const filename = document.getElementById('rec-filename').value.trim() || 'recording';
+        const blob = overlay._pendingBlob;
+        if (blob) { app.recording.downloadBlob(blob, filename + '.webm'); }
+        app.recording._hideDownloadDialog();
+    });
+    document.getElementById('dl-cancel').addEventListener('click', () => {
+        app.recording._hideDownloadDialog();
+    });
+    document.getElementById('rec-filename').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('dl-confirm').click();
+        if (e.key === 'Escape') app.recording._hideDownloadDialog();
+    });
+
+    // Frame drag
+    document.getElementById('rec-frame-border').addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('rec-handle')) return;
+        e.preventDefault();
+        const border = document.getElementById('rec-frame-border');
+        const startX = e.clientX - (parseInt(border.style.left) || 0);
+        const startY = e.clientY - (parseInt(border.style.top) || 0);
+        function onMove(ev) {
+            border.style.left = (ev.clientX - startX) + 'px';
+            border.style.top = (ev.clientY - startY) + 'px';
+            app.recording.syncFrameFromDOM();
+            app.recording.positionControls();
+        }
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+
+    // Frame resize handles
+    document.querySelectorAll('.rec-handle').forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const dir = handle.dataset.dir;
+            const border = document.getElementById('rec-frame-border');
+            const startMouseX = e.clientX; const startMouseY = e.clientY;
+            const startLeft = parseInt(border.style.left) || 0;
+            const startTop = parseInt(border.style.top) || 0;
+            const startW = parseInt(border.style.width) || 0;
+            const startH = parseInt(border.style.height) || 0;
+            const MIN = 100;
+            function onMove(ev) {
+                const dx = ev.clientX - startMouseX; const dy = ev.clientY - startMouseY;
+                let l = startLeft, t = startTop, w = startW, h = startH;
+                const ar = app.recording.aspectRatio;
+                if (dir.includes('e')) { w = Math.max(MIN, startW + dx); }
+                if (dir.includes('w')) { w = Math.max(MIN, startW - dx); l = startLeft + (startW - w); }
+                if (dir.includes('s')) { h = Math.max(MIN, startH + dy); }
+                if (dir.includes('n')) { h = Math.max(MIN, startH - dy); t = startTop + (startH - h); }
+                if (ar) {
+                    if (dir === 'e' || dir === 'w') { h = Math.round(w / ar); }
+                    else if (dir === 'n' || dir === 's') { w = Math.round(h * ar); }
+                    else { const dw = Math.abs(w - startW); const dh = Math.abs(h - startH); if (dw >= dh) { h = Math.round(w / ar); } else { w = Math.round(h * ar); } }
+                    if (w < MIN) { w = MIN; h = Math.round(w / ar); }
+                    if (h < MIN) { h = MIN; w = Math.round(h * ar); }
+                    if (dir.includes('n')) { t = startTop + startH - h; }
+                    if (dir.includes('w')) { l = startLeft + startW - w; }
+                }
+                border.style.left = l + 'px'; border.style.top = t + 'px';
+                border.style.width = w + 'px'; border.style.height = h + 'px';
+                app.recording.syncFrameFromDOM();
+                app.recording.positionControls();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    });
+
+    // Keyboard: Space = pause/play
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !e.target.matches('input, textarea, select')) {
+            e.preventDefault();
+            app.state.paused = !app.state.paused;
+        }
+    });
+};
+
+app.ui.toggleDialogue = function(name) {
+    const el = document.getElementById('dialogue-' + name);
+    if (!el) return;
+    document.querySelectorAll('.dialogue').forEach(d => {
+        if (d !== el) d.style.display = 'none';
+    });
+    el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+    document.getElementById('context-menu').style.display = 'none';
+};
+
+app.ui.closeDialogue = function(name) {
+    const el = document.getElementById('dialogue-' + name);
+    if (el) el.style.display = 'none';
+};
+
+app.ui.toggleRecFrame = function() {
+    const frame = document.getElementById('rec-frame');
+    const isVisible = frame.classList.contains('active');
+    document.getElementById('context-menu').style.display = 'none';
+    if (isVisible) {
+        if (app.recording.isActive) return;
+        frame.classList.remove('active');
+    } else {
+        frame.classList.add('active');
+        const border = document.getElementById('rec-frame-border');
+        const pad = 60;
+        const maxW = window.innerWidth - pad * 2;
+        const maxH = window.innerHeight - pad * 2 - 60;
+        const ar = app.recording.aspectRatio;
+        let fw, fh;
+        if (ar) {
+            if (maxW / maxH > ar) { fh = maxH; fw = Math.round(fh * ar); }
+            else { fw = maxW; fh = Math.round(fw / ar); }
+        } else { fw = maxW; fh = maxH; }
+        const offsetX = pad + Math.round((maxW - fw) / 2);
+        const offsetY = pad + Math.round((maxH - fh) / 2);
+        border.style.left = offsetX + 'px'; border.style.top = offsetY + 'px';
+        border.style.width = fw + 'px'; border.style.height = fh + 'px';
+        app.recording.syncFrameFromDOM();
+        app.recording.positionControls();
+    }
+};
+
+app.ui.setLanguage = function(lang) {
+    app.state.language = lang;
+    const dir = lang === 'he' ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dir;
+    document.querySelectorAll('[data-he][data-en]').forEach(el => {
+        const text = el.getAttribute('data-' + lang);
+        if (text) el.textContent = text;
+    });
+    document.getElementById('setting-lang').value = lang;
+};
+
+app.ui.syncFromParams = function() {
+    app.syncSlidersFromParams();
+    // Sync view checkboxes
+    const viewContent = document.querySelector('#dialogue-view .dialogue-content');
+    if (viewContent) {
+        const checkboxes = viewContent.querySelectorAll('input[type="checkbox"]');
+        const boolParams = ['showTrails', 'showLabels', 'showEcliptic', 'showConstellations', 'showRetrograde'];
+        checkboxes.forEach((cb, i) => {
+            if (boolParams[i] && boolParams[i] in app.params) {
+                cb.checked = app.params[boolParams[i]];
+            }
+        });
+    }
+};
+
+
+// ═══════════════════════════════════════════════
+// 4g: Bot Control API (window.physital)
+// ═══════════════════════════════════════════════
+
+window.physital = {
+    version: '2.0',
+    get name() { return app.meta.name; },
+    isReady: false,
+    _onReadyCallbacks: [],
+
+    getParams: function() { return JSON.parse(JSON.stringify(app.params)); },
+    setParams: function(params) {
+        Object.assign(app.params, params);
+        if (app.ui.syncFromParams) app.ui.syncFromParams();
+    },
+    getState: function() {
+        return {
+            paused: app.state.paused,
+            frameCount: app.state.frameCount,
+            isRecording: app.recording.isActive,
+            seed: app.state.seed,
+        };
+    },
+    play: function() { app.state.paused = false; },
+    pause: function() { app.state.paused = true; },
+    step: function(n) {
+        n = n || 1;
+        for (let i = 0; i < n; i++) {
+            app.state.frameCount++;
+            app.math.tick();
+        }
+        app.render.drawFrame();
+    },
+    reset: function() {
+        app.state.frameCount = 0;
+        if (app.state.seed !== null) {
+            app.math._prng = app.math._createPRNG(app.state.seed);
+        }
+        app.canvas.trailCtx.clearRect(0, 0, app.canvas.width, app.canvas.height);
+        app.math.initState();
+    },
+    seekFrame: function(frameNumber) { this.reset(); this.step(frameNumber); },
+    getCurrentFrame: function() { return app.state.frameCount; },
+    captureFrame: function(options) { return app.canvas.captureFrame(options); },
+    captureRegion: function(x, y, w, h, options) {
+        const opts = Object.assign({}, options || {}, { region: { x, y, w, h } });
+        return app.canvas.captureFrame(opts);
+    },
+    startRecording: function(options) { app.recording.start(options); },
+    stopRecording: function() { return app.recording.stop(); },
+    setSeed: function(seed) {
+        app.state.seed = seed;
+        app.math._prng = app.math._createPRNG(seed);
+    },
+    set onReady(callback) {
+        if (this.isReady) callback();
+        else this._onReadyCallbacks.push(callback);
+    },
+    _notifyReady: function() {
+        this.isReady = true;
+        this._onReadyCallbacks.forEach(cb => cb());
+        this._onReadyCallbacks = [];
+        window.dispatchEvent(new CustomEvent('physital:ready', {
+            detail: { name: app.meta.name, version: '2.0' }
+        }));
+    },
+    getCanvas: function() { return app.canvas.sim; },
+    getTrailCanvas: function() { return app.canvas.trail; },
+};
+
+
+// ═══════════════════════════════════════════════
+// 4h: URL Parameter Parsing
+// ═══════════════════════════════════════════════
+
+app.parseURLParams = function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('seed')) {
+        const seed = parseInt(params.get('seed'));
+        if (!isNaN(seed)) {
+            app.state.seed = seed;
+            app.math._prng = app.math._createPRNG(seed);
+        }
+    }
+    if (params.get('autoplay') === 'false') { app.state.paused = true; }
+    if (params.has('lang')) { app.state.language = params.get('lang'); }
+    for (const [key, value] of params.entries()) {
+        if (key in app.params) {
+            const num = parseFloat(value);
+            if (!isNaN(num)) app.params[key] = num;
+            else if (value === 'true') app.params[key] = true;
+            else if (value === 'false') app.params[key] = false;
+            else app.params[key] = value;
+        }
+    }
+};
+
+
+// ═══════════════════════════════════════════════
+// 4i: PostMessage Bridge (for iframe embedding)
+// ═══════════════════════════════════════════════
+
+window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!data || data.type !== 'physital') return;
+    const { method, args, id } = data;
+    let result;
+    try {
+        if (method && typeof window.physital[method] === 'function') {
+            result = window.physital[method](...(args || []));
+        } else if (method && method in window.physital) {
+            result = window.physital[method];
+        }
+        if (result && typeof result.then === 'function') {
+            result.then(val => {
+                event.source.postMessage({ type: 'physital:response', id, result: val ? 'blob-ready' : null }, '*');
+            });
+        } else {
+            event.source.postMessage({ type: 'physital:response', id, result }, '*');
+        }
+    } catch (err) {
+        event.source.postMessage({ type: 'physital:error', id, error: err.message }, '*');
+    }
+});
+
+
+// ═══════════════════════════════════════════════
+// 4j: Initialization
+// ═══════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded', () => {
+    // 1. Parse URL params
+    app.parseURLParams();
+
+    // 2. Canvas setup
+    app.canvas.init();
+
+    // 3. Render init
+    app.render.init();
+
+    // 4. UI init
+    app.ui.init();
+
+    // 5. Build Desmos-style sliders
+    app.buildSliders();
+
+    // 6. Apply language
+    app.ui.setLanguage(app.state.language);
+
+    // 7. Initialize simulation state
+    app.math.initState();
+
+    // 8. Start render loop
+    app.render.frame();
+
+    // 9. Resize handler
+    window.addEventListener('resize', () => {
+        app.canvas.resize();
+    });
+
+    // 10. Signal ready
+    window.physital._notifyReady();
+});
+
+</script>
+</body>
+</html>

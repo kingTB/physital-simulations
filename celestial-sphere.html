@@ -1,0 +1,1947 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhysiTal — הכדור השמימי</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+    :root {
+        --glass-bg: rgba(18, 18, 24, 0.90);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --accent: #60a5fa;
+        --accent-glow: rgba(96, 165, 250, 0.4);
+        --text-main: #e2e8f0;
+        --text-dim: #94a3b8;
+        --bg-dark: #050510;
+        --rec-red: #dc2626;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        background: var(--bg-dark);
+        color: var(--text-main);
+        font-family: 'Rubik', 'Assistant', sans-serif;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+        cursor: default;
+        user-select: none;
+    }
+    #canvas-container { position: relative; width: 100vw; height: 100vh; }
+    #trailCanvas, #simCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    #trailCanvas { z-index: 0; }
+    #simCanvas { z-index: 1; }
+    #context-menu {
+        position: absolute; display: none; flex-direction: column;
+        background: var(--glass-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border); border-radius: 12px; padding: 8px 0;
+        min-width: 200px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 1000;
+    }
+    .menu-item {
+        padding: 10px 20px; cursor: pointer; transition: background 0.2s;
+        display: flex; align-items: center; gap: 8px; font-size: 0.95rem; white-space: nowrap;
+    }
+    .menu-item:hover { background: rgba(255,255,255,0.1); }
+    .menu-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 4px 0; }
+    [dir="rtl"] .menu-item { justify-content: flex-end; flex-direction: row-reverse; }
+    [dir="ltr"] .menu-item { justify-content: flex-start; }
+    .dialogue {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 380px; background: var(--glass-bg); backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px); border: 1px solid var(--glass-border);
+        border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        display: none; flex-direction: column; z-index: 500; overflow: hidden; transition: opacity 0.2s;
+    }
+    .dialogue.wide { width: 480px; }
+    .dialogue-header {
+        padding: 16px; background: rgba(255,255,255,0.05); cursor: grab;
+        display: flex; justify-content: space-between; align-items: center;
+        font-weight: 500; font-size: 1rem;
+    }
+    .dialogue-header:active { cursor: grabbing; }
+    .close-btn { cursor: pointer; opacity: 0.6; transition: opacity 0.2s; font-size: 1.1rem; }
+    .close-btn:hover { opacity: 1; }
+    .dialogue-content {
+        padding: 20px; max-height: 70vh; overflow-y: auto; font-size: 0.9rem; line-height: 1.6;
+    }
+    .dialogue-content::-webkit-scrollbar { width: 6px; }
+    .dialogue-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+    .physi-slider { margin-bottom: 16px; direction: ltr; }
+    .physi-slider-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 6px; font-size: 0.85rem; color: var(--text-dim); direction: rtl;
+    }
+    .physi-slider-label { display: flex; align-items: center; gap: 6px; }
+    .ps-play {
+        width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--text-dim);
+        background: none; color: var(--text-dim); cursor: pointer; display: inline-flex;
+        align-items: center; justify-content: center; font-size: 0.55rem; padding: 0;
+        transition: all 0.2s; flex-shrink: 0;
+    }
+    .ps-play:hover { border-color: var(--accent); color: var(--accent); }
+    .ps-play.playing { border-color: var(--accent); color: var(--accent); background: rgba(96,165,250,0.15); }
+    .ps-value {
+        color: var(--accent); font-weight: 500; font-variant-numeric: tabular-nums;
+        cursor: pointer; padding: 1px 4px; border-radius: 4px;
+        border: 1px solid transparent; transition: border-color 0.2s;
+        min-width: 36px; text-align: center; direction: ltr;
+    }
+    .ps-value:hover { border-color: rgba(96,165,250,0.3); }
+    .ps-value-input {
+        background: rgba(255,255,255,0.08); border: 1px solid var(--accent);
+        border-radius: 4px; color: var(--accent); font-family: inherit;
+        font-size: 0.85rem; font-weight: 500; width: 60px; text-align: center;
+        padding: 1px 4px; direction: ltr; -moz-appearance: textfield;
+    }
+    .ps-value-input::-webkit-inner-spin-button,
+    .ps-value-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .ps-value-input:focus { outline: none; }
+    .ps-track-wrap { position: relative; height: 20px; display: flex; align-items: center; }
+    .ps-track { -webkit-appearance: none; width: 100%; background: transparent; margin: 0; }
+    .ps-track::-webkit-slider-runnable-track {
+        width: 100%; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; cursor: pointer;
+    }
+    .ps-track::-webkit-slider-thumb {
+        -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%;
+        background: var(--accent); cursor: pointer; margin-top: -5px; transition: box-shadow 0.15s;
+    }
+    .ps-track::-webkit-slider-thumb:hover { box-shadow: 0 0 0 4px rgba(96,165,250,0.2); }
+    .ps-track::-moz-range-track { width: 100%; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; }
+    .ps-track::-moz-range-thumb { height: 14px; width: 14px; border-radius: 50%; background: var(--accent); border: none; cursor: pointer; }
+    .ps-expand {
+        background: none; border: none; color: var(--text-dim);
+        cursor: pointer; font-size: 0.65rem; padding: 2px; opacity: 0.5; transition: opacity 0.2s;
+    }
+    .ps-expand:hover { opacity: 1; }
+    .ps-expand.open { transform: rotate(180deg); }
+    .ps-settings {
+        display: none; background: rgba(0,0,0,0.25); border-radius: 8px;
+        padding: 10px 12px; margin-top: 6px; font-size: 0.78rem; color: var(--text-dim);
+    }
+    .ps-settings.open { display: block; }
+    .ps-settings-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .ps-settings-row:last-child { margin-bottom: 0; }
+    .ps-settings-row label { min-width: 48px; text-align: right; direction: rtl; }
+    .ps-mini-input {
+        background: rgba(255,255,255,0.08); border: 1px solid var(--glass-border);
+        border-radius: 4px; color: var(--text-main); font-family: inherit;
+        font-size: 0.78rem; width: 56px; text-align: center; padding: 3px 4px;
+        direction: ltr; -moz-appearance: textfield;
+    }
+    .ps-mini-input::-webkit-inner-spin-button,
+    .ps-mini-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .ps-mini-input:focus { outline: none; border-color: var(--accent); }
+    .ps-loop-btns { display: flex; gap: 2px; }
+    .ps-loop-btn {
+        background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);
+        color: var(--text-dim); cursor: pointer; font-size: 0.72rem; padding: 3px 7px; transition: all 0.15s;
+    }
+    .ps-loop-btn:first-child { border-radius: 4px 0 0 4px; }
+    .ps-loop-btn:last-child { border-radius: 0 4px 4px 0; }
+    .ps-loop-btn.active { background: rgba(96,165,250,0.2); border-color: var(--accent); color: var(--accent); }
+    .ps-reset {
+        background: none; border: 1px solid var(--glass-border); border-radius: 4px;
+        color: var(--text-dim); cursor: pointer; font-size: 0.72rem; padding: 3px 8px;
+        transition: all 0.15s; margin-right: auto;
+    }
+    .ps-reset:hover { border-color: var(--accent); color: var(--accent); }
+    .control-group { margin-bottom: 16px; }
+    .control-label {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 6px; font-size: 0.85rem; color: var(--text-dim);
+    }
+    .control-value { color: var(--accent); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .toggle-row {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 12px; font-size: 0.85rem;
+    }
+    select {
+        background: rgba(255,255,255,0.1); color: var(--text-main);
+        border: 1px solid var(--glass-border); border-radius: 8px;
+        padding: 6px 10px; font-family: inherit; font-size: 0.85rem; cursor: pointer; direction: ltr;
+    }
+    select option { background: #1a1a2e; }
+    .info-text { color: var(--text-dim); font-size: 0.85rem; line-height: 1.6; }
+    .math-block {
+        background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; margin: 10px 0;
+        font-family: 'Rubik', monospace; direction: ltr; text-align: center;
+        font-size: 1.1rem; color: var(--accent);
+    }
+    #rec-frame { position: fixed; inset: 0; z-index: 400; display: none; pointer-events: none; }
+    #rec-frame.active { display: block; }
+    #rec-frame-border {
+        position: absolute; border: 2px solid var(--accent);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+        pointer-events: auto; cursor: move; transition: border-color 0.3s;
+    }
+    #rec-frame-border.recording {
+        border-color: var(--rec-red);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(220,38,38,0.3);
+    }
+    #rec-frame-border.paused { border-color: #f59e0b; animation: pulse-border 1.2s ease-in-out infinite; }
+    .rec-handle {
+        position: absolute; width: 12px; height: 12px; background: var(--accent);
+        border-radius: 2px; pointer-events: auto; z-index: 2;
+    }
+    .rec-handle-nw { top: -6px; left: -6px; cursor: nw-resize; }
+    .rec-handle-ne { top: -6px; right: -6px; cursor: ne-resize; }
+    .rec-handle-sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+    .rec-handle-se { bottom: -6px; right: -6px; cursor: se-resize; }
+    .rec-handle-n  { top: -6px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+    .rec-handle-s  { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+    .rec-handle-e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+    .rec-handle-w  { left: -6px; top: 50%; transform: translateY(-50%); cursor: w-resize; }
+    #rec-frame-dims {
+        position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.7); padding: 2px 10px; border-radius: 4px;
+        font-size: 0.75rem; color: var(--text-dim); white-space: nowrap;
+        font-variant-numeric: tabular-nums; pointer-events: none;
+    }
+    #rec-controls {
+        position: fixed; display: flex; align-items: center; gap: 8px;
+        background: var(--glass-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border); border-radius: 12px; padding: 8px 14px;
+        pointer-events: auto; white-space: nowrap; z-index: 401;
+    }
+    #rec-controls select { padding: 4px 6px; font-size: 0.78rem; border-radius: 6px; }
+    .rc-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+        font-size: 1rem; transition: all 0.2s; color: white; background: rgba(255,255,255,0.1);
+    }
+    .rc-btn:hover { background: rgba(255,255,255,0.2); }
+    .rc-btn.rec-active { background: var(--rec-red); animation: pulse-rec 1.5s ease-in-out infinite; }
+    .rc-btn.paused-active { background: #f59e0b; }
+    #rc-timer { font-size: 0.82rem; font-variant-numeric: tabular-nums; color: var(--text-dim); min-width: 42px; text-align: center; }
+    .rc-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
+    #rc-close { opacity: 0.5; transition: opacity 0.2s; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1rem; }
+    #rc-close:hover { opacity: 1; }
+    @keyframes pulse-rec { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes pulse-border { 0%, 100% { border-color: #f59e0b; } 50% { border-color: rgba(245,158,11,0.4); } }
+    #rec-download-overlay {
+        position: fixed; inset: 0; z-index: 800; display: none;
+        align-items: center; justify-content: center; background: rgba(0,0,0,0.6);
+    }
+    #rec-download-dialog {
+        background: var(--glass-bg); backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border); border-radius: 16px;
+        padding: 24px; min-width: 340px; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    #rec-download-dialog h3 { font-size: 1rem; font-weight: 500; margin-bottom: 14px; }
+    #rec-filename {
+        width: 100%; background: rgba(255,255,255,0.08); border: 1px solid var(--glass-border);
+        border-radius: 8px; padding: 10px 12px; color: var(--text-main);
+        font-family: inherit; font-size: 0.9rem; direction: ltr; margin-bottom: 14px;
+    }
+    #rec-filename:focus { outline: none; border-color: var(--accent); }
+    #rec-download-dialog .dl-btns { display: flex; gap: 10px; justify-content: flex-end; }
+    .dl-btn {
+        padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer;
+        font-family: inherit; font-size: 0.85rem; color: white; transition: background 0.2s;
+    }
+    .dl-btn-primary { background: var(--accent); }
+    .dl-btn-primary:hover { background: #3b82f6; }
+    .dl-btn-secondary { background: rgba(255,255,255,0.1); }
+    .dl-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+    .attribution { color: var(--text-dim); font-size: 0.8rem; line-height: 1.8; }
+    .attribution a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+
+<body>
+
+<div id="canvas-container">
+    <canvas id="trailCanvas"></canvas>
+    <canvas id="simCanvas"></canvas>
+</div>
+
+<!-- Context Menu -->
+<div id="context-menu">
+    <div class="menu-item" onclick="app.ui.toggleDialogue('instructions')">
+        <span>📖</span>
+        <span data-he="הוראות" data-en="Instructions">הוראות</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('controls')">
+        <span>⚙️</span>
+        <span data-he="בקרים" data-en="Controls">בקרים</span>
+    </div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('view')">
+        <span>👁️</span>
+        <span data-he="תצוגה" data-en="View">תצוגה</span>
+    </div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('camera')">
+        <span>🎥</span>
+        <span data-he="מצלמה" data-en="Camera">מצלמה</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('graphs')">
+        <span>📊</span>
+        <span data-he="גרפים" data-en="Graphs">גרפים</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleRecFrame()">
+        <span>🔴</span>
+        <span data-he="הקלטה" data-en="Recording">הקלטה</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('settings')">
+        <span>⚙️</span>
+        <span data-he="הגדרות" data-en="Settings">הגדרות</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="app.ui.toggleDialogue('docs')">
+        <span>📄</span>
+        <span data-he="תיעוד" data-en="Documentation">תיעוד</span>
+    </div>
+</div>
+
+<!-- Instructions Dialogue -->
+<div id="dialogue-instructions" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="הוראות שימוש" data-en="Instructions">הוראות שימוש</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('instructions')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="info-text mb-4" data-he="סימולציה אינטראקטיבית של סיבוב כדור הארץ והכדור השמימי כפי שנצפים מעל פני כדור הארץ." data-en="Interactive simulation of Earth's rotation and the celestial sphere as seen by an observer on Earth's surface.">
+            סימולציה אינטראקטיבית של סיבוב כדור הארץ והכדור השמימי כפי שנצפים מעל פני כדור הארץ.
+        </p>
+        <p class="info-text mb-4" data-he="הכוכבים קבועים על הכדור השמימי וסובבים סביב הקוטב השמימי. כוכבים עולים במזרח ושוקעים במערב." data-en="Stars are fixed on the celestial sphere and rotate around the celestial pole. Stars rise in the east and set in the west.">
+            הכוכבים קבועים על הכדור השמימי וסובבים סביב הקוטב השמימי. כוכבים עולים במזרח ושוקעים במערב.
+        </p>
+        <p class="info-text mb-4" data-he="שנו את קו הרוחב כדי לראות כיצד השמיים נראים ממקומות שונים בעולם. בקווי רוחב גבוהים יש כוכבים ציר-קוטביים שלעולם אינם שוקעים." data-en="Change the latitude to see how the sky looks from different locations. At high latitudes, circumpolar stars never set.">
+            שנו את קו הרוחב כדי לראות כיצד השמיים נראים ממקומות שונים בעולם. בקווי רוחב גבוהים יש כוכבים ציר-קוטביים שלעולם אינם שוקעים.
+        </p>
+        <div class="math-block">HA = LST - RA</div>
+        <p class="info-text mb-2" data-he="HA = זווית שעה, LST = זמן כוכבי מקומי, RA = עלייה ישרה" data-en="HA = Hour Angle, LST = Local Sidereal Time, RA = Right Ascension">
+            HA = זווית שעה, LST = זמן כוכבי מקומי, RA = עלייה ישרה
+        </p>
+        <p class="info-text mb-4" data-he="לחצו על לחצן ימני בעכבר לתפריט." data-en="Right-click for menu.">
+            לחצו על לחצן ימני בעכבר לתפריט.
+        </p>
+    </div>
+</div>
+
+<!-- Controls Dialogue -->
+<div id="dialogue-controls" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="בקרים" data-en="Controls">בקרים</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('controls')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="physi-slider" data-param="speed" data-min="0.1" data-max="5" data-step="0.1" data-default="1"
+             data-label-he="מהירות סיבוב" data-label-en="Rotation Speed"></div>
+        <div class="physi-slider" data-param="latitude" data-min="-90" data-max="90" data-step="1" data-default="32"
+             data-label-he="קו רוחב" data-label-en="Latitude"></div>
+        <div class="physi-slider" data-param="starCount" data-min="50" data-max="500" data-step="10" data-default="200"
+             data-label-he="מספר כוכבים" data-label-en="Star Count"></div>
+    </div>
+</div>
+
+<!-- View Dialogue -->
+<div id="dialogue-view" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="תצוגה" data-en="View">תצוגה</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('view')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="toggle-row">
+            <span data-he="קווי רשת שמימיים" data-en="Celestial Grid">קווי רשת שמימיים</span>
+            <input type="checkbox" onchange="app.params.showGrid = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="קווי קבוצות כוכבים" data-en="Constellations">קווי קבוצות כוכבים</span>
+            <input type="checkbox" checked onchange="app.params.showConstellations = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="קו אופק" data-en="Horizon">קו אופק</span>
+            <input type="checkbox" checked onchange="app.params.showHorizon = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="משווה שמימי" data-en="Celestial Equator">משווה שמימי</span>
+            <input type="checkbox" checked onchange="app.params.showEquator = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="מישור המילקה (אקליפטיקה)" data-en="Ecliptic">מישור המילקה (אקליפטיקה)</span>
+            <input type="checkbox" onchange="app.params.showEcliptic = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="שמות קבוצות כוכבים" data-en="Constellation Names">שמות קבוצות כוכבים</span>
+            <input type="checkbox" checked onchange="app.params.showNames = this.checked;">
+        </div>
+        <div class="toggle-row">
+            <span data-he="סימוני כיוון" data-en="Cardinal Directions">סימוני כיוון</span>
+            <input type="checkbox" checked onchange="app.params.showCardinals = this.checked;">
+        </div>
+    </div>
+</div>
+
+<!-- Camera Dialogue -->
+<div id="dialogue-camera" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="מצלמה" data-en="Camera">מצלמה</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('camera')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="info-text" data-he="אין אפשרויות מצלמה בסימולציה זו." data-en="No camera options for this simulation.">אין אפשרויות מצלמה בסימולציה זו.</p>
+    </div>
+</div>
+
+<!-- Graphs Dialogue -->
+<div id="dialogue-graphs" class="dialogue wide">
+    <div class="dialogue-header">
+        <span data-he="גרפים" data-en="Graphs">גרפים</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('graphs')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="info-text" data-he="אין גרפים זמינים." data-en="No graphs available.">אין גרפים זמינים.</p>
+    </div>
+</div>
+
+<!-- Settings Dialogue -->
+<div id="dialogue-settings" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="הגדרות" data-en="Settings">הגדרות</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('settings')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <div class="toggle-row">
+            <span data-he="שפה" data-en="Language">שפה</span>
+            <select id="setting-lang" onchange="app.ui.setLanguage(this.value);">
+                <option value="he" selected>עברית</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Documentation Dialogue -->
+<div id="dialogue-docs" class="dialogue">
+    <div class="dialogue-header">
+        <span data-he="תיעוד" data-en="Documentation">תיעוד</span>
+        <span class="close-btn" onclick="app.ui.closeDialogue('docs')">✕</span>
+    </div>
+    <div class="dialogue-content">
+        <p class="attribution" data-he="נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי." data-en="Created by PhysiTal for physics lovers in the universe and is provided under a permissive free use license.">
+            נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי.
+        </p>
+        <p class="attribution" style="margin-top:12px;" data-he="סימולציית הכדור השמימי: סיבוב כדור הארץ והשמיים כפי שנצפים ממיקום צופה." data-en="Celestial Sphere simulation: Earth's rotation and the sky as seen from an observer's location.">
+            סימולציית הכדור השמימי: סיבוב כדור הארץ והשמיים כפי שנצפים ממיקום צופה.
+        </p>
+        <p class="attribution" style="margin-top:12px;">
+            Tech Stack: Vanilla JS, Canvas API, TailwindCSS
+        </p>
+    </div>
+</div>
+
+<!-- Recording Frame Overlay -->
+<div id="rec-frame">
+    <div id="rec-frame-border">
+        <div class="rec-handle rec-handle-nw" data-dir="nw"></div>
+        <div class="rec-handle rec-handle-n"  data-dir="n"></div>
+        <div class="rec-handle rec-handle-ne" data-dir="ne"></div>
+        <div class="rec-handle rec-handle-e"  data-dir="e"></div>
+        <div class="rec-handle rec-handle-se" data-dir="se"></div>
+        <div class="rec-handle rec-handle-s"  data-dir="s"></div>
+        <div class="rec-handle rec-handle-sw" data-dir="sw"></div>
+        <div class="rec-handle rec-handle-w"  data-dir="w"></div>
+        <div id="rec-frame-dims">1920 × 1080</div>
+    </div>
+    <div id="rec-controls">
+        <button class="rc-btn" id="rc-rec" title="Record">⏺</button>
+        <button class="rc-btn" id="rc-pause" title="Pause" style="display:none;">⏸</button>
+        <span id="rc-timer">0:00</span>
+        <div class="rc-sep"></div>
+        <button class="rc-btn" id="rc-screenshot" title="Screenshot">📷</button>
+        <div class="rc-sep"></div>
+        <select id="rc-aspect">
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="21:9">21:9</option>
+            <option value="free">חופשי</option>
+        </select>
+        <select id="rc-resolution">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="3840x2160">4K</option>
+        </select>
+        <select id="rc-fps">
+            <option value="30" selected>30fps</option>
+            <option value="24">24fps</option>
+            <option value="60">60fps</option>
+        </select>
+        <div class="rc-sep"></div>
+        <button id="rc-close" title="Close">✕</button>
+    </div>
+</div>
+
+<!-- Download Dialog -->
+<div id="rec-download-overlay">
+    <div id="rec-download-dialog">
+        <h3 data-he="שמירת הקלטה" data-en="Save Recording">שמירת הקלטה</h3>
+        <input type="text" id="rec-filename" placeholder="filename" dir="ltr">
+        <div class="dl-btns">
+            <button class="dl-btn dl-btn-secondary" id="dl-cancel" data-he="ביטול" data-en="Cancel">ביטול</button>
+            <button class="dl-btn dl-btn-primary" id="dl-confirm" data-he="הורדה" data-en="Download">הורדה</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// 4a: App Object Skeleton
+// ═══════════════════════════════════════════════
+
+const app = {
+    meta: {
+        name: 'celestial-sphere',
+        version: '2.0',
+    },
+
+    params: {
+        speed: 1.0,
+        latitude: 32,
+        starCount: 200,
+        showGrid: false,
+        showConstellations: true,
+        showHorizon: true,
+        showEquator: true,
+        showEcliptic: false,
+        showNames: true,
+        showCardinals: true,
+    },
+
+    state: {
+        paused: false,
+        frameCount: 0,
+        seed: null,
+        animFrame: 0,
+        language: 'he',
+        theme: 'dark',
+    },
+
+    canvas: {},
+    math: {},
+    render: {},
+    ui: {},
+    recording: {},
+};
+
+
+// ═══════════════════════════════════════════════
+// 4b: Math Module
+// ═══════════════════════════════════════════════
+
+app.math._createPRNG = function(seed) {
+    let t = seed | 0;
+    return function() {
+        t = (t + 0x6D2B79F5) | 0;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+};
+
+app.math._prng = null;
+
+app.math.random = function() {
+    if (app.math._prng) return app.math._prng();
+    return Math.random();
+};
+
+app.math.gaussianRandom = function() {
+    let u = 0, v = 0;
+    while (u === 0) u = app.math.random();
+    while (v === 0) v = app.math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+};
+
+// ── Celestial Sphere Math ──
+
+// Constellation data: RA (hours), Dec (degrees) for each star, plus line connections
+app.math.constellations = {
+    'Ursa Major': {
+        nameHe: 'הדוב הגדול',
+        stars: [
+            { ra: 11.06, dec: 61.75 },  // Dubhe (alpha)
+            { ra: 11.03, dec: 56.38 },  // Merak (beta)
+            { ra: 11.90, dec: 53.69 },  // Phecda (gamma)
+            { ra: 12.26, dec: 57.03 },  // Megrez (delta)
+            { ra: 12.90, dec: 55.96 },  // Alioth (epsilon)
+            { ra: 13.40, dec: 54.93 },  // Mizar (zeta)
+            { ra: 13.79, dec: 49.31 },  // Alkaid (eta)
+        ],
+        lines: [[0,1],[1,2],[2,3],[3,0],[3,4],[4,5],[5,6]],
+    },
+    'Orion': {
+        nameHe: 'אוריון',
+        stars: [
+            { ra: 5.92, dec: 7.41 },    // Betelgeuse (alpha)
+            { ra: 5.24, dec: -8.20 },   // Rigel (beta)
+            { ra: 5.42, dec: 6.35 },    // Bellatrix (gamma)
+            { ra: 5.68, dec: -1.94 },   // Mintaka (delta - belt)
+            { ra: 5.60, dec: -1.20 },   // Alnilam (epsilon - belt)
+            { ra: 5.53, dec: -1.94 },   // Alnitak (zeta - belt)
+            { ra: 5.59, dec: -9.67 },   // Saiph (kappa)
+        ],
+        lines: [[0,2],[0,3],[2,5],[3,4],[4,5],[1,3],[6,5],[1,6]],
+    },
+    'Cassiopeia': {
+        nameHe: 'קסיופאה',
+        stars: [
+            { ra: 0.68, dec: 56.54 },   // Schedar (alpha)
+            { ra: 0.15, dec: 59.15 },   // Caph (beta)
+            { ra: 0.95, dec: 60.72 },   // Gamma
+            { ra: 1.43, dec: 60.24 },   // Ruchbah (delta)
+            { ra: 1.91, dec: 63.67 },   // Segin (epsilon)
+        ],
+        lines: [[0,1],[0,2],[2,3],[3,4]],
+    },
+    'Crux': {
+        nameHe: 'הצלב הדרומי',
+        stars: [
+            { ra: 12.44, dec: -63.10 },  // Acrux (alpha)
+            { ra: 12.79, dec: -59.69 },  // Mimosa (beta)
+            { ra: 12.52, dec: -57.11 },  // Gacrux (gamma)
+            { ra: 12.36, dec: -58.75 },  // Delta
+        ],
+        lines: [[0,2],[1,3]],
+    },
+    'Scorpius': {
+        nameHe: 'העקרב',
+        stars: [
+            { ra: 16.49, dec: -26.43 },  // Antares (alpha)
+            { ra: 16.09, dec: -19.81 },  // Graffias (beta)
+            { ra: 16.01, dec: -22.62 },  // Dschubba (delta)
+            { ra: 16.84, dec: -34.29 },  // Epsilon
+            { ra: 17.20, dec: -37.10 },  // Mu1
+            { ra: 17.56, dec: -42.99 },  // Lambda (Shaula)
+        ],
+        lines: [[1,2],[2,0],[0,3],[3,4],[4,5]],
+    },
+    'Leo': {
+        nameHe: 'אריה',
+        stars: [
+            { ra: 10.14, dec: 11.97 },   // Regulus (alpha)
+            { ra: 11.82, dec: 14.57 },   // Denebola (beta)
+            { ra: 10.33, dec: 19.84 },   // Algieba (gamma)
+            { ra: 11.24, dec: 20.52 },   // Zosma (delta)
+        ],
+        lines: [[0,2],[2,3],[3,1]],
+    },
+};
+
+// Stars array populated in initState
+app.math.stars = [];
+app.math.siderealAngle = 0; // current rotation angle in radians
+
+app.math.initState = function() {
+    app.math.stars = [];
+    app.math.siderealAngle = 0;
+
+    // Generate random stars on the celestial sphere
+    const count = app.params.starCount;
+    for (let i = 0; i < count; i++) {
+        const ra = app.math.random() * 24;  // 0 to 24 hours
+        const dec = Math.asin(2 * app.math.random() - 1) * 180 / Math.PI; // uniform on sphere
+        const mag = app.math.random() * 3 + 1; // magnitude 1-4 (visual size)
+        const twinklePhase = app.math.random() * Math.PI * 2;
+        const twinkleSpeed = 1 + app.math.random() * 3;
+        const colorTemp = app.math.random(); // 0=red, 0.5=white, 1=blue
+        app.math.stars.push({ ra, dec, mag, twinklePhase, twinkleSpeed, colorTemp });
+    }
+};
+
+app.math.tick = function(dt) {
+    // Earth rotates 360 degrees per sidereal day (23h 56m 4s = 86164s)
+    // At speed=1, we want one full rotation in about 60 seconds for visual effect
+    const rotationRate = (2 * Math.PI) / (60); // radians per second at speed=1
+    app.math.siderealAngle += rotationRate * app.params.speed * dt;
+    // Keep angle in [0, 2pi]
+    if (app.math.siderealAngle > 2 * Math.PI) {
+        app.math.siderealAngle -= 2 * Math.PI;
+    }
+};
+
+// Convert RA/Dec to altitude/azimuth for the observer
+app.math.equatorialToHorizontal = function(raHours, decDeg, latDeg, lst) {
+    const ra = raHours * (Math.PI / 12);   // hours to radians
+    const dec = decDeg * (Math.PI / 180);  // degrees to radians
+    const lat = latDeg * (Math.PI / 180);
+
+    // Hour angle
+    const ha = lst - ra;
+
+    // Altitude
+    const sinAlt = Math.sin(dec) * Math.sin(lat) + Math.cos(dec) * Math.cos(lat) * Math.cos(ha);
+    const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt)));
+
+    // Azimuth
+    const cosA = (Math.sin(dec) - Math.sin(alt) * Math.sin(lat)) / (Math.cos(alt) * Math.cos(lat) + 1e-10);
+    const sinA = -Math.cos(dec) * Math.sin(ha) / (Math.cos(alt) + 1e-10);
+    let az = Math.atan2(sinA, cosA);
+
+    return { alt, az }; // both in radians
+};
+
+// Project altitude/azimuth to screen coordinates (stereographic-like projection)
+app.math.projectToScreen = function(alt, az, cx, cy, radius) {
+    // alt: altitude in radians (0 = horizon, pi/2 = zenith)
+    // az: azimuth in radians (0 = north, positive eastward)
+    // We use a polar projection centered on zenith
+    const r = radius * (1 - alt / (Math.PI / 2)); // zenith at center, horizon at edge
+    const x = cx + r * Math.sin(az);
+    const y = cy - r * Math.cos(az); // negative because screen Y is down
+    return { x, y, r: r };
+};
+
+
+// ═══════════════════════════════════════════════
+// 4c: Canvas Module
+// ═══════════════════════════════════════════════
+
+app.canvas.init = function() {
+    app.canvas.trail = document.getElementById('trailCanvas');
+    app.canvas.sim = document.getElementById('simCanvas');
+    app.canvas.trailCtx = app.canvas.trail.getContext('2d');
+    app.canvas.simCtx = app.canvas.sim.getContext('2d');
+    app.canvas.dpr = window.devicePixelRatio || 1;
+    app.canvas.resize();
+};
+
+app.canvas.resize = function() {
+    const dpr = app.canvas.dpr;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    app.canvas.width = w;
+    app.canvas.height = h;
+
+    [app.canvas.trail, app.canvas.sim].forEach(cvs => {
+        cvs.width = w * dpr;
+        cvs.height = h * dpr;
+        cvs.style.width = w + 'px';
+        cvs.style.height = h + 'px';
+        cvs.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+    });
+};
+
+app.canvas.compositeOnto = function(targetCtx, targetW, targetH, region) {
+    const r = region || { x: 0, y: 0, w: app.canvas.width, h: app.canvas.height };
+    const dpr = app.canvas.dpr;
+    const sx = r.x * dpr, sy = r.y * dpr;
+    const sw = r.w * dpr, sh = r.h * dpr;
+    targetCtx.clearRect(0, 0, targetW, targetH);
+    targetCtx.drawImage(app.canvas.trail, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    targetCtx.drawImage(app.canvas.sim, sx, sy, sw, sh, 0, 0, targetW, targetH);
+};
+
+app.canvas.captureFrame = function(options) {
+    const opts = options || {};
+    const w = opts.width || app.canvas.width;
+    const h = opts.height || app.canvas.height;
+    const format = opts.format || 'image/png';
+    const quality = opts.quality || 0.95;
+    const region = opts.region || null;
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d');
+    app.canvas.compositeOnto(ctx, w, h, region);
+    return offscreen.toDataURL(format, quality);
+};
+
+
+// ═══════════════════════════════════════════════
+// 4d: Render Module
+// ═══════════════════════════════════════════════
+
+app.render.init = function() {
+    // Pre-render nothing; everything is done per-frame
+};
+
+app.render._lastTime = 0;
+
+app.render.drawFrame = function() {
+    const W = app.canvas.width;
+    const H = app.canvas.height;
+    const trailCtx = app.canvas.trailCtx;
+    const simCtx = app.canvas.simCtx;
+
+    // Clear both canvases (we redraw everything each frame for this simulation)
+    simCtx.clearRect(0, 0, W, H);
+    trailCtx.clearRect(0, 0, W, H);
+
+    // Compute dt
+    const now = performance.now() / 1000;
+    const dt = app.render._lastTime ? Math.min(now - app.render._lastTime, 0.1) : 1/60;
+    app.render._lastTime = now;
+
+    // Advance physics
+    app.math.tick(dt);
+
+    // ── Drawing ──
+    const cx = W / 2;
+    const cy = H / 2;
+    const radius = Math.min(W, H) * 0.42;
+    const lat = app.params.latitude;
+    const lst = app.math.siderealAngle; // Local sidereal time in radians
+
+    // Background gradient (dark sky)
+    const bgGrad = simCtx.createRadialGradient(cx, cy, 0, cx, cy, radius * 1.2);
+    bgGrad.addColorStop(0, '#0a0a20');
+    bgGrad.addColorStop(0.7, '#050515');
+    bgGrad.addColorStop(1, '#020208');
+    simCtx.fillStyle = bgGrad;
+    simCtx.fillRect(0, 0, W, H);
+
+    // ── Celestial Grid ──
+    if (app.params.showGrid) {
+        simCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+        simCtx.lineWidth = 0.5;
+
+        // Declination circles (every 30 degrees)
+        for (let dec = -60; dec <= 60; dec += 30) {
+            simCtx.beginPath();
+            let first = true;
+            for (let ra = 0; ra <= 24; ra += 0.2) {
+                const { alt, az } = app.math.equatorialToHorizontal(ra, dec, lat, lst);
+                if (alt < -0.05) { first = true; continue; }
+                const { x, y } = app.math.projectToScreen(alt, az, cx, cy, radius);
+                if (first) { simCtx.moveTo(x, y); first = false; }
+                else simCtx.lineTo(x, y);
+            }
+            simCtx.stroke();
+        }
+
+        // Right ascension lines (every 2 hours)
+        for (let ra = 0; ra < 24; ra += 2) {
+            simCtx.beginPath();
+            let first = true;
+            for (let dec = -90; dec <= 90; dec += 2) {
+                const { alt, az } = app.math.equatorialToHorizontal(ra, dec, lat, lst);
+                if (alt < -0.05) { first = true; continue; }
+                const { x, y } = app.math.projectToScreen(alt, az, cx, cy, radius);
+                if (first) { simCtx.moveTo(x, y); first = false; }
+                else simCtx.lineTo(x, y);
+            }
+            simCtx.stroke();
+        }
+    }
+
+    // ── Celestial Equator ──
+    if (app.params.showEquator) {
+        simCtx.strokeStyle = 'rgba(100, 150, 255, 0.5)';
+        simCtx.lineWidth = 1.5;
+        simCtx.setLineDash([8, 4]);
+        simCtx.beginPath();
+        let first = true;
+        for (let ra = 0; ra <= 24.1; ra += 0.15) {
+            const { alt, az } = app.math.equatorialToHorizontal(ra, 0, lat, lst);
+            if (alt < -0.02) { first = true; continue; }
+            const { x, y } = app.math.projectToScreen(alt, az, cx, cy, radius);
+            if (first) { simCtx.moveTo(x, y); first = false; }
+            else simCtx.lineTo(x, y);
+        }
+        simCtx.stroke();
+        simCtx.setLineDash([]);
+    }
+
+    // ── Ecliptic ──
+    if (app.params.showEcliptic) {
+        simCtx.strokeStyle = 'rgba(255, 220, 80, 0.45)';
+        simCtx.lineWidth = 1.5;
+        simCtx.setLineDash([6, 4]);
+        simCtx.beginPath();
+        let first = true;
+        const obliquity = 23.44; // degrees
+        for (let lon = 0; lon <= 360; lon += 2) {
+            const lonRad = lon * Math.PI / 180;
+            // Ecliptic to equatorial
+            const eDec = Math.asin(Math.sin(obliquity * Math.PI / 180) * Math.sin(lonRad));
+            const eRA = Math.atan2(
+                Math.cos(obliquity * Math.PI / 180) * Math.sin(lonRad),
+                Math.cos(lonRad)
+            );
+            const raH = ((eRA * 12 / Math.PI) + 24) % 24;
+            const decD = eDec * 180 / Math.PI;
+            const { alt, az } = app.math.equatorialToHorizontal(raH, decD, lat, lst);
+            if (alt < -0.02) { first = true; continue; }
+            const { x, y } = app.math.projectToScreen(alt, az, cx, cy, radius);
+            if (first) { simCtx.moveTo(x, y); first = false; }
+            else simCtx.lineTo(x, y);
+        }
+        simCtx.stroke();
+        simCtx.setLineDash([]);
+    }
+
+    // ── Constellation Lines ──
+    if (app.params.showConstellations) {
+        simCtx.strokeStyle = 'rgba(100, 220, 255, 0.25)';
+        simCtx.lineWidth = 1;
+
+        for (const [name, con] of Object.entries(app.math.constellations)) {
+            const projected = con.stars.map(s => {
+                const { alt, az } = app.math.equatorialToHorizontal(s.ra, s.dec, lat, lst);
+                const { x, y } = app.math.projectToScreen(alt, az, cx, cy, radius);
+                return { x, y, alt };
+            });
+
+            for (const [i, j] of con.lines) {
+                if (projected[i].alt < -0.02 || projected[j].alt < -0.02) continue;
+                simCtx.beginPath();
+                simCtx.moveTo(projected[i].x, projected[i].y);
+                simCtx.lineTo(projected[j].x, projected[j].y);
+                simCtx.stroke();
+            }
+
+            // Constellation name label
+            if (app.params.showNames) {
+                let sumX = 0, sumY = 0, count = 0;
+                for (const p of projected) {
+                    if (p.alt >= 0) { sumX += p.x; sumY += p.y; count++; }
+                }
+                if (count > 0) {
+                    const lx = sumX / count;
+                    const ly = sumY / count - 12;
+                    const label = app.state.language === 'en' ? name : con.nameHe;
+                    simCtx.fillStyle = 'rgba(100, 220, 255, 0.4)';
+                    simCtx.font = '11px Rubik';
+                    simCtx.textAlign = 'center';
+                    simCtx.fillText(label, lx, ly);
+                }
+            }
+
+            // Draw constellation stars brighter
+            for (const p of projected) {
+                if (p.alt < 0) continue;
+                simCtx.fillStyle = 'rgba(255, 255, 240, 0.9)';
+                simCtx.beginPath();
+                simCtx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+                simCtx.fill();
+            }
+        }
+    }
+
+    // ── Random Stars ──
+    const time = app.state.frameCount * 0.016;
+    for (const star of app.math.stars) {
+        const { alt, az } = app.math.equatorialToHorizontal(star.ra, star.dec, lat, lst);
+        if (alt < -0.01) continue; // below horizon
+
+        const { x, y } = app.math.projectToScreen(alt, az, cx, cy, radius);
+
+        // Twinkle effect
+        const twinkle = 0.5 + 0.5 * Math.sin(time * star.twinkleSpeed + star.twinklePhase);
+        const brightness = (0.4 + 0.6 * twinkle);
+        const size = (4 - star.mag) * 0.8 * (0.7 + 0.3 * twinkle);
+
+        // Star color based on temperature
+        let r, g, b;
+        if (star.colorTemp < 0.2) { r = 255; g = 180; b = 140; }      // red/orange
+        else if (star.colorTemp < 0.5) { r = 255; g = 240; b = 220; }  // warm white
+        else if (star.colorTemp < 0.8) { r = 240; g = 245; b = 255; }  // white
+        else { r = 200; g = 220; b = 255; }                             // blue-white
+
+        // Dim near horizon (atmospheric extinction)
+        const horizonDim = Math.min(1, alt / 0.15);
+        const alpha = brightness * horizonDim;
+
+        // Glow
+        simCtx.fillStyle = `rgba(${r},${g},${b},${alpha * 0.15})`;
+        simCtx.beginPath();
+        simCtx.arc(x, y, size * 3, 0, Math.PI * 2);
+        simCtx.fill();
+
+        // Core
+        simCtx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+        simCtx.beginPath();
+        simCtx.arc(x, y, Math.max(0.5, size), 0, Math.PI * 2);
+        simCtx.fill();
+    }
+
+    // ── Celestial Poles ──
+    // North celestial pole
+    const ncp = app.math.equatorialToHorizontal(0, 90, lat, lst);
+    if (ncp.alt > -0.05) {
+        const np = app.math.projectToScreen(ncp.alt, ncp.az, cx, cy, radius);
+        // Cross marker
+        simCtx.strokeStyle = 'rgba(255, 200, 100, 0.7)';
+        simCtx.lineWidth = 1.5;
+        const s = 8;
+        simCtx.beginPath();
+        simCtx.moveTo(np.x - s, np.y); simCtx.lineTo(np.x + s, np.y);
+        simCtx.moveTo(np.x, np.y - s); simCtx.lineTo(np.x, np.y + s);
+        simCtx.stroke();
+        // Label
+        simCtx.fillStyle = 'rgba(255, 200, 100, 0.7)';
+        simCtx.font = '12px Rubik';
+        simCtx.textAlign = 'center';
+        const ncpLabel = app.state.language === 'en' ? 'NCP' : 'קוטב צפוני';
+        simCtx.fillText(ncpLabel, np.x, np.y - 14);
+    }
+
+    // South celestial pole
+    const scp = app.math.equatorialToHorizontal(0, -90, lat, lst);
+    if (scp.alt > -0.05) {
+        const sp = app.math.projectToScreen(scp.alt, scp.az, cx, cy, radius);
+        simCtx.strokeStyle = 'rgba(255, 200, 100, 0.7)';
+        simCtx.lineWidth = 1.5;
+        const s = 8;
+        simCtx.beginPath();
+        simCtx.moveTo(sp.x - s, sp.y); simCtx.lineTo(sp.x + s, sp.y);
+        simCtx.moveTo(sp.x, sp.y - s); simCtx.lineTo(sp.x, sp.y + s);
+        simCtx.stroke();
+        simCtx.fillStyle = 'rgba(255, 200, 100, 0.7)';
+        simCtx.font = '12px Rubik';
+        simCtx.textAlign = 'center';
+        const scpLabel = app.state.language === 'en' ? 'SCP' : 'קוטב דרומי';
+        simCtx.fillText(scpLabel, sp.x, sp.y - 14);
+    }
+
+    // ── Horizon Line ──
+    if (app.params.showHorizon) {
+        // Draw a soft glow ring at the horizon
+        const horizGrad = simCtx.createRadialGradient(cx, cy, radius * 0.95, cx, cy, radius * 1.08);
+        horizGrad.addColorStop(0, 'rgba(255, 100, 40, 0)');
+        horizGrad.addColorStop(0.5, 'rgba(255, 80, 30, 0.12)');
+        horizGrad.addColorStop(1, 'rgba(255, 60, 20, 0)');
+        simCtx.fillStyle = horizGrad;
+        simCtx.beginPath();
+        simCtx.arc(cx, cy, radius * 1.08, 0, Math.PI * 2);
+        simCtx.fill();
+
+        // Draw horizon circle line
+        simCtx.strokeStyle = 'rgba(255, 120, 50, 0.6)';
+        simCtx.lineWidth = 2;
+        simCtx.beginPath();
+        simCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+        simCtx.stroke();
+    }
+
+    // ── Cardinal Directions ──
+    if (app.params.showCardinals) {
+        const dirs = app.state.language === 'en'
+            ? [{ label: 'N', az: 0 }, { label: 'E', az: Math.PI / 2 }, { label: 'S', az: Math.PI }, { label: 'W', az: 3 * Math.PI / 2 }]
+            : [{ label: 'צ', az: 0 }, { label: 'מז', az: Math.PI / 2 }, { label: 'ד', az: Math.PI }, { label: 'מע', az: 3 * Math.PI / 2 }];
+
+        simCtx.font = 'bold 16px Rubik';
+        simCtx.textAlign = 'center';
+        simCtx.textBaseline = 'middle';
+
+        for (const d of dirs) {
+            const dx = cx + (radius + 22) * Math.sin(d.az);
+            const dy = cy - (radius + 22) * Math.cos(d.az);
+            simCtx.fillStyle = 'rgba(255, 120, 50, 0.8)';
+            simCtx.fillText(d.label, dx, dy);
+        }
+        simCtx.textBaseline = 'alphabetic';
+    }
+
+    // ── Observer marker at center (zenith) ──
+    simCtx.fillStyle = 'rgba(96, 165, 250, 0.5)';
+    simCtx.beginPath();
+    simCtx.arc(cx, cy, 4, 0, Math.PI * 2);
+    simCtx.fill();
+    simCtx.fillStyle = 'rgba(96, 165, 250, 0.15)';
+    simCtx.beginPath();
+    simCtx.arc(cx, cy, 10, 0, Math.PI * 2);
+    simCtx.fill();
+
+    // ── Info overlay: latitude and sidereal time ──
+    const lstHours = (app.math.siderealAngle * 12 / Math.PI) % 24;
+    const lstH = Math.floor(lstHours);
+    const lstM = Math.floor((lstHours - lstH) * 60);
+    const latStr = app.params.latitude >= 0
+        ? app.params.latitude + (app.state.language === 'en' ? '° N' : '° צפון')
+        : Math.abs(app.params.latitude) + (app.state.language === 'en' ? '° S' : '° דרום');
+    const lstStr = String(lstH).padStart(2, '0') + ':' + String(lstM).padStart(2, '0');
+
+    simCtx.fillStyle = 'rgba(200, 210, 230, 0.5)';
+    simCtx.font = '13px Rubik';
+    simCtx.textAlign = 'left';
+    simCtx.fillText((app.state.language === 'en' ? 'Lat: ' : 'רוחב: ') + latStr, 16, H - 38);
+    simCtx.fillText((app.state.language === 'en' ? 'LST: ' : 'זמן כוכבי: ') + lstStr, 16, H - 18);
+};
+
+// Animation loop
+app.render.frame = function() {
+    if (!app.state.paused) {
+        app.state.frameCount++;
+        app.render.drawFrame();
+    }
+    if (app.recording.isActive) {
+        app.recording.updateFrame();
+    }
+    app.state.animFrame = requestAnimationFrame(app.render.frame);
+};
+
+
+// ═══════════════════════════════════════════════
+// 4e: Recording Module
+// ═══════════════════════════════════════════════
+
+app.recording.isActive = false;
+app.recording.isPaused = false;
+app.recording.mediaRecorder = null;
+app.recording.chunks = [];
+app.recording.offscreenCanvas = null;
+app.recording.offscreenCtx = null;
+app.recording.stream = null;
+app.recording.startTimestamp = 0;
+app.recording.pausedElapsed = 0;
+app.recording.timerInterval = null;
+app.recording.lastBlob = null;
+app.recording.resolution = { w: 1920, h: 1080 };
+app.recording.fps = 30;
+app.recording.frame = { x: 0, y: 0, w: 0, h: 0 };
+app.recording.aspectRatio = 16 / 9;
+app.recording._domCache = null;
+app.recording._domCaptureActive = false;
+app.recording._lastDomCapture = 0;
+app.recording._domCaptureInterval = 120;
+
+app.recording.parseAspect = function(val) {
+    if (val === 'free') return null;
+    const [w, h] = val.split(':').map(Number);
+    return w / h;
+};
+
+app.recording.enforceAspect = function() {
+    if (!this.aspectRatio) return;
+    const border = document.getElementById('rec-frame-border');
+    const w = parseInt(border.style.width) || 0;
+    const newH = Math.round(w / this.aspectRatio);
+    border.style.height = newH + 'px';
+    this.syncFrameFromDOM();
+    this.positionControls();
+};
+
+app.recording.setupOffscreen = function() {
+    if (!this.offscreenCanvas) this.offscreenCanvas = document.createElement('canvas');
+    this.offscreenCanvas.width = this.resolution.w;
+    this.offscreenCanvas.height = this.resolution.h;
+    this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+};
+
+app.recording.updateFrame = function() {
+    if (!this.offscreenCtx) return;
+    const f = this.frame;
+    const region = { x: f.x, y: f.y, w: f.w, h: f.h };
+    app.canvas.compositeOnto(this.offscreenCtx, this.resolution.w, this.resolution.h, region);
+    if (this._domCache) this.offscreenCtx.drawImage(this._domCache, 0, 0);
+    const now = performance.now();
+    if (!this._domCaptureActive && now - this._lastDomCapture >= this._domCaptureInterval) {
+        this._lastDomCapture = now;
+        this._captureDomOverlay();
+    }
+};
+
+app.recording._captureDomOverlay = async function() {
+    if (typeof html2canvas === 'undefined') return;
+    this._domCaptureActive = true;
+    try {
+        const f = this.frame;
+        const scaleX = this.resolution.w / f.w;
+        const scaleY = this.resolution.h / f.h;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = this.resolution.w;
+        tempCanvas.height = this.resolution.h;
+        const tempCtx = tempCanvas.getContext('2d');
+        const dialogues = document.querySelectorAll('.dialogue');
+        let anyRendered = false;
+        for (const dlg of dialogues) {
+            if (dlg.style.display === 'none') continue;
+            const rect = dlg.getBoundingClientRect();
+            if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+            if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+            const rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+            const dx = (rect.left - f.x) * scaleX;
+            const dy = (rect.top - f.y) * scaleY;
+            const dw = rect.width * scaleX;
+            const dh = rect.height * scaleY;
+            tempCtx.drawImage(rendered, dx, dy, dw, dh);
+            anyRendered = true;
+        }
+        this._domCache = anyRendered ? tempCanvas : null;
+    } catch (e) { console.warn('DOM overlay capture failed:', e); }
+    this._domCaptureActive = false;
+};
+
+app.recording.start = function(options) {
+    const opts = options || {};
+    if (opts.width) this.resolution.w = opts.width;
+    if (opts.height) this.resolution.h = opts.height;
+    if (opts.fps) this.fps = opts.fps;
+    this.setupOffscreen();
+    this.chunks = [];
+    this.isPaused = false;
+    this.pausedElapsed = 0;
+    this.stream = this.offscreenCanvas.captureStream(this.fps);
+    const mimeTypes = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+    let mimeType = '';
+    for (const mt of mimeTypes) { if (MediaRecorder.isTypeSupported(mt)) { mimeType = mt; break; } }
+    this.mediaRecorder = new MediaRecorder(this.stream, {
+        mimeType,
+        videoBitsPerSecond: this.resolution.w >= 3840 ? 20000000 : this.resolution.w >= 1920 ? 10000000 : 5000000,
+    });
+    this.mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) this.chunks.push(e.data); };
+    this.mediaRecorder.start(1000);
+    this.isActive = true;
+    this.startTimestamp = Date.now();
+    this._startTimer();
+    const border = document.getElementById('rec-frame-border');
+    const recBtn = document.getElementById('rc-rec');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.add('recording');
+    recBtn.classList.add('rec-active');
+    recBtn.textContent = '⏹';
+    recBtn.title = 'Stop';
+    pauseBtn.style.display = 'inline-flex';
+};
+
+app.recording.stop = function() {
+    return new Promise((resolve) => {
+        if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') { resolve(null); return; }
+        if (this.mediaRecorder.state === 'paused') this.mediaRecorder.resume();
+        this.mediaRecorder.onstop = () => {
+            const blob = new Blob(this.chunks, { type: this.mediaRecorder.mimeType });
+            this.isActive = false;
+            this.isPaused = false;
+            this._stopTimer();
+            this.lastBlob = blob;
+            this._domCache = null;
+            this._domCaptureActive = false;
+            const border = document.getElementById('rec-frame-border');
+            const recBtn = document.getElementById('rc-rec');
+            const pauseBtn = document.getElementById('rc-pause');
+            border.classList.remove('recording', 'paused');
+            recBtn.classList.remove('rec-active');
+            recBtn.textContent = '⏺';
+            recBtn.title = 'Record';
+            pauseBtn.style.display = 'none';
+            pauseBtn.classList.remove('paused-active');
+            pauseBtn.textContent = '⏸';
+            this._showDownloadDialog(blob);
+            resolve(blob);
+        };
+        this.mediaRecorder.stop();
+    });
+};
+
+app.recording.pause = function() {
+    if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+    this.mediaRecorder.pause();
+    this.isPaused = true;
+    this.pausedElapsed += Date.now() - this.startTimestamp;
+    const border = document.getElementById('rec-frame-border');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.add('paused');
+    pauseBtn.classList.add('paused-active');
+    pauseBtn.textContent = '▶';
+    pauseBtn.title = 'Resume';
+};
+
+app.recording.resume = function() {
+    if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+    this.mediaRecorder.resume();
+    this.isPaused = false;
+    this.startTimestamp = Date.now();
+    const border = document.getElementById('rec-frame-border');
+    const pauseBtn = document.getElementById('rc-pause');
+    border.classList.remove('paused');
+    pauseBtn.classList.remove('paused-active');
+    pauseBtn.textContent = '⏸';
+    pauseBtn.title = 'Pause';
+};
+
+app.recording.screenshot = async function(options) {
+    const opts = options || {};
+    const w = opts.width || this.resolution.w;
+    const h = opts.height || this.resolution.h;
+    const f = this.frame;
+    const region = { x: f.x, y: f.y, w: f.w, h: f.h };
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d');
+    app.canvas.compositeOnto(ctx, w, h, region);
+    if (typeof html2canvas !== 'undefined') {
+        const scaleX = w / f.w;
+        const scaleY = h / f.h;
+        const dialogues = document.querySelectorAll('.dialogue');
+        for (const dlg of dialogues) {
+            if (dlg.style.display === 'none') continue;
+            const rect = dlg.getBoundingClientRect();
+            if (rect.right <= f.x || rect.left >= f.x + f.w) continue;
+            if (rect.bottom <= f.y || rect.top >= f.y + f.h) continue;
+            try {
+                const rendered = await html2canvas(dlg, { backgroundColor: null, logging: false, useCORS: true });
+                const dx = (rect.left - f.x) * scaleX;
+                const dy = (rect.top - f.y) * scaleY;
+                const dw = rect.width * scaleX;
+                const dh = rect.height * scaleY;
+                ctx.drawImage(rendered, dx, dy, dw, dh);
+            } catch (e) { console.warn('Screenshot DOM capture failed:', e); }
+        }
+    }
+    return offscreen.toDataURL(opts.format || 'image/png', opts.quality || 0.95);
+};
+
+app.recording.downloadBlob = function(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+app.recording.downloadDataURL = function(dataURL, filename) {
+    const a = document.createElement('a');
+    a.href = dataURL; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+};
+
+app.recording._startTimer = function() {
+    const el = document.getElementById('rc-timer');
+    this.timerInterval = setInterval(() => {
+        let elapsed;
+        if (this.isPaused) elapsed = Math.floor(this.pausedElapsed / 1000);
+        else elapsed = Math.floor((this.pausedElapsed + Date.now() - this.startTimestamp) / 1000);
+        const min = Math.floor(elapsed / 60);
+        const sec = String(elapsed % 60).padStart(2, '0');
+        el.textContent = min + ':' + sec;
+    }, 250);
+};
+
+app.recording._stopTimer = function() {
+    clearInterval(this.timerInterval);
+    document.getElementById('rc-timer').textContent = '0:00';
+};
+
+app.recording._showDownloadDialog = function(blob) {
+    const overlay = document.getElementById('rec-download-overlay');
+    const input = document.getElementById('rec-filename');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    input.value = 'physital-' + app.meta.name + '-' + ts;
+    overlay.style.display = 'flex';
+    input.focus(); input.select();
+    overlay._pendingBlob = blob;
+};
+
+app.recording._hideDownloadDialog = function() {
+    document.getElementById('rec-download-overlay').style.display = 'none';
+};
+
+app.recording.syncFrameFromDOM = function() {
+    const border = document.getElementById('rec-frame-border');
+    this.frame.x = parseInt(border.style.left) || 0;
+    this.frame.y = parseInt(border.style.top) || 0;
+    this.frame.w = parseInt(border.style.width) || app.canvas.width;
+    this.frame.h = parseInt(border.style.height) || app.canvas.height;
+    document.getElementById('rec-frame-dims').textContent = this.frame.w + ' \u00d7 ' + this.frame.h;
+};
+
+app.recording.positionControls = function() {
+    const border = document.getElementById('rec-frame-border');
+    const controls = document.getElementById('rec-controls');
+    const bLeft = parseInt(border.style.left) || 0;
+    const bWidth = parseInt(border.style.width) || 0;
+    const bTop = parseInt(border.style.top) || 0;
+    const bHeight = parseInt(border.style.height) || 0;
+    controls.style.left = (bLeft + bWidth / 2) + 'px';
+    controls.style.transform = 'translateX(-50%)';
+    controls.style.top = (bTop + bHeight + 12) + 'px';
+    controls.style.bottom = 'auto';
+};
+
+
+// ═══════════════════════════════════════════════
+// 4e2: Desmos-style Slider Engine
+// ═══════════════════════════════════════════════
+
+app.sliders = {};
+app._sliderAnimFrame = null;
+
+app.buildSliders = function() {
+    document.querySelectorAll('.physi-slider').forEach(container => {
+        const param   = container.dataset.param;
+        const min     = parseFloat(container.dataset.min) || 0;
+        const max     = parseFloat(container.dataset.max) || 100;
+        const step    = parseFloat(container.dataset.step) || 1;
+        const def     = parseFloat(container.dataset.default) || min;
+        const labelHe = container.dataset.labelHe || param;
+        const labelEn = container.dataset.labelEn || param;
+
+        if (!(param in app.params)) app.params[param] = def;
+
+        const slider = {
+            param, min, max, step, default: def,
+            animating: false, animSpeed: 1, loopMode: 'loop', animDir: 1,
+            container, els: {},
+        };
+
+        container.innerHTML = '';
+
+        const header = document.createElement('div');
+        header.className = 'physi-slider-header';
+        const labelWrap = document.createElement('div');
+        labelWrap.className = 'physi-slider-label';
+        const playBtn = document.createElement('button');
+        playBtn.className = 'ps-play';
+        playBtn.innerHTML = '&#9654;';
+        playBtn.title = 'Animate';
+        slider.els.playBtn = playBtn;
+        const labelSpan = document.createElement('span');
+        labelSpan.setAttribute('data-he', labelHe);
+        labelSpan.setAttribute('data-en', labelEn);
+        labelSpan.textContent = app.state.language === 'en' ? labelEn : labelHe;
+        slider.els.label = labelSpan;
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'ps-expand';
+        expandBtn.innerHTML = '&#9660;';
+        expandBtn.title = 'Settings';
+        slider.els.expandBtn = expandBtn;
+        labelWrap.appendChild(playBtn);
+        labelWrap.appendChild(labelSpan);
+        labelWrap.appendChild(expandBtn);
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'ps-value';
+        valueSpan.textContent = app.params[param];
+        slider.els.value = valueSpan;
+        header.appendChild(labelWrap);
+        header.appendChild(valueSpan);
+
+        const trackWrap = document.createElement('div');
+        trackWrap.className = 'ps-track-wrap';
+        const track = document.createElement('input');
+        track.type = 'range';
+        track.className = 'ps-track';
+        track.min = min; track.max = max; track.step = step;
+        track.value = app.params[param];
+        slider.els.track = track;
+        trackWrap.appendChild(track);
+
+        const settings = document.createElement('div');
+        settings.className = 'ps-settings';
+        slider.els.settings = settings;
+
+        const rowBounds = document.createElement('div');
+        rowBounds.className = 'ps-settings-row';
+        const lblMin = document.createElement('label'); lblMin.textContent = 'Min';
+        const inputMin = document.createElement('input');
+        inputMin.className = 'ps-mini-input'; inputMin.type = 'number'; inputMin.value = min; inputMin.step = 'any';
+        slider.els.inputMin = inputMin;
+        const lblMax = document.createElement('label'); lblMax.textContent = 'Max';
+        const inputMax = document.createElement('input');
+        inputMax.className = 'ps-mini-input'; inputMax.type = 'number'; inputMax.value = max; inputMax.step = 'any';
+        slider.els.inputMax = inputMax;
+        rowBounds.append(lblMin, inputMin, lblMax, inputMax);
+
+        const rowStep = document.createElement('div');
+        rowStep.className = 'ps-settings-row';
+        const lblStep = document.createElement('label'); lblStep.textContent = 'Step';
+        const inputStep = document.createElement('input');
+        inputStep.className = 'ps-mini-input'; inputStep.type = 'number'; inputStep.value = step; inputStep.step = 'any'; inputStep.min = '0';
+        slider.els.inputStep = inputStep;
+        const lblSpeed = document.createElement('label'); lblSpeed.textContent = 'Speed';
+        const inputSpeed = document.createElement('input');
+        inputSpeed.className = 'ps-mini-input'; inputSpeed.type = 'number'; inputSpeed.value = 1; inputSpeed.step = '0.1'; inputSpeed.min = '0.1';
+        slider.els.inputSpeed = inputSpeed;
+        rowStep.append(lblStep, inputStep, lblSpeed, inputSpeed);
+
+        const rowLoop = document.createElement('div');
+        rowLoop.className = 'ps-settings-row';
+        const lblLoop = document.createElement('label');
+        lblLoop.setAttribute('data-he', '\u05dc\u05d5\u05dc\u05d0\u05d4');
+        lblLoop.setAttribute('data-en', 'Loop');
+        lblLoop.textContent = app.state.language === 'en' ? 'Loop' : '\u05dc\u05d5\u05dc\u05d0\u05d4';
+        const loopBtns = document.createElement('div');
+        loopBtns.className = 'ps-loop-btns';
+        ['loop', 'bounce', 'once'].forEach(mode => {
+            const btn = document.createElement('button');
+            btn.className = 'ps-loop-btn' + (mode === 'loop' ? ' active' : '');
+            btn.dataset.mode = mode;
+            btn.textContent = mode === 'loop' ? '\u21BB' : mode === 'bounce' ? '\u21C4' : '\u2192';
+            btn.title = mode;
+            loopBtns.appendChild(btn);
+        });
+        slider.els.loopBtns = loopBtns;
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'ps-reset';
+        resetBtn.setAttribute('data-he', '\u05D0\u05D9\u05E4\u05D5\u05E1');
+        resetBtn.setAttribute('data-en', 'Reset');
+        resetBtn.textContent = app.state.language === 'en' ? 'Reset' : '\u05D0\u05D9\u05E4\u05D5\u05E1';
+        slider.els.resetBtn = resetBtn;
+        rowLoop.append(lblLoop, loopBtns, resetBtn);
+
+        settings.append(rowBounds, rowStep, rowLoop);
+        container.append(header, trackWrap, settings);
+
+        track.addEventListener('input', () => {
+            const v = parseFloat(track.value);
+            app.params[param] = v;
+            valueSpan.textContent = app._formatSliderValue(v, step);
+            if (param === 'starCount') { app.math.initState(); }
+        });
+
+        valueSpan.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.className = 'ps-value-input'; input.type = 'number';
+            input.value = app.params[param]; input.step = slider.step;
+            valueSpan.replaceWith(input); input.focus(); input.select();
+            const commit = () => {
+                let v = parseFloat(input.value);
+                if (isNaN(v)) v = slider.default;
+                v = Math.max(slider.min, Math.min(slider.max, v));
+                app.params[param] = v;
+                track.value = v;
+                valueSpan.textContent = app._formatSliderValue(v, slider.step);
+                input.replaceWith(valueSpan);
+                if (param === 'starCount') { app.math.initState(); }
+            };
+            input.addEventListener('blur', commit);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') { input.value = app.params[param]; commit(); }
+            });
+        });
+
+        playBtn.addEventListener('click', () => {
+            slider.animating = !slider.animating;
+            playBtn.innerHTML = slider.animating ? '&#9208;' : '&#9654;';
+            playBtn.classList.toggle('playing', slider.animating);
+            if (slider.animating) app._startSliderAnimLoop();
+        });
+
+        expandBtn.addEventListener('click', () => {
+            const open = settings.classList.toggle('open');
+            expandBtn.classList.toggle('open', open);
+        });
+
+        inputMin.addEventListener('change', () => { slider.min = parseFloat(inputMin.value); track.min = slider.min; });
+        inputMax.addEventListener('change', () => { slider.max = parseFloat(inputMax.value); track.max = slider.max; });
+        inputStep.addEventListener('change', () => { slider.step = parseFloat(inputStep.value) || 0.01; track.step = slider.step; });
+        inputSpeed.addEventListener('change', () => { slider.animSpeed = parseFloat(inputSpeed.value) || 1; });
+
+        loopBtns.querySelectorAll('.ps-loop-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                loopBtns.querySelectorAll('.ps-loop-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                slider.loopMode = btn.dataset.mode;
+            });
+        });
+
+        resetBtn.addEventListener('click', () => {
+            app.params[param] = slider.default;
+            track.value = slider.default;
+            valueSpan.textContent = app._formatSliderValue(slider.default, slider.step);
+            slider.animating = false;
+            playBtn.innerHTML = '&#9654;';
+            playBtn.classList.remove('playing');
+            slider.animDir = 1;
+            slider.min = parseFloat(container.dataset.min) || 0;
+            slider.max = parseFloat(container.dataset.max) || 100;
+            slider.step = parseFloat(container.dataset.step) || 1;
+            slider.animSpeed = 1;
+            track.min = slider.min; track.max = slider.max; track.step = slider.step;
+            inputMin.value = slider.min; inputMax.value = slider.max;
+            inputStep.value = slider.step; inputSpeed.value = 1;
+            if (param === 'starCount') { app.math.initState(); }
+        });
+
+        container.addEventListener('mousedown', (e) => e.stopPropagation());
+        app.sliders[param] = slider;
+    });
+};
+
+app._formatSliderValue = function(val, step) {
+    if (step >= 1) return String(Math.round(val));
+    const decimals = Math.max(0, Math.ceil(-Math.log10(step)));
+    return val.toFixed(decimals);
+};
+
+app._startSliderAnimLoop = function() {
+    if (app._sliderAnimFrame) return;
+    function tick() {
+        let anyActive = false;
+        for (const key in app.sliders) {
+            const s = app.sliders[key];
+            if (!s.animating) continue;
+            anyActive = true;
+            let v = app.params[s.param];
+            const delta = s.step * s.animSpeed * s.animDir;
+            v += delta;
+            if (v > s.max) {
+                if (s.loopMode === 'loop') v = s.min;
+                else if (s.loopMode === 'bounce') { v = s.max; s.animDir = -1; }
+                else { v = s.max; s.animating = false; s.els.playBtn.innerHTML = '&#9654;'; s.els.playBtn.classList.remove('playing'); }
+            } else if (v < s.min) {
+                if (s.loopMode === 'loop') v = s.max;
+                else if (s.loopMode === 'bounce') { v = s.min; s.animDir = 1; }
+                else { v = s.min; s.animating = false; s.els.playBtn.innerHTML = '&#9654;'; s.els.playBtn.classList.remove('playing'); }
+            }
+            app.params[s.param] = v;
+            s.els.track.value = v;
+            s.els.value.textContent = app._formatSliderValue(v, s.step);
+        }
+        if (anyActive) app._sliderAnimFrame = requestAnimationFrame(tick);
+        else app._sliderAnimFrame = null;
+    }
+    app._sliderAnimFrame = requestAnimationFrame(tick);
+};
+
+app.syncSlidersFromParams = function() {
+    for (const key in app.sliders) {
+        const s = app.sliders[key];
+        const v = app.params[s.param];
+        s.els.track.value = v;
+        s.els.value.textContent = app._formatSliderValue(v, s.step);
+    }
+};
+
+
+// ═══════════════════════════════════════════════
+// 4f: UI Module
+// ═══════════════════════════════════════════════
+
+app.ui.init = function() {
+    document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'flex';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
+            if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
+        });
+    });
+
+    document.addEventListener('click', () => {
+        document.getElementById('context-menu').style.display = 'none';
+    });
+
+    document.querySelectorAll('.dialogue-header').forEach(header => {
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('close-btn')) return;
+            const dialogue = header.parentElement;
+            const rect = dialogue.getBoundingClientRect();
+            dialogue.style.transform = 'none';
+            dialogue.style.right = 'auto';
+            dialogue.style.bottom = 'auto';
+            dialogue.style.left = rect.left + 'px';
+            dialogue.style.top = rect.top + 'px';
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+            function onMouseMove(ev) {
+                dialogue.style.left = (ev.clientX - offsetX) + 'px';
+                dialogue.style.top = (ev.clientY - offsetY) + 'px';
+            }
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
+
+    document.querySelectorAll('.dialogue').forEach(d => {
+        ['mousedown', 'click', 'wheel'].forEach(evt => {
+            d.addEventListener(evt, (e) => e.stopPropagation());
+        });
+    });
+
+    document.getElementById('rc-rec').addEventListener('click', () => {
+        if (app.recording.isActive) app.recording.stop();
+        else app.recording.start();
+    });
+    document.getElementById('rc-pause').addEventListener('click', () => {
+        if (app.recording.isPaused) app.recording.resume();
+        else app.recording.pause();
+    });
+    document.getElementById('rc-screenshot').addEventListener('click', async () => {
+        const dataURL = await app.recording.screenshot();
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        app.recording.downloadDataURL(dataURL, 'physital-' + app.meta.name + '-' + ts + '.png');
+    });
+    document.getElementById('rc-aspect').addEventListener('change', (e) => {
+        app.recording.aspectRatio = app.recording.parseAspect(e.target.value);
+        app.recording.enforceAspect();
+    });
+    document.getElementById('rc-resolution').addEventListener('change', (e) => {
+        const [w, h] = e.target.value.split('x').map(Number);
+        app.recording.resolution = { w, h };
+    });
+    document.getElementById('rc-fps').addEventListener('change', (e) => {
+        app.recording.fps = parseInt(e.target.value);
+    });
+    document.getElementById('rc-close').addEventListener('click', () => {
+        if (app.recording.isActive) return;
+        app.ui.toggleRecFrame();
+    });
+    document.getElementById('dl-confirm').addEventListener('click', () => {
+        const overlay = document.getElementById('rec-download-overlay');
+        const filename = document.getElementById('rec-filename').value.trim() || 'recording';
+        const blob = overlay._pendingBlob;
+        if (blob) app.recording.downloadBlob(blob, filename + '.webm');
+        app.recording._hideDownloadDialog();
+    });
+    document.getElementById('dl-cancel').addEventListener('click', () => {
+        app.recording._hideDownloadDialog();
+    });
+    document.getElementById('rec-filename').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('dl-confirm').click();
+        if (e.key === 'Escape') app.recording._hideDownloadDialog();
+    });
+
+    document.getElementById('rec-frame-border').addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('rec-handle')) return;
+        e.preventDefault();
+        const border = document.getElementById('rec-frame-border');
+        const startX = e.clientX - (parseInt(border.style.left) || 0);
+        const startY = e.clientY - (parseInt(border.style.top) || 0);
+        function onMove(ev) {
+            border.style.left = (ev.clientX - startX) + 'px';
+            border.style.top = (ev.clientY - startY) + 'px';
+            app.recording.syncFrameFromDOM();
+            app.recording.positionControls();
+        }
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+
+    document.querySelectorAll('.rec-handle').forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const dir = handle.dataset.dir;
+            const border = document.getElementById('rec-frame-border');
+            const startMouseX = e.clientX; const startMouseY = e.clientY;
+            const startLeft = parseInt(border.style.left) || 0;
+            const startTop = parseInt(border.style.top) || 0;
+            const startW = parseInt(border.style.width) || 0;
+            const startH = parseInt(border.style.height) || 0;
+            const MIN = 100;
+            function onMove(ev) {
+                const dx = ev.clientX - startMouseX; const dy = ev.clientY - startMouseY;
+                let l = startLeft, t = startTop, w = startW, h = startH;
+                const ar = app.recording.aspectRatio;
+                if (dir.includes('e')) w = Math.max(MIN, startW + dx);
+                if (dir.includes('w')) { w = Math.max(MIN, startW - dx); l = startLeft + (startW - w); }
+                if (dir.includes('s')) h = Math.max(MIN, startH + dy);
+                if (dir.includes('n')) { h = Math.max(MIN, startH - dy); t = startTop + (startH - h); }
+                if (ar) {
+                    if (dir === 'e' || dir === 'w') h = Math.round(w / ar);
+                    else if (dir === 'n' || dir === 's') w = Math.round(h * ar);
+                    else { if (Math.abs(w - startW) >= Math.abs(h - startH)) h = Math.round(w / ar); else w = Math.round(h * ar); }
+                    if (w < MIN) { w = MIN; h = Math.round(w / ar); }
+                    if (h < MIN) { h = MIN; w = Math.round(h * ar); }
+                    if (dir.includes('n')) t = startTop + startH - h;
+                    if (dir.includes('w')) l = startLeft + startW - w;
+                }
+                border.style.left = l + 'px'; border.style.top = t + 'px';
+                border.style.width = w + 'px'; border.style.height = h + 'px';
+                app.recording.syncFrameFromDOM(); app.recording.positionControls();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    });
+
+    // Keyboard: space to pause/resume
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if (e.code === 'Space') {
+            e.preventDefault();
+            app.state.paused = !app.state.paused;
+        }
+    });
+};
+
+app.ui.toggleDialogue = function(name) {
+    const el = document.getElementById('dialogue-' + name);
+    if (!el) return;
+    document.querySelectorAll('.dialogue').forEach(d => { if (d !== el) d.style.display = 'none'; });
+    el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+    document.getElementById('context-menu').style.display = 'none';
+};
+
+app.ui.closeDialogue = function(name) {
+    const el = document.getElementById('dialogue-' + name);
+    if (el) el.style.display = 'none';
+};
+
+app.ui.toggleRecFrame = function() {
+    const frame = document.getElementById('rec-frame');
+    const isVisible = frame.classList.contains('active');
+    document.getElementById('context-menu').style.display = 'none';
+    if (isVisible) {
+        if (app.recording.isActive) return;
+        frame.classList.remove('active');
+    } else {
+        frame.classList.add('active');
+        const border = document.getElementById('rec-frame-border');
+        const pad = 60;
+        const maxW = window.innerWidth - pad * 2;
+        const maxH = window.innerHeight - pad * 2 - 60;
+        const ar = app.recording.aspectRatio;
+        let fw, fh;
+        if (ar) {
+            if (maxW / maxH > ar) { fh = maxH; fw = Math.round(fh * ar); }
+            else { fw = maxW; fh = Math.round(fw / ar); }
+        } else { fw = maxW; fh = maxH; }
+        const offsetX = pad + Math.round((maxW - fw) / 2);
+        const offsetY = pad + Math.round((maxH - fh) / 2);
+        border.style.left = offsetX + 'px'; border.style.top = offsetY + 'px';
+        border.style.width = fw + 'px'; border.style.height = fh + 'px';
+        app.recording.syncFrameFromDOM();
+        app.recording.positionControls();
+    }
+};
+
+app.ui.setLanguage = function(lang) {
+    app.state.language = lang;
+    const dir = lang === 'he' ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dir;
+    document.querySelectorAll('[data-he][data-en]').forEach(el => {
+        const text = el.getAttribute('data-' + lang);
+        if (text) el.textContent = text;
+    });
+    document.getElementById('setting-lang').value = lang;
+};
+
+app.ui.syncFromParams = function() {
+    app.syncSlidersFromParams();
+};
+
+
+// ═══════════════════════════════════════════════
+// 4g: Bot Control API
+// ═══════════════════════════════════════════════
+
+window.physital = {
+    version: '2.0',
+    get name() { return app.meta.name; },
+    isReady: false,
+    _onReadyCallbacks: [],
+    getParams: function() { return JSON.parse(JSON.stringify(app.params)); },
+    setParams: function(params) { Object.assign(app.params, params); if (app.ui.syncFromParams) app.ui.syncFromParams(); },
+    getState: function() { return { paused: app.state.paused, frameCount: app.state.frameCount, isRecording: app.recording.isActive, seed: app.state.seed }; },
+    play: function() { app.state.paused = false; },
+    pause: function() { app.state.paused = true; },
+    step: function(n) {
+        n = n || 1;
+        for (let i = 0; i < n; i++) { app.state.frameCount++; }
+        app.render.drawFrame();
+    },
+    reset: function() {
+        app.state.frameCount = 0;
+        app.math.siderealAngle = 0;
+        if (app.state.seed !== null) app.math._prng = app.math._createPRNG(app.state.seed);
+        app.canvas.trailCtx.clearRect(0, 0, app.canvas.width, app.canvas.height);
+        app.math.initState();
+    },
+    seekFrame: function(frameNumber) { this.reset(); this.step(frameNumber); },
+    getCurrentFrame: function() { return app.state.frameCount; },
+    captureFrame: function(options) { return app.canvas.captureFrame(options); },
+    captureRegion: function(x, y, w, h, options) {
+        const opts = Object.assign({}, options || {}, { region: { x, y, w, h } });
+        return app.canvas.captureFrame(opts);
+    },
+    startRecording: function(options) { app.recording.start(options); },
+    stopRecording: function() { return app.recording.stop(); },
+    setSeed: function(seed) { app.state.seed = seed; app.math._prng = app.math._createPRNG(seed); },
+    set onReady(callback) { if (this.isReady) callback(); else this._onReadyCallbacks.push(callback); },
+    _notifyReady: function() {
+        this.isReady = true;
+        this._onReadyCallbacks.forEach(cb => cb());
+        this._onReadyCallbacks = [];
+        window.dispatchEvent(new CustomEvent('physital:ready', { detail: { name: app.meta.name, version: '2.0' } }));
+    },
+    getCanvas: function() { return app.canvas.sim; },
+    getTrailCanvas: function() { return app.canvas.trail; },
+};
+
+
+// ═══════════════════════════════════════════════
+// 4h: URL Parameter Parsing
+// ═══════════════════════════════════════════════
+
+app.parseURLParams = function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('seed')) {
+        const seed = parseInt(params.get('seed'));
+        if (!isNaN(seed)) { app.state.seed = seed; app.math._prng = app.math._createPRNG(seed); }
+    }
+    if (params.get('autoplay') === 'false') app.state.paused = true;
+    if (params.has('lang')) app.state.language = params.get('lang');
+    for (const [key, value] of params.entries()) {
+        if (key in app.params) {
+            const num = parseFloat(value);
+            if (!isNaN(num)) app.params[key] = num;
+            else if (value === 'true') app.params[key] = true;
+            else if (value === 'false') app.params[key] = false;
+            else app.params[key] = value;
+        }
+    }
+};
+
+
+// ═══════════════════════════════════════════════
+// 4i: PostMessage Bridge
+// ═══════════════════════════════════════════════
+
+window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!data || data.type !== 'physital') return;
+    const { method, args, id } = data;
+    let result;
+    try {
+        if (method && typeof window.physital[method] === 'function') result = window.physital[method](...(args || []));
+        else if (method && method in window.physital) result = window.physital[method];
+        if (result && typeof result.then === 'function') {
+            result.then(val => { event.source.postMessage({ type: 'physital:response', id, result: val ? 'blob-ready' : null }, '*'); });
+        } else {
+            event.source.postMessage({ type: 'physital:response', id, result }, '*');
+        }
+    } catch (err) {
+        event.source.postMessage({ type: 'physital:error', id, error: err.message }, '*');
+    }
+});
+
+
+// ═══════════════════════════════════════════════
+// 4j: Initialization
+// ═══════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded', () => {
+    app.parseURLParams();
+    app.canvas.init();
+    app.render.init();
+    app.ui.init();
+    app.buildSliders();
+    app.ui.setLanguage(app.state.language);
+    app.math.initState();
+    app.render.frame();
+    window.addEventListener('resize', () => { app.canvas.resize(); });
+    window.physital._notifyReady();
+});
+
+</script>
+</body>
+</html>
