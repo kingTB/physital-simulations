@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>יממה שמשית מול יממה כוכבית — PhysiTal</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --glass-bg: rgba(18, 18, 28, 0.92);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --accent: #7eb8ff;
+    --accent-glow: rgba(126, 184, 255, 0.35);
+    --solar-color: #FFD866;
+    --sidereal-color: #7eb8ff;
+    --diff-color: #ff8a80;
+    --text-main: #e2e8f0;
+    --text-dim: #94a3b8;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #05060f;
+    font-family: 'Rubik', sans-serif;
+    cursor: crosshair;
+    user-select: none;
+}
+
+#container { position: relative; width: 100vw; height: 100vh; }
+canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+#bgCanvas { z-index: 0; }
+#trailCanvas { z-index: 1; }
+#simCanvas { z-index: 2; }
+
+/* ── Context Menu ── */
+#ctxMenu {
+    position: fixed; z-index: 1000;
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px; padding: 6px 0; min-width: 210px;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    direction: rtl;
+}
+#ctxMenu .item {
+    padding: 10px 18px; color: #ccc; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; flex-direction: row-reverse;
+    transition: background 0.15s;
+}
+#ctxMenu .item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+#ctxMenu .item.active { color: var(--accent); }
+#ctxMenu .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
+
+/* ── Dialogues ── */
+.dialogue {
+    position: fixed; z-index: 500;
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    min-width: 300px; max-width: 460px;
+    display: none;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+    direction: rtl; color: #ccc; font-size: 13px; line-height: 1.7;
+}
+.dialogue .dlg-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px 10px; cursor: grab; user-select: none; flex-direction: row-reverse;
+}
+.dialogue .dlg-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #fff; }
+.dialogue .dlg-close {
+    background: none; border: none; color: #666; font-size: 18px; cursor: pointer;
+    padding: 0 4px; transition: color 0.2s;
+}
+.dialogue .dlg-close:hover { color: #fff; }
+.dialogue .dlg-body { padding: 4px 18px 18px; max-height: 60vh; overflow-y: auto; }
+.dialogue .dlg-body p { margin-bottom: 8px; }
+.dialogue .dlg-body h4 { color: var(--accent); font-size: 13px; margin: 12px 0 6px; font-weight: 500; }
+
+/* ── Controls ── */
+.ctrl-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 8px 0; flex-direction: row-reverse;
+}
+.ctrl-row label { font-size: 12px; color: #aaa; min-width: 80px; text-align: right; }
+.ctrl-row input[type=range] { direction: ltr; flex: 1; margin: 0 10px; accent-color: var(--accent); }
+.ctrl-row .val {
+    font-size: 12px; color: var(--accent); min-width: 40px; text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+
+.btn-group { display: flex; gap: 6px; margin: 10px 0; flex-direction: row-reverse; flex-wrap: wrap; }
+.btn-group button {
+    flex: 1; padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    background: rgba(255,255,255,0.04); color: #ccc;
+    font-family: 'Rubik', sans-serif; font-size: 12px; cursor: pointer;
+    transition: all 0.2s; min-width: 60px;
+}
+.btn-group button:hover { background: rgba(255,255,255,0.1); }
+.btn-group button.active { background: rgba(126,184,255,0.15); border-color: rgba(126,184,255,0.4); color: var(--accent); }
+.btn-group button.reverse-active { background: rgba(255,130,120,0.15); border-color: rgba(255,130,120,0.4); color: var(--diff-color); }
+.btn-group button.step-active { background: rgba(180,130,255,0.15); border-color: rgba(180,130,255,0.4); color: #c8a0ff; }
+
+.checkbox-row {
+    display: flex; align-items: center; gap: 8px; margin: 6px 0;
+    flex-direction: row-reverse; font-size: 12px;
+}
+.checkbox-row input { accent-color: var(--accent); }
+
+/* ── HUD ── */
+#hud {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 50; display: flex; gap: 20px; direction: rtl; pointer-events: none;
+}
+.hud-item { text-align: center; font-size: 11px; color: rgba(255,255,255,0.5); pointer-events: none; }
+.hud-item .hud-val { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+.hud-solar .hud-val { color: var(--solar-color); }
+.hud-sidereal .hud-val { color: var(--sidereal-color); }
+.hud-diff .hud-val { color: var(--diff-color); font-size: 16px; }
+
+/* ── Mode indicator ── */
+#modeIndicator {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 50; font-size: 11px; color: rgba(255,255,255,0.3);
+    pointer-events: none; text-align: center;
+}
+
+/* ── Annotation Toast ── */
+#annotation {
+    position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+    z-index: 60; font-size: 16px; font-weight: 600; color: #fff;
+    background: rgba(18, 18, 28, 0.85); backdrop-filter: blur(12px);
+    padding: 10px 24px; border-radius: 12px;
+    border: 1px solid rgba(126, 184, 255, 0.3);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    pointer-events: none; opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    direction: rtl; white-space: nowrap;
+}
+#annotation.visible { opacity: 1; }
+
+/* ── Keyboard Shortcuts Bar ── */
+#shortcutsHint {
+    position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+    z-index: 50; font-size: 10px; color: rgba(255,255,255,0.15);
+    pointer-events: none; text-align: center; direction: ltr;
+    transition: opacity 2s;
+}
+
+/* ── Stopwatch ── */
+#btnSwTop:hover { transform: scale(1.05); filter: brightness(1.3); }
+#btnSwTop:active { transform: scale(0.95); }
+
+/* ── Scrollbar ── */
+.dlg-body::-webkit-scrollbar { width: 4px; }
+.dlg-body::-webkit-scrollbar-track { background: transparent; }
+.dlg-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="container">
+    <canvas id="bgCanvas"></canvas>
+    <canvas id="trailCanvas"></canvas>
+    <canvas id="simCanvas"></canvas>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+    <div class="hud-item hud-solar"><div class="hud-val" id="hudSolar">0.000</div>ימים שמשיים</div>
+    <div class="hud-item hud-sidereal"><div class="hud-val" id="hudSidereal">0.000</div>ימים כוכביים</div>
+    <div class="hud-item hud-diff"><div class="hud-val" id="hudDiff">0</div>הפרש מצטבר (דקות)</div>
+</div>
+<div id="modeIndicator">קליק ימני לתפריט</div>
+<div id="annotation"></div>
+<div id="shortcutsHint">Space: Pause &nbsp;|&nbsp; R: Reset &nbsp;|&nbsp; 1/2: Toy/Real &nbsp;|&nbsp; S: Step &nbsp;|&nbsp; T: Trails</div>
+
+<!-- Context Menu -->
+<div id="ctxMenu">
+    <div class="item" data-dlg="instructions">📖 הוראות</div>
+    <div class="divider"></div>
+    <div class="item" data-dlg="controls">🎛️ בקרים</div>
+    <div class="item" data-dlg="view">👁️ תצוגה</div>
+    <div class="item" data-dlg="camera">📷 מצלמה</div>
+    <div class="item" data-dlg="stopwatch">⏱️ שעון עצר</div>
+    <div class="divider"></div>
+    <div class="item" data-dlg="docs">📄 תיעוד</div>
+</div>
+
+<!-- Instructions Dialogue -->
+<div class="dialogue" id="dlg-instructions" style="top:80px;right:30px;">
+<div class="dlg-header"><h3>הוראות</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<h4>מה זה?</h4>
+<p>סימולציה המציגה מבט-על (מלמעלה) של כדור הארץ סובב סביב השמש, וממחישה את ההבדל בין <strong style="color:var(--solar-color)">יממה שמשית</strong> ל<strong style="color:var(--sidereal-color)">יממה כוכבית</strong>.</p>
+<h4>יממה כוכבית (Sidereal Day)</h4>
+<p>הזמן שלוקח לכדור הארץ לבצע סיבוב מלא של 360° סביב צירו ביחס לכוכבים הרחוקים.<br>
+<strong>משך מדויק: 23h 56m 4.0905s = 86,164.0905 שניות</strong></p>
+<h4>יממה שמשית (Solar Day)</h4>
+<p>הזמן בין שתי "צהרי שמש" רצופות — כלומר עד שאותה נקודה על פני כדור הארץ מצביעה שוב ישירות אל השמש.<br>
+<strong>משך מדויק: 24h 0m 0s = 86,400 שניות</strong></p>
+<h4>ההפרש</h4>
+<p>ההפרש בין יממה שמשית ליממה כוכבית:<br>
+<strong>86,400 - 86,164.09 = 235.91 שניות ~ 3 דקות 55.91 שניות</strong></p>
+<h4>כמות ימים בשנה</h4>
+<p>בשנה טרופית אחת (365.2422 ימים שמשיים = 31,556,925.2 שניות):<br>
+<strong style="color:var(--sidereal-color)">~366.2422 ימים כוכביים</strong> (סיבובי 360°)<br>
+<strong style="color:var(--solar-color)">~365.2422 ימים שמשיים</strong> (צהריים-&gt;צהריים)<br>
+ההפרש הוא בדיוק <strong style="color:var(--diff-color)">1</strong> — סיבוב כוכבי אחד "נוסף" נבלע בתוך ההקפה סביב השמש.</p>
+<h4>למה ההבדל?</h4>
+<p>בזמן שכדור הארץ מסתובב סביב צירו, הוא גם נע קדימה במסלולו סביב השמש (~0.986° ליום). לכן, כדי "להדביק" את השמש, הוא צריך להסתובב עוד קצת מעבר ל-360°. התוספת הזו מסתכמת ב-~3 דקות ו-56 שניות.</p>
+<h4>שימוש</h4>
+<p>🖱️ קליק ימני — תפריט<br>
+🎛️ בקרים — שינוי מהירות ומודל<br>
+📷 מצלמה — מעקב, זום, הזזה<br>
+👁️ תצוגה — הצג/הסתר שכבות ומסלולים<br>
+🔄 הסימולציה רצה אוטומטית</p>
+<h4>מודלים</h4>
+<p><strong>Toy Model</strong> — 13 סיבובים כוכביים (= 12 ימים שמשיים) להקפה, כדי שההבדל ייראה בבירור.<br>
+<strong>Real Model</strong> — 366.2422 סיבובים כוכביים (= 365.2422 ימים שמשיים) להקפה. גדלים ומרחקים בקנה מידה אמיתי. השתמשו ב"זום לכדור הארץ" בדיאלוג מצלמה.</p>
+<h4>קיצורי מקלדת</h4>
+<p style="direction:ltr;text-align:left;font-size:12px;">
+<strong>Space</strong> — השהה / המשך<br>
+<strong>R</strong> — אפס סימולציה<br>
+<strong>1</strong> — Toy Model<br>
+<strong>2</strong> — Real Model<br>
+<strong>S</strong> — צעד יממה כוכבית אחת (Step Mode)<br>
+<strong>T</strong> — הפעל/כבה מסלולים (Trails)<br>
+<strong>[ / ]</strong> — מהירות -/+</p>
+</div>
+</div>
+
+<!-- Controls Dialogue -->
+<div class="dialogue" id="dlg-controls" style="top:80px;left:30px;">
+<div class="dlg-header"><h3>בקרים</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<h4>מודל</h4>
+<div class="btn-group" id="modelBtns">
+    <button class="active" data-model="toy">Toy Model</button>
+    <button data-model="real">Real Model</button>
+</div>
+<h4>מהירות סימולציה</h4>
+<div class="ctrl-row">
+    <label>מהירות</label>
+    <input type="range" id="speedSlider" min="0" max="100" value="30" step="1">
+    <span class="val" id="speedVal">1.0x</span>
+</div>
+<div class="btn-group">
+    <button id="btnReverse">⏪ הפוך כיוון</button>
+    <button id="btnPause">⏸ השהה</button>
+    <button id="btnReset">🔄 אפס</button>
+</div>
+<h4>צעד יממה (Step Mode)</h4>
+<p style="font-size:11px;color:#888;margin-bottom:6px;">מקדם את הסימולציה בדיוק יממה כוכבית אחת בכל לחיצה, כדי לראות את ההפרש בבירור.</p>
+<div class="btn-group">
+    <button id="btnStep">⏭ צעד יממה כוכבית</button>
+    <button id="btnStepSolar">⏭ צעד יממה שמשית</button>
+</div>
+<h4>סיבוב ידני</h4>
+<div class="ctrl-row">
+    <label>מיקום במסלול</label>
+    <input type="range" id="orbitSlider" min="0" max="360" value="0" step="0.1" style="direction:ltr;">
+    <span class="val" id="orbitVal">0°</span>
+</div>
+</div>
+</div>
+
+<!-- View Dialogue -->
+<div class="dialogue" id="dlg-view" style="top:200px;right:30px;">
+<div class="dlg-header"><h3>תצוגה</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<h4>שכבות</h4>
+<div class="checkbox-row"><input type="checkbox" id="chkSunRay" checked><label for="chkSunRay">קו לשמש (צהוב)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkStarRef" checked><label for="chkStarRef">קו התייחסות כוכבי (כחול)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkOrbit" checked><label for="chkOrbit">מסלול</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkStars" checked><label for="chkStars">כוכבים</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkGhostsSidereal" checked><label for="chkGhostsSidereal">סימוני יממה כוכבית (כחול)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkGhostsSolar" checked><label for="chkGhostsSolar">סימוני יממה שמשית (צהוב)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkLabels" checked><label for="chkLabels">תוויות</label></div>
+<h4>מסלולים (Trails)</h4>
+<div class="checkbox-row"><input type="checkbox" id="chkTrails"><label for="chkTrails">מסלול קצה החץ האדום (World Trails)</label></div>
+<div class="ctrl-row">
+    <label>אטימות מסלול</label>
+    <input type="range" id="trailOpacity" min="0" max="100" value="60" step="1" style="direction:ltr;">
+    <span class="val" id="trailOpacityVal">60%</span>
+</div>
+<div class="ctrl-row">
+    <label>אורך מסלול</label>
+    <input type="range" id="trailLength" min="100" max="5000" value="2000" step="100" style="direction:ltr;">
+    <span class="val" id="trailLengthVal">2000</span>
+</div>
+<div class="btn-group">
+    <button id="btnClearTrails">🗑️ נקה מסלולים</button>
+</div>
+</div>
+</div>
+
+<!-- Camera Dialogue -->
+<div class="dialogue" id="dlg-camera" style="top:200px;left:30px;">
+<div class="dlg-header"><h3>מצלמה</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<h4>מעקב</h4>
+<div class="btn-group" id="trackBtns">
+    <button class="active" data-track="none">חופשי</button>
+    <button data-track="sun">☀ שמש</button>
+    <button data-track="earth">🌍 כדור הארץ</button>
+</div>
+<h4>זום</h4>
+<div class="ctrl-row">
+    <label>רמת זום</label>
+    <input type="range" id="zoomSlider" min="0" max="100" value="50" step="1" style="direction:ltr;">
+    <span class="val" id="zoomVal">1.0x</span>
+</div>
+<div class="btn-group">
+    <button id="btnZoomReset">🔄 אפס מצלמה</button>
+    <button id="btnZoomEarth">🌍 זום לכדור הארץ</button>
+</div>
+<h4>פקדים</h4>
+<p style="font-size:11px;color:#888;">🖱️ גלגלת — זום אין/אאוט (מוקד בסמן)<br>
+Alt + גרירה — הזזת המבט<br>
+📌 זום והזזה עובדים גם במעקב</p>
+</div>
+</div>
+
+<!-- Stopwatch Dialogue -->
+<div class="dialogue" id="dlg-stopwatch" style="top:250px;right:30px;min-width:280px;">
+<div class="dlg-header"><h3>שעון עצר</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body" style="text-align:center;padding-top:10px;">
+<button id="btnSwTop" style="
+    width:80px;height:80px;border-radius:50%;border:3px solid rgba(126,184,255,0.4);
+    background:rgba(126,184,255,0.08);color:#7eb8ff;font-size:28px;cursor:pointer;
+    font-family:'Rubik',sans-serif;transition:all 0.2s;margin-bottom:14px;
+    display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto;
+">&#9654;</button>
+<div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:14px 10px 10px;margin-bottom:10px;">
+    <div id="swDisplay" style="font-size:42px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;direction:ltr;letter-spacing:1px;">0.00</div>
+    <div id="swUnit" style="font-size:12px;color:#888;margin-top:4px;">ימים שמשיים</div>
+</div>
+<div id="swMarkA" style="font-size:12px;color:#7eb8ff;min-height:18px;direction:ltr;"></div>
+<div id="swMarkB" style="font-size:12px;color:#FFD866;min-height:18px;direction:ltr;margin-bottom:8px;"></div>
+<div id="swDelta" style="font-size:13px;color:#ff8a80;font-weight:600;min-height:20px;direction:ltr;margin-bottom:10px;"></div>
+<div class="btn-group" style="justify-content:center;">
+    <button id="btnSwReset">🔄 אפס</button>
+</div>
+<div style="display:flex;gap:12px;margin-top:12px;justify-content:center;align-items:center;flex-direction:row-reverse;">
+    <span style="font-size:11px;color:#888;">רזולוציה:</span>
+    <div class="btn-group" id="swResBtns" style="margin:0;flex:0;">
+        <button class="active" data-res="0.01">0.01</button>
+        <button data-res="0.001">0.001</button>
+    </div>
+</div>
+<div style="margin-top:8px;">
+    <div class="checkbox-row" style="justify-content:center;"><input type="checkbox" id="chkSwAbs"><label for="chkSwAbs">ערך מוחלט (Abs)</label></div>
+</div>
+</div>
+</div>
+
+<!-- Documentation Dialogue -->
+<div class="dialogue" id="dlg-docs" style="top:120px;left:60px;">
+<div class="dlg-header"><h3>תיעוד</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<p>נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי.</p>
+<h4>מחסנית טכנולוגית</h4>
+<p>Vanilla JS, Canvas API, Google Fonts (Rubik).</p>
+<h4>Making Of</h4>
+<p>סימולציה דו-ממדית מבט-על הממחישה את ההבדל הגיאומטרי בין יממה שמשית ליממה כוכבית. המודל מציג את כדור הארץ מסתובב סביב צירו תוך כדי מעבר במסלולו סביב השמש, כאשר חץ ייחוס מאפשר לעקוב אחרי ההבדל.</p>
+<h4>תכונות מיוחדות</h4>
+<p>מערכת מסלולים (trails) לעקיבה חזותית אחרי קצה החץ במרחב, הערות אוטומטיות ברגעים מרכזיים, מצב צעדים לניתוח מדויק של ההפרש, כוכבים מהבהבים, ואפקטי זוהר עדינים.</p>
+<h4>קיצורי מקלדת</h4>
+<p style="direction:ltr;text-align:left;font-size:11px;">
+Space — Pause/Resume | R — Reset | 1 — Toy Model | 2 — Real Model<br>
+S — Step one sidereal day | T — Toggle trails | [ / ] — Speed down/up</p>
+</div>
+</div>
+
+<script>
+// ================================================================
+// SOLAR DAY vs SIDEREAL DAY — PhysiTal Enhanced Simulation
+// ================================================================
+
+// ===== CANVAS SETUP =====
+const bgC = document.getElementById('bgCanvas');
+const trailC = document.getElementById('trailCanvas');
+const simC = document.getElementById('simCanvas');
+const bgCtx = bgC.getContext('2d');
+const trailCtx = trailC.getContext('2d');
+const ctx = simC.getContext('2d');
+let W, H, cx, cy;
+
+function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    bgC.width = trailC.width = simC.width = W;
+    bgC.height = trailC.height = simC.height = H;
+    cx = W / 2; cy = H / 2;
+    genStars();
+    drawStarfield();
+}
+window.addEventListener('resize', resize);
+
+// ===== STARFIELD WITH TWINKLING =====
+let stars = [];
+let starTime = 0;
+
+function genStars() {
+    stars = [];
+    for (let i = 0; i < 400; i++) {
+        stars.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            r: Math.random() * 1.5 + 0.3,
+            baseBright: Math.random() * 0.4 + 0.4,
+            twinkleSpeed: Math.random() * 2.0 + 0.5,
+            twinklePhase: Math.random() * Math.PI * 2,
+            // Color temperature variation
+            temp: Math.random(),
+        });
+    }
+}
+
+function drawStarfield() {
+    bgCtx.fillStyle = '#05060f';
+    bgCtx.fillRect(0, 0, W, H);
+
+    // Subtle nebula background
+    const ng = bgCtx.createRadialGradient(W * 0.7, H * 0.3, 0, W * 0.7, H * 0.3, W * 0.5);
+    ng.addColorStop(0, 'rgba(40, 20, 80, 0.06)');
+    ng.addColorStop(0.5, 'rgba(20, 30, 60, 0.03)');
+    ng.addColorStop(1, 'transparent');
+    bgCtx.fillStyle = ng;
+    bgCtx.fillRect(0, 0, W, H);
+
+    stars.forEach(s => {
+        const twinkle = Math.sin(starTime * s.twinkleSpeed + s.twinklePhase) * 0.3 + 0.7;
+        const bright = s.baseBright * twinkle;
+
+        // Slight color variation based on temperature
+        let r = 200, g = 210, b = 255;
+        if (s.temp < 0.2) { r = 255; g = 200; b = 180; } // warm
+        else if (s.temp > 0.8) { r = 180; g = 200; b = 255; } // cool
+
+        bgCtx.beginPath();
+        bgCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        bgCtx.fillStyle = `rgba(${r},${g},${b},${bright})`;
+        bgCtx.fill();
+
+        // Subtle glow for brighter stars
+        if (s.r > 1.2 && bright > 0.6) {
+            bgCtx.beginPath();
+            bgCtx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+            bgCtx.fillStyle = `rgba(${r},${g},${b},${bright * 0.1})`;
+            bgCtx.fill();
+        }
+    });
+}
+
+// ===== SIMULATION STATE =====
+const state = {
+    model: 'toy',
+    paused: false,
+    speed: 1.0,
+    direction: 1,
+    orbitalAngle: 0,
+    rotationAngle: 0,
+    totalOrbitalRevs: 0,
+    totalRotationRevs: 0,
+    time: 0,
+    manualOrbit: false,
+    stepMode: false,
+    stepTarget: null,
+};
+
+// At t=0, Earth is at orbital angle 0 (right of sun).
+// Sun direction from Earth = PI (left).
+// Offset so the red arrow initially points toward the sun.
+const ROT_OFFSET = Math.PI;
+
+// ===== CAMERA =====
+const cam = {
+    zoom: 1.0,
+    targetZoom: 1.0,
+    lookX: 0, lookY: 0,
+    offsetX: 0, offsetY: 0,
+    targetOffsetX: 0, targetOffsetY: 0,
+    trackMode: 'none',
+    _initDone: false,
+};
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function getTrackAnchor(p) {
+    if (cam.trackMode === 'earth') return getEarthPos(p, state.orbitalAngle);
+    return { x: cx, y: cy };
+}
+
+function screenToWorld(sx, sy) {
+    return {
+        x: (sx - W / 2) / cam.zoom + cam.lookX,
+        y: (sy - H / 2) / cam.zoom + cam.lookY,
+    };
+}
+
+function updateZoomSlider() {
+    const v = 50 + 20 * Math.log10(cam.targetZoom);
+    document.getElementById('zoomSlider').value = Math.max(0, Math.min(100, v));
+    document.getElementById('zoomVal').textContent = cam.targetZoom < 0.01
+        ? cam.targetZoom.toExponential(1) + 'x'
+        : cam.targetZoom.toFixed(2) + 'x';
+}
+
+function getDefaultZoom() {
+    if (state.model === 'real') {
+        const p = getParams();
+        return Math.min(W, H) / (2.5 * p.orbitR);
+    }
+    return 1.0;
+}
+
+function resetCamera() {
+    const z = getDefaultZoom();
+    cam.targetZoom = z;
+    cam.zoom = z;
+    cam.trackMode = 'none';
+    cam.offsetX = cam.targetOffsetX = 0;
+    cam.offsetY = cam.targetOffsetY = 0;
+    cam.lookX = cx;
+    cam.lookY = cy;
+    document.querySelectorAll('#trackBtns button').forEach(b => b.classList.remove('active'));
+    document.querySelector('#trackBtns button[data-track="none"]').classList.add('active');
+    updateZoomSlider();
+}
+
+function setTrackMode(mode) {
+    const p = getParams();
+    const oldAnchor = getTrackAnchor(p);
+    cam.trackMode = mode;
+    const newAnchor = getTrackAnchor(p);
+    cam.targetOffsetX = (oldAnchor.x + cam.targetOffsetX) - newAnchor.x;
+    cam.targetOffsetY = (oldAnchor.y + cam.targetOffsetY) - newAnchor.y;
+    cam.offsetX = cam.targetOffsetX;
+    cam.offsetY = cam.targetOffsetY;
+}
+
+function centerOnTrack() {
+    cam.targetOffsetX = 0;
+    cam.targetOffsetY = 0;
+}
+
+// ===== ASTRONOMICAL CONSTANTS =====
+const AU_KM = 149_597_870.7;
+const SUN_RADIUS_KM = 696_000;
+const EARTH_RADIUS_KM = 6_371;
+const SIDEREAL_DAY_SEC = 86164.0905;    // 23h 56m 4.0905s
+const SOLAR_DAY_SEC    = 86400;          // 24h 0m 0s
+const TROPICAL_YEAR_SEC = 365.2422 * SOLAR_DAY_SEC;
+const SIDEREAL_DAYS_PER_YEAR = TROPICAL_YEAR_SEC / SIDEREAL_DAY_SEC; // ~366.2422
+
+function getParams() {
+    if (state.model === 'toy') {
+        const sunR = Math.min(W, H) * 0.06;
+        const earthR = Math.min(W, H) * 0.028;
+        return {
+            sunR,
+            earthR,
+            orbitR: Math.min(W, H) * 0.32,
+            daysPerYear: 13, // 13 sidereal rotations = 12 solar days per orbit
+        };
+    } else {
+        const WORLD_AU = 80000;
+        return {
+            sunR:   WORLD_AU * SUN_RADIUS_KM / AU_KM,
+            earthR: WORLD_AU * EARTH_RADIUS_KM / AU_KM,
+            orbitR: WORLD_AU,
+            daysPerYear: SIDEREAL_DAYS_PER_YEAR,
+        };
+    }
+}
+
+// ===== GHOST MARKERS =====
+let ghosts = [
+    { orbAngle: 0, arrowAngle: ROT_OFFSET, type: 'sidereal', dayNum: 0 },
+    { orbAngle: 0, arrowAngle: Math.PI, type: 'solar', dayNum: 0 },
+];
+let siderealDayCount = 0;
+let solarDayCount = 0;
+
+// ===== TRAIL SYSTEM (World Trails) =====
+const trails = {
+    points: [],       // {x, y, age} in world coordinates
+    maxLength: 2000,
+    enabled: false,
+    opacity: 0.6,
+};
+
+function addTrailPoint(wx, wy) {
+    if (!trails.enabled) return;
+    trails.points.push({ x: wx, y: wy, age: 0 });
+    if (trails.points.length > trails.maxLength) {
+        trails.points.shift();
+    }
+}
+
+function clearTrails() {
+    trails.points = [];
+    trailCtx.clearRect(0, 0, W, H);
+}
+
+// ===== ANNOTATION SYSTEM =====
+const annotations = {
+    shown: new Set(),
+    timer: null,
+};
+
+function showAnnotation(text, duration) {
+    duration = duration || 3000;
+    const el = document.getElementById('annotation');
+    el.textContent = text;
+    el.classList.add('visible');
+    if (annotations.timer) clearTimeout(annotations.timer);
+    annotations.timer = setTimeout(() => {
+        el.classList.remove('visible');
+    }, duration);
+}
+
+function checkAnnotations() {
+    const p = getParams();
+    const siderealDays = state.totalRotationRevs;
+    const solarDays = siderealDays * (1 - 1 / p.daysPerYear);
+
+    // First sidereal day
+    if (siderealDayCount >= 1 && !annotations.shown.has('sid1')) {
+        annotations.shown.add('sid1');
+        showAnnotation('!יממה כוכבית ראשונה הושלמה', 3500);
+    }
+    // First solar day
+    if (solarDayCount >= 1 && !annotations.shown.has('sol1')) {
+        annotations.shown.add('sol1');
+        showAnnotation('!יממה שמשית ראשונה הושלמה — שימו לב להפרש', 4000);
+    }
+    // Full orbit (toy model specific)
+    if (state.model === 'toy' && siderealDayCount >= 13 && !annotations.shown.has('orbit_toy')) {
+        annotations.shown.add('orbit_toy');
+        showAnnotation('הקפה שלמה! 13 ימים כוכביים = 12 ימים שמשיים', 5000);
+    }
+    // Real model: after 10 sidereal days
+    if (state.model === 'real' && siderealDayCount >= 10 && !annotations.shown.has('ten_days')) {
+        annotations.shown.add('ten_days');
+        showAnnotation('10 ימים כוכביים — ההפרש כבר כ-39 דקות!', 4000);
+    }
+}
+
+// ===== STOPWATCH =====
+const stopwatch = {
+    state: 'idle',
+    markA: null,
+    markB: null,
+    resolution: 0.01,
+    absMode: false,
+};
+
+function getCurrentSolarDays() {
+    const p = getParams();
+    return state.totalRotationRevs * (1 - 1 / p.daysPerYear);
+}
+
+function updateStopwatchUI() {
+    const btn = document.getElementById('btnSwTop');
+    const disp = document.getElementById('swDisplay');
+    const markAEl = document.getElementById('swMarkA');
+    const markBEl = document.getElementById('swMarkB');
+    const deltaEl = document.getElementById('swDelta');
+    const decimals = stopwatch.resolution === 0.001 ? 3 : 2;
+
+    if (stopwatch.state === 'idle') {
+        btn.innerHTML = '&#9654;';
+        btn.style.borderColor = 'rgba(126,184,255,0.4)';
+        btn.style.color = '#7eb8ff';
+        disp.textContent = (0).toFixed(decimals);
+        disp.style.color = '#fff';
+        markAEl.textContent = '';
+        markBEl.textContent = '';
+        deltaEl.textContent = '';
+    } else if (stopwatch.state === 'running') {
+        btn.innerHTML = '&#9209;';
+        btn.style.borderColor = 'rgba(255,130,120,0.5)';
+        btn.style.color = '#ff8a80';
+        disp.style.color = '#7eb8ff';
+        markAEl.textContent = 'A: ' + stopwatch.markA.toFixed(decimals);
+        markBEl.textContent = '';
+        deltaEl.textContent = '';
+    } else if (stopwatch.state === 'frozen') {
+        btn.innerHTML = '&#9654;';
+        btn.style.borderColor = 'rgba(255,216,100,0.5)';
+        btn.style.color = '#FFD866';
+        disp.style.color = '#FFD866';
+        markAEl.textContent = 'A: ' + stopwatch.markA.toFixed(decimals);
+        markBEl.textContent = 'B: ' + stopwatch.markB.toFixed(decimals);
+        let delta = stopwatch.markB - stopwatch.markA;
+        if (stopwatch.absMode) delta = Math.abs(delta);
+        deltaEl.textContent = '\u0394 = ' + delta.toFixed(decimals) + ' ימים';
+    }
+}
+
+// ===== SIMULATION RESET =====
+function resetSim() {
+    state.orbitalAngle = 0;
+    state.rotationAngle = 0;
+    state.totalOrbitalRevs = 0;
+    state.totalRotationRevs = 0;
+    state.time = 0;
+    state.direction = 1;
+    state.stepMode = false;
+    state.stepTarget = null;
+    siderealDayCount = 0;
+    solarDayCount = 0;
+    stopwatch.state = 'idle';
+    stopwatch.markA = null;
+    stopwatch.markB = null;
+    annotations.shown.clear();
+    ghosts = [
+        { orbAngle: 0, arrowAngle: ROT_OFFSET, type: 'sidereal', dayNum: 0 },
+        { orbAngle: 0, arrowAngle: Math.PI, type: 'solar', dayNum: 0 },
+    ];
+    clearTrails();
+    updateStopwatchUI();
+    document.getElementById('btnReverse').classList.remove('reverse-active');
+    document.getElementById('btnReverse').textContent = '\u23EA \u05D4\u05E4\u05D5\u05DA \u05DB\u05D9\u05D5\u05D5\u05DF';
+    document.getElementById('btnPause').textContent = '\u23F8 \u05D4\u05E9\u05D4\u05D4';
+    state.paused = false;
+}
+
+// ===== STEP MODE =====
+function stepOneSiderealDay() {
+    const p = getParams();
+    const targetRot = (siderealDayCount + 1) * Math.PI * 2;
+    state.stepMode = true;
+    state.stepTarget = targetRot;
+    state.paused = false;
+    state.direction = 1;
+    // Use a moderate speed for the stepping animation
+    state.speed = 2.0;
+}
+
+function stepOneSolarDay() {
+    const p = getParams();
+    // Solar day = rotation by 2*PI * (daysPerYear / (daysPerYear - 1))
+    // equivalently, advance until (rotationAngle - orbitalAngle) increases by 2*PI
+    const currentSolarPhase = (state.rotationAngle - state.orbitalAngle) / (Math.PI * 2);
+    const targetSolarPhase = Math.floor(currentSolarPhase) + 1;
+    // We need rotation such that (rot - orb) / 2PI = targetSolarPhase
+    // rot = orb + targetSolarPhase * 2PI
+    // But orb also advances, so we compute the target rotation directly:
+    // daysPerYear sidereal rotations per orbit, so:
+    // solar days per year = daysPerYear - 1
+    // sidereal rotations per solar day = daysPerYear / (daysPerYear - 1)
+    const siderealPerSolar = p.daysPerYear / (p.daysPerYear - 1);
+    const targetRot = state.rotationAngle + siderealPerSolar * Math.PI * 2;
+    state.stepMode = true;
+    state.stepTarget = targetRot;
+    state.paused = false;
+    state.direction = 1;
+    state.speed = 2.0;
+}
+
+// ===== DRAWING =====
+function drawSun(p) {
+    // Outer glow
+    const grd = ctx.createRadialGradient(cx, cy, p.sunR * 0.2, cx, cy, p.sunR * 3);
+    grd.addColorStop(0, 'rgba(255,220,80,0.5)');
+    grd.addColorStop(0.3, 'rgba(255,180,40,0.15)');
+    grd.addColorStop(0.6, 'rgba(255,150,30,0.05)');
+    grd.addColorStop(1, 'rgba(255,150,30,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(cx, cy, p.sunR * 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sun body
+    const sg = ctx.createRadialGradient(cx - p.sunR * 0.2, cy - p.sunR * 0.2, p.sunR * 0.1, cx, cy, p.sunR);
+    sg.addColorStop(0, '#fff8e0');
+    sg.addColorStop(0.4, '#FFD866');
+    sg.addColorStop(1, '#e6a800');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.arc(cx, cy, p.sunR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner corona ring
+    ctx.strokeStyle = 'rgba(255,240,180,0.1)';
+    ctx.lineWidth = 2 / cam.zoom;
+    ctx.beginPath();
+    ctx.arc(cx, cy, p.sunR * 1.15, 0, Math.PI * 2);
+    ctx.stroke();
+}
+
+function getEarthPos(p, angle) {
+    return {
+        x: cx + Math.cos(angle) * p.orbitR,
+        y: cy + Math.sin(angle) * p.orbitR,
+    };
+}
+
+function drawOrbit(p) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth = 1 / cam.zoom;
+    const dashLen = 4 / cam.zoom;
+    ctx.setLineDash([dashLen, dashLen * 2]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, p.orbitR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawEarth(p, ex, ey, rotAngle) {
+    const screenR = p.earthR * cam.zoom;
+
+    // Locator glow when Earth is too small
+    if (screenR < 8) {
+        const glowR = 12 / cam.zoom;
+        const grd = ctx.createRadialGradient(ex, ey, 0, ex, ey, glowR);
+        grd.addColorStop(0, 'rgba(100,180,255,0.7)');
+        grd.addColorStop(0.5, 'rgba(100,180,255,0.2)');
+        grd.addColorStop(1, 'rgba(100,180,255,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(ex, ey, glowR, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    const drawR = Math.max(p.earthR, 3 / cam.zoom);
+
+    // Earth atmospheric glow
+    if (screenR > 4) {
+        const atmoGrd = ctx.createRadialGradient(ex, ey, drawR * 0.8, ex, ey, drawR * 1.4);
+        atmoGrd.addColorStop(0, 'rgba(100,180,255,0)');
+        atmoGrd.addColorStop(0.5, 'rgba(100,180,255,0.08)');
+        atmoGrd.addColorStop(1, 'rgba(100,180,255,0)');
+        ctx.fillStyle = atmoGrd;
+        ctx.beginPath();
+        ctx.arc(ex, ey, drawR * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Earth shadow (slightly darker on far-from-sun side)
+    const earthGrad = ctx.createRadialGradient(
+        ex - Math.cos(state.orbitalAngle) * drawR * 0.3,
+        ey - Math.sin(state.orbitalAngle) * drawR * 0.3,
+        drawR * 0.1, ex, ey, drawR
+    );
+    earthGrad.addColorStop(0, '#a8d4ff');
+    earthGrad.addColorStop(0.7, '#6aabdb');
+    earthGrad.addColorStop(1, '#3a6a8a');
+    ctx.fillStyle = earthGrad;
+    ctx.beginPath();
+    ctx.arc(ex, ey, drawR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Continent markings (when zoomed in enough)
+    if (screenR > 6) {
+        ctx.save();
+        ctx.translate(ex, ey);
+        ctx.rotate(rotAngle);
+        ctx.fillStyle = 'rgba(80,160,80,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(drawR * 0.2, -drawR * 0.1, drawR * 0.25, drawR * 0.15, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(-drawR * 0.3, drawR * 0.2, drawR * 0.15, drawR * 0.2, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.arc(ex - drawR * 0.25, ey - drawR * 0.25, drawR * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawArrow(fromX, fromY, angle, length, color, lineW, headSize) {
+    const sw = 1 / cam.zoom;
+    const toX = fromX + Math.cos(angle) * length;
+    const toY = fromY + Math.sin(angle) * length;
+
+    // Subtle glow for arrows
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 4 * sw;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW * sw;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    ctx.restore();
+
+    // Arrowhead
+    const hs = headSize * sw;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - Math.cos(angle - 0.4) * hs, toY - Math.sin(angle - 0.4) * hs);
+    ctx.lineTo(toX - Math.cos(angle + 0.4) * hs, toY - Math.sin(angle + 0.4) * hs);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function drawGhosts(p, showSidereal, showSolar) {
+    const sw = 1 / cam.zoom;
+    const halfW = (W / 2) / cam.zoom;
+    const halfH = (H / 2) / cam.zoom;
+    const vLeft = cam.lookX - halfW;
+    const vRight = cam.lookX + halfW;
+    const vTop = cam.lookY - halfH;
+    const vBottom = cam.lookY + halfH;
+    const margin = Math.max(p.earthR, 3 * sw) * 3;
+
+    ghosts.forEach(g => {
+        if (g.type === 'sidereal' && !showSidereal) return;
+        if (g.type === 'solar' && !showSolar) return;
+        const pos = getEarthPos(p, g.orbAngle);
+
+        if (pos.x < vLeft - margin || pos.x > vRight + margin ||
+            pos.y < vTop - margin || pos.y > vBottom + margin) return;
+
+        const isSidereal = g.type === 'sidereal';
+        const color = isSidereal ? '#7eb8ff' : '#FFD866';
+        const drawR = Math.max(p.earthR, 3 * sw);
+
+        // Circle with subtle glow
+        ctx.globalAlpha = isSidereal ? 0.35 : 0.3;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 * sw;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, drawR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.globalAlpha = isSidereal ? 0.08 : 0.06;
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // Arrow
+        const arrowLen = drawR * 1.5;
+        const toX = pos.x + Math.cos(g.arrowAngle) * arrowLen;
+        const toY = pos.y + Math.sin(g.arrowAngle) * arrowLen;
+        ctx.globalAlpha = isSidereal ? 0.5 : 0.45;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 * sw;
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineTo(toX, toY);
+        ctx.stroke();
+
+        const hs = 5 * sw;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(toX - Math.cos(g.arrowAngle - 0.4) * hs, toY - Math.sin(g.arrowAngle - 0.4) * hs);
+        ctx.lineTo(toX - Math.cos(g.arrowAngle + 0.4) * hs, toY - Math.sin(g.arrowAngle + 0.4) * hs);
+        ctx.closePath();
+        ctx.fill();
+
+        // Day number label
+        if (document.getElementById('chkLabels').checked && g.dayNum !== undefined) {
+            ctx.globalAlpha = 0.6;
+            ctx.fillStyle = color;
+            ctx.font = (10 * sw) + 'px Rubik';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(g.dayNum, pos.x, pos.y);
+        }
+
+        ctx.globalAlpha = 1;
+    });
+}
+
+function drawSunRay(p, ex, ey) {
+    const sw = 1 / cam.zoom;
+    ctx.strokeStyle = 'rgba(255,216,100,0.35)';
+    ctx.lineWidth = 1.5 * sw;
+    const dashLen = 6 * sw;
+    ctx.setLineDash([dashLen, dashLen]);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(cx, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawStarRefLine(p, ex, ey) {
+    const sw = 1 / cam.zoom;
+    const refAngle = Math.PI;
+    const len = Math.max(W, H) / cam.zoom;
+    ctx.strokeStyle = 'rgba(126,184,255,0.35)';
+    ctx.lineWidth = 1.5 * sw;
+    const dashLen = 5 * sw;
+    ctx.setLineDash([dashLen, dashLen]);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex + Math.cos(refAngle) * len, ey + Math.sin(refAngle) * len);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawTrails() {
+    if (!trails.enabled || trails.points.length < 2) return;
+
+    trailCtx.clearRect(0, 0, W, H);
+    trailCtx.save();
+    trailCtx.translate(W / 2, H / 2);
+    trailCtx.scale(cam.zoom, cam.zoom);
+    trailCtx.translate(-cam.lookX, -cam.lookY);
+
+    const len = trails.points.length;
+    for (let i = 1; i < len; i++) {
+        const prev = trails.points[i - 1];
+        const curr = trails.points[i];
+        const progress = i / len;
+        const alpha = progress * trails.opacity;
+
+        // Color transitions from blue to red as trail ages from old to new
+        const r = Math.floor(100 + 155 * progress);
+        const g = Math.floor(100 + 50 * (1 - progress));
+        const b = Math.floor(255 * (1 - progress * 0.5));
+
+        trailCtx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+        trailCtx.lineWidth = (1 + progress * 2) / cam.zoom;
+        trailCtx.lineCap = 'round';
+        trailCtx.beginPath();
+        trailCtx.moveTo(prev.x, prev.y);
+        trailCtx.lineTo(curr.x, curr.y);
+        trailCtx.stroke();
+    }
+
+    // Glow at the tip of the trail
+    if (len > 0) {
+        const tip = trails.points[len - 1];
+        const glowR = 4 / cam.zoom;
+        const grd = trailCtx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, glowR);
+        grd.addColorStop(0, `rgba(255,100,80,${trails.opacity})`);
+        grd.addColorStop(1, 'rgba(255,100,80,0)');
+        trailCtx.fillStyle = grd;
+        trailCtx.beginPath();
+        trailCtx.arc(tip.x, tip.y, glowR, 0, Math.PI * 2);
+        trailCtx.fill();
+    }
+
+    trailCtx.restore();
+}
+
+function drawLabels(p, ex, ey) {
+    const sw = 1 / cam.zoom;
+    const fontSize = 12 * sw;
+    ctx.font = fontSize + 'px Rubik';
+    ctx.textAlign = 'center';
+
+    ctx.fillStyle = 'rgba(255,220,100,0.7)';
+    ctx.fillText('\u2600 \u05E9\u05DE\u05E9', cx, cy + p.sunR + 18 * sw);
+
+    const drawR = Math.max(p.earthR, 3 * sw);
+    ctx.fillStyle = 'rgba(170,210,255,0.7)';
+    ctx.fillText('\uD83C\uDF0D \u05DB\u05D3\u05D5\u05E8 \u05D4\u05D0\u05E8\u05E5', ex, ey + drawR + 18 * sw);
+
+    const leftEdge = cam.lookX - (W / 2) / cam.zoom;
+    ctx.fillStyle = 'rgba(126,184,255,0.5)';
+    ctx.font = (11 * sw) + 'px Rubik';
+    ctx.textAlign = 'right';
+    ctx.fillText('\u2B50 \u05DB\u05D5\u05DB\u05D1 \u05E8\u05D7\u05D5\u05E7 (\u05D4\u05EA\u05D9\u05D9\u05D7\u05E1\u05D5\u05EA)', leftEdge + 180 * sw, cy);
+    ctx.textAlign = 'center';
+}
+
+// ===== PHYSICS UPDATE =====
+let lastTime = 0;
+let trailSampleCounter = 0;
+
+function update(dt) {
+    if (state.paused || state.manualOrbit) return;
+
+    const p = getParams();
+    // Base rotation speed: one full sidereal rotation per 2 seconds at 1x speed
+    const rotSpeed = Math.PI * 2 * 0.5;
+    const orbSpeed = rotSpeed / p.daysPerYear;
+
+    const effectiveDt = dt * state.speed * state.direction;
+
+    const prevRotation = state.rotationAngle;
+    const prevOrbital = state.orbitalAngle;
+
+    state.rotationAngle += rotSpeed * effectiveDt;
+    state.orbitalAngle += orbSpeed * effectiveDt;
+    state.time += effectiveDt;
+
+    // Clamp at t=0
+    if (state.rotationAngle < 0) {
+        state.rotationAngle = 0;
+        state.orbitalAngle = 0;
+        state.time = 0;
+    }
+
+    state.totalRotationRevs = state.rotationAngle / (Math.PI * 2);
+    state.totalOrbitalRevs = state.orbitalAngle / (Math.PI * 2);
+
+    // Step mode: stop when target reached
+    if (state.stepMode && state.stepTarget !== null) {
+        if (state.rotationAngle >= state.stepTarget) {
+            state.rotationAngle = state.stepTarget;
+            state.orbitalAngle = state.stepTarget / p.daysPerYear;
+            state.totalRotationRevs = state.rotationAngle / (Math.PI * 2);
+            state.totalOrbitalRevs = state.orbitalAngle / (Math.PI * 2);
+            state.stepMode = false;
+            state.stepTarget = null;
+            state.paused = true;
+            document.getElementById('btnPause').textContent = '\u25B6 \u05D4\u05DE\u05E9\u05DA';
+        }
+    }
+
+    // Trail sampling
+    if (trails.enabled) {
+        trailSampleCounter++;
+        if (trailSampleCounter % 2 === 0) {
+            const ePos = getEarthPos(p, state.orbitalAngle);
+            const drawR = Math.max(p.earthR, 3 / cam.zoom);
+            const arrowLen = drawR * 1.8;
+            const arrowAngle = state.rotationAngle + ROT_OFFSET;
+            const tipX = ePos.x + Math.cos(arrowAngle) * arrowLen;
+            const tipY = ePos.y + Math.sin(arrowAngle) * arrowLen;
+            addTrailPoint(tipX, tipY);
+        }
+    }
+
+    const maxGhostsPerFrame = 500;
+
+    if (state.direction >= 0) {
+        // Forward: add ghosts
+        const newSiderealCount = Math.floor(state.totalRotationRevs);
+        if (newSiderealCount > siderealDayCount) {
+            const startDay = Math.max(siderealDayCount + 1, newSiderealCount - maxGhostsPerFrame);
+            for (let d = startDay; d <= newSiderealCount; d++) {
+                const targetRot = d * Math.PI * 2;
+                const dRot = state.rotationAngle - prevRotation;
+                const t = dRot !== 0 ? (targetRot - prevRotation) / dRot : 0.5;
+                const interpOrb = prevOrbital + (state.orbitalAngle - prevOrbital) * Math.max(0, Math.min(1, t));
+                ghosts.push({
+                    orbAngle: interpOrb,
+                    arrowAngle: targetRot + ROT_OFFSET,
+                    type: 'sidereal',
+                    dayNum: d
+                });
+            }
+            siderealDayCount = newSiderealCount;
+        }
+
+        const solarPhase = (state.rotationAngle - state.orbitalAngle) / (Math.PI * 2);
+        const newSolarCount = Math.floor(solarPhase);
+        if (newSolarCount > solarDayCount) {
+            const startSolar = Math.max(solarDayCount + 1, newSolarCount - maxGhostsPerFrame);
+            for (let d = startSolar; d <= newSolarCount; d++) {
+                const dRot = state.rotationAngle - prevRotation;
+                const dOrb = state.orbitalAngle - prevOrbital;
+                const denom = dRot - dOrb;
+                let t = 0.5;
+                if (Math.abs(denom) > 1e-12) {
+                    t = (d * Math.PI * 2 - (prevRotation - prevOrbital)) / denom;
+                }
+                t = Math.max(0, Math.min(1, t));
+                const interpOrb = prevOrbital + (state.orbitalAngle - prevOrbital) * t;
+                const ePos = getEarthPos(p, interpOrb);
+                const sunAngle = Math.atan2(cy - ePos.y, cx - ePos.x);
+                ghosts.push({
+                    orbAngle: interpOrb,
+                    arrowAngle: sunAngle,
+                    type: 'solar',
+                    dayNum: d
+                });
+            }
+            solarDayCount = newSolarCount;
+        }
+    } else {
+        // Reverse: remove ghosts that are beyond current state
+        const newSiderealCount = Math.floor(state.totalRotationRevs);
+        const solarPhase = (state.rotationAngle - state.orbitalAngle) / (Math.PI * 2);
+        const newSolarCount = Math.floor(solarPhase);
+
+        ghosts = ghosts.filter(g => {
+            if (g.type === 'sidereal') return g.dayNum <= newSiderealCount;
+            if (g.type === 'solar') return g.dayNum <= newSolarCount;
+            return true;
+        });
+
+        siderealDayCount = newSiderealCount;
+        solarDayCount = newSolarCount;
+    }
+
+    // Check for educational annotations
+    checkAnnotations();
+}
+
+// ===== RENDER LOOP =====
+function render(timestamp) {
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+    lastTime = timestamp;
+
+    // Update twinkling stars
+    starTime += dt;
+    if (document.getElementById('chkStars').checked) {
+        // Redraw starfield periodically for twinkling
+        if (Math.floor(starTime * 10) !== Math.floor((starTime - dt) * 10)) {
+            drawStarfield();
+        }
+    }
+
+    update(dt);
+
+    const p = getParams();
+
+    // Camera init
+    if (!cam._initDone) {
+        cam.lookX = cx;
+        cam.lookY = cy;
+        cam._initDone = true;
+    }
+
+    // Smooth zoom
+    cam.zoom = lerp(cam.zoom, cam.targetZoom, 0.12);
+
+    // Smooth offset
+    cam.offsetX = lerp(cam.offsetX, cam.targetOffsetX, 0.12);
+    cam.offsetY = lerp(cam.offsetY, cam.targetOffsetY, 0.12);
+
+    // Compute lookAt
+    const anchor = getTrackAnchor(p);
+    const targetLookX = anchor.x + cam.offsetX;
+    const targetLookY = anchor.y + cam.offsetY;
+
+    if (cam.trackMode !== 'none') {
+        cam.lookX = targetLookX;
+        cam.lookY = targetLookY;
+    } else {
+        cam.lookX = lerp(cam.lookX, targetLookX, 0.1);
+        cam.lookY = lerp(cam.lookY, targetLookY, 0.1);
+    }
+
+    // Clear simulation canvas
+    ctx.clearRect(0, 0, W, H);
+
+    // Apply camera transform
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(cam.zoom, cam.zoom);
+    ctx.translate(-cam.lookX, -cam.lookY);
+
+    // Draw orbit
+    if (document.getElementById('chkOrbit').checked) drawOrbit(p);
+
+    // Draw Sun
+    drawSun(p);
+
+    // Earth position
+    const ePos = getEarthPos(p, state.orbitalAngle);
+
+    // Draw ghosts
+    const showSidereal = document.getElementById('chkGhostsSidereal').checked;
+    const showSolar = document.getElementById('chkGhostsSolar').checked;
+    if (showSidereal || showSolar) {
+        drawGhosts(p, showSidereal, showSolar);
+    }
+
+    // Sun ray line
+    if (document.getElementById('chkSunRay').checked) drawSunRay(p, ePos.x, ePos.y);
+
+    // Star reference line
+    if (document.getElementById('chkStarRef').checked) drawStarRefLine(p, ePos.x, ePos.y);
+
+    // Earth
+    drawEarth(p, ePos.x, ePos.y, state.rotationAngle + ROT_OFFSET);
+
+    // Arrows on Earth
+    const drawR = Math.max(p.earthR, 3 / cam.zoom);
+    const arrowLen = drawR * 1.8;
+
+    // Red arrow = noon meridian, fixed on Earth body
+    drawArrow(ePos.x, ePos.y, state.rotationAngle + ROT_OFFSET, arrowLen, '#ff5544', 2.5, 8);
+
+    // Blue sidereal reference arrow (fixed direction in space)
+    if (document.getElementById('chkStarRef').checked) {
+        drawArrow(ePos.x, ePos.y, Math.PI, arrowLen * 0.7, 'rgba(126,184,255,0.55)', 2, 6);
+    }
+
+    // Labels
+    if (document.getElementById('chkLabels').checked) drawLabels(p, ePos.x, ePos.y);
+
+    ctx.restore();
+
+    // Draw world trails (needs camera transform)
+    drawTrails();
+
+    // ===== HUD UPDATE =====
+    const siderealDays = state.totalRotationRevs;
+    const solarDays = siderealDays > 0 ? siderealDays * (1 - 1 / p.daysPerYear) : 0;
+    const diffMinutes = (siderealDays - solarDays) * 24 * 60;
+
+    document.getElementById('hudSolar').textContent = solarDays.toFixed(3);
+    document.getElementById('hudSidereal').textContent = siderealDays.toFixed(3);
+    document.getElementById('hudDiff').textContent = diffMinutes.toFixed(1);
+
+    // Orbit slider sync
+    const orbDeg = ((state.orbitalAngle * 180 / Math.PI) % 360 + 360) % 360;
+    document.getElementById('orbitSlider').value = orbDeg.toFixed(1);
+    document.getElementById('orbitVal').textContent = orbDeg.toFixed(1) + '\u00B0';
+
+    // Stopwatch live update
+    if (stopwatch.state === 'running') {
+        const current = getCurrentSolarDays();
+        let elapsed = current - stopwatch.markA;
+        if (stopwatch.absMode) elapsed = Math.abs(elapsed);
+        const decimals = stopwatch.resolution === 0.001 ? 3 : 2;
+        document.getElementById('swDisplay').textContent = elapsed.toFixed(decimals);
+    }
+
+    // Mode indicator text
+    const modeText = state.model === 'toy' ? 'Toy Model' : 'Real Model';
+    const pauseText = state.paused ? ' | \u05D4\u05E9\u05D4\u05D9\u05D4' : '';
+    const reverseText = state.direction < 0 ? ' | \u05D4\u05E4\u05D5\u05DA' : '';
+    const stepText = state.stepMode ? ' | \u05E6\u05E2\u05D3' : '';
+
+    requestAnimationFrame(render);
+}
+
+// ===== CONTEXT MENU =====
+document.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const menu = document.getElementById('ctxMenu');
+    menu.style.display = 'block';
+    let x = e.clientX, y = e.clientY;
+    if (x + 220 > W) x = W - 220;
+    if (y + 250 > H) y = H - 250;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+
+    menu.querySelectorAll('.item').forEach(item => {
+        const dlgId = item.dataset.dlg;
+        if (dlgId) {
+            const dlg = document.getElementById('dlg-' + dlgId);
+            if (dlg && dlg.style.display === 'block') item.classList.add('active');
+            else item.classList.remove('active');
+        }
+    });
+});
+
+document.addEventListener('click', e => {
+    const menu = document.getElementById('ctxMenu');
+    if (!menu.contains(e.target)) menu.style.display = 'none';
+});
+
+document.querySelectorAll('#ctxMenu .item').forEach(item => {
+    item.addEventListener('click', () => {
+        const dlgId = item.dataset.dlg;
+        if (dlgId) {
+            const dlg = document.getElementById('dlg-' + dlgId);
+            if (dlg) dlg.style.display = dlg.style.display === 'block' ? 'none' : 'block';
+        }
+        document.getElementById('ctxMenu').style.display = 'none';
+    });
+});
+
+// ===== DIALOGUE DRAGGING =====
+document.querySelectorAll('.dialogue').forEach(dlg => {
+    const header = dlg.querySelector('.dlg-header');
+    const closeBtn = dlg.querySelector('.dlg-close');
+    let dragging = false, offX, offY;
+
+    header.addEventListener('mousedown', e => {
+        if (e.target === closeBtn) return;
+        dragging = true;
+        const rect = dlg.getBoundingClientRect();
+        dlg.style.right = 'auto';
+        dlg.style.bottom = 'auto';
+        dlg.style.transform = 'none';
+        dlg.style.left = rect.left + 'px';
+        dlg.style.top = rect.top + 'px';
+        offX = e.clientX - rect.left;
+        offY = e.clientY - rect.top;
+        header.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        dlg.style.left = (e.clientX - offX) + 'px';
+        dlg.style.top = (e.clientY - offY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        dragging = false;
+        header.style.cursor = 'grab';
+    });
+
+    closeBtn.addEventListener('click', () => dlg.style.display = 'none');
+
+    // Block sim events from passing through dialogues
+    dlg.addEventListener('mousedown', e => e.stopPropagation());
+    dlg.addEventListener('click', e => e.stopPropagation());
+    dlg.addEventListener('wheel', e => e.stopPropagation());
+});
+
+// ===== UI CONTROLS =====
+
+// Model buttons
+document.querySelectorAll('#modelBtns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#modelBtns button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.model = btn.dataset.model;
+        resetSim();
+        resetCamera();
+    });
+});
+
+// Speed slider (exponential mapping)
+const speedSlider = document.getElementById('speedSlider');
+speedSlider.addEventListener('input', () => {
+    const v = parseFloat(speedSlider.value);
+    if (v === 0) state.speed = 0;
+    else state.speed = Math.pow(10, (v - 30) / 30);
+    document.getElementById('speedVal').textContent = state.speed.toFixed(2) + 'x';
+});
+
+// Pause
+document.getElementById('btnPause').addEventListener('click', function() {
+    state.paused = !state.paused;
+    this.textContent = state.paused ? '\u25B6 \u05D4\u05DE\u05E9\u05DA' : '\u23F8 \u05D4\u05E9\u05D4\u05D4';
+});
+
+// Reverse
+document.getElementById('btnReverse').addEventListener('click', function() {
+    state.direction *= -1;
+    if (state.direction < 0) {
+        this.classList.add('reverse-active');
+        this.textContent = '\u23E9 \u05E7\u05D3\u05D9\u05DE\u05D4';
+    } else {
+        this.classList.remove('reverse-active');
+        this.textContent = '\u23EA \u05D4\u05E4\u05D5\u05DA \u05DB\u05D9\u05D5\u05D5\u05DF';
+    }
+});
+
+// Reset
+document.getElementById('btnReset').addEventListener('click', () => resetSim());
+
+// Step buttons
+document.getElementById('btnStep').addEventListener('click', () => stepOneSiderealDay());
+document.getElementById('btnStepSolar').addEventListener('click', () => stepOneSolarDay());
+
+// Manual orbit slider
+const orbitSlider = document.getElementById('orbitSlider');
+orbitSlider.addEventListener('input', () => {
+    state.manualOrbit = true;
+    const deg = parseFloat(orbitSlider.value);
+    const p = getParams();
+    state.orbitalAngle = deg * Math.PI / 180;
+    state.rotationAngle = state.orbitalAngle * p.daysPerYear;
+    state.totalRotationRevs = state.rotationAngle / (Math.PI * 2);
+    state.totalOrbitalRevs = state.orbitalAngle / (Math.PI * 2);
+    document.getElementById('orbitVal').textContent = deg.toFixed(1) + '\u00B0';
+});
+orbitSlider.addEventListener('change', () => { state.manualOrbit = false; });
+
+// ===== VIEW CONTROLS =====
+document.getElementById('chkTrails').addEventListener('change', function() {
+    trails.enabled = this.checked;
+    if (!this.checked) clearTrails();
+});
+
+document.getElementById('trailOpacity').addEventListener('input', function() {
+    trails.opacity = parseInt(this.value) / 100;
+    document.getElementById('trailOpacityVal').textContent = this.value + '%';
+});
+
+document.getElementById('trailLength').addEventListener('input', function() {
+    trails.maxLength = parseInt(this.value);
+    document.getElementById('trailLengthVal').textContent = this.value;
+    while (trails.points.length > trails.maxLength) trails.points.shift();
+});
+
+document.getElementById('btnClearTrails').addEventListener('click', clearTrails);
+
+// ===== CAMERA CONTROLS =====
+document.querySelectorAll('#trackBtns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#trackBtns button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        setTrackMode(btn.dataset.track);
+        centerOnTrack();
+    });
+});
+
+const zoomSlider = document.getElementById('zoomSlider');
+zoomSlider.addEventListener('input', () => {
+    const v = parseFloat(zoomSlider.value);
+    cam.targetZoom = Math.pow(10, (v - 50) / 20);
+    document.getElementById('zoomVal').textContent = cam.targetZoom < 0.01
+        ? cam.targetZoom.toExponential(1) + 'x'
+        : cam.targetZoom.toFixed(2) + 'x';
+});
+
+document.getElementById('btnZoomReset').addEventListener('click', resetCamera);
+
+document.getElementById('btnZoomEarth').addEventListener('click', () => {
+    const p = getParams();
+    setTrackMode('earth');
+    centerOnTrack();
+    const targetScreenR = 150;
+    const drawR = Math.max(p.earthR, 1);
+    cam.targetZoom = targetScreenR / drawR;
+    document.querySelectorAll('#trackBtns button').forEach(b => b.classList.remove('active'));
+    document.querySelector('#trackBtns button[data-track="earth"]').classList.add('active');
+    updateZoomSlider();
+});
+
+// Mouse wheel zoom (focal point at cursor)
+simC.addEventListener('wheel', e => {
+    e.preventDefault();
+    const worldBefore = screenToWorld(e.clientX, e.clientY);
+    const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+    cam.targetZoom = Math.max(0.002, Math.min(500, cam.targetZoom * factor));
+    cam.zoom = Math.max(0.002, Math.min(500, cam.zoom * factor));
+    const worldAfter = screenToWorld(e.clientX, e.clientY);
+    const dx = worldBefore.x - worldAfter.x;
+    const dy = worldBefore.y - worldAfter.y;
+    cam.offsetX += dx;
+    cam.offsetY += dy;
+    cam.targetOffsetX += dx;
+    cam.targetOffsetY += dy;
+    cam.lookX += dx;
+    cam.lookY += dy;
+    updateZoomSlider();
+}, { passive: false });
+
+// Alt + drag to pan
+let isPanning = false, panStartX, panStartY, panStartOffX, panStartOffY;
+
+simC.addEventListener('mousedown', e => {
+    if (e.altKey) {
+        isPanning = true;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panStartOffX = cam.targetOffsetX;
+        panStartOffY = cam.targetOffsetY;
+        simC.style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+});
+
+document.addEventListener('mousemove', e => {
+    if (!isPanning) return;
+    const dx = (e.clientX - panStartX) / cam.zoom;
+    const dy = (e.clientY - panStartY) / cam.zoom;
+    cam.targetOffsetX = panStartOffX - dx;
+    cam.targetOffsetY = panStartOffY - dy;
+    cam.offsetX = cam.targetOffsetX;
+    cam.offsetY = cam.targetOffsetY;
+});
+
+document.addEventListener('mouseup', () => {
+    if (isPanning) {
+        isPanning = false;
+        simC.style.cursor = 'crosshair';
+    }
+});
+
+// ===== KEYBOARD SHORTCUTS =====
+document.addEventListener('keydown', e => {
+    // Don't capture if typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    switch (e.code) {
+        case 'Space':
+            e.preventDefault();
+            state.paused = !state.paused;
+            document.getElementById('btnPause').textContent = state.paused
+                ? '\u25B6 \u05D4\u05DE\u05E9\u05DA' : '\u23F8 \u05D4\u05E9\u05D4\u05D4';
+            break;
+        case 'KeyR':
+            resetSim();
+            break;
+        case 'Digit1':
+            document.querySelectorAll('#modelBtns button').forEach(b => b.classList.remove('active'));
+            document.querySelector('#modelBtns button[data-model="toy"]').classList.add('active');
+            state.model = 'toy';
+            resetSim();
+            resetCamera();
+            break;
+        case 'Digit2':
+            document.querySelectorAll('#modelBtns button').forEach(b => b.classList.remove('active'));
+            document.querySelector('#modelBtns button[data-model="real"]').classList.add('active');
+            state.model = 'real';
+            resetSim();
+            resetCamera();
+            break;
+        case 'KeyS':
+            stepOneSiderealDay();
+            break;
+        case 'KeyT':
+            trails.enabled = !trails.enabled;
+            document.getElementById('chkTrails').checked = trails.enabled;
+            if (!trails.enabled) clearTrails();
+            showAnnotation(trails.enabled ? 'World Trails: ON' : 'World Trails: OFF', 1500);
+            break;
+        case 'BracketLeft':
+            // Decrease speed
+            speedSlider.value = Math.max(0, parseInt(speedSlider.value) - 5);
+            speedSlider.dispatchEvent(new Event('input'));
+            break;
+        case 'BracketRight':
+            // Increase speed
+            speedSlider.value = Math.min(100, parseInt(speedSlider.value) + 5);
+            speedSlider.dispatchEvent(new Event('input'));
+            break;
+    }
+});
+
+// ===== STOPWATCH =====
+document.getElementById('btnSwTop').addEventListener('click', () => {
+    if (stopwatch.state === 'idle') {
+        stopwatch.markA = getCurrentSolarDays();
+        stopwatch.markB = null;
+        stopwatch.state = 'running';
+    } else if (stopwatch.state === 'running') {
+        stopwatch.markB = getCurrentSolarDays();
+        stopwatch.state = 'frozen';
+    } else if (stopwatch.state === 'frozen') {
+        stopwatch.markA = getCurrentSolarDays();
+        stopwatch.markB = null;
+        stopwatch.state = 'running';
+    }
+    updateStopwatchUI();
+});
+
+document.getElementById('btnSwReset').addEventListener('click', () => {
+    stopwatch.state = 'idle';
+    stopwatch.markA = null;
+    stopwatch.markB = null;
+    updateStopwatchUI();
+});
+
+document.querySelectorAll('#swResBtns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#swResBtns button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        stopwatch.resolution = parseFloat(btn.dataset.res);
+        updateStopwatchUI();
+    });
+});
+
+document.getElementById('chkSwAbs').addEventListener('change', function() {
+    stopwatch.absMode = this.checked;
+    updateStopwatchUI();
+});
+
+// ===== INITIALIZATION =====
+resize();
+cam.lookX = cx;
+cam.lookY = cy;
+cam.offsetX = cam.targetOffsetX = 0;
+cam.offsetY = cam.targetOffsetY = 0;
+cam._initDone = true;
+requestAnimationFrame(render);
+
+// Fade mode indicator
+setTimeout(() => {
+    const mi = document.getElementById('modeIndicator');
+    mi.style.transition = 'opacity 3s';
+    mi.style.opacity = '0';
+}, 4000);
+
+// Fade shortcuts hint
+setTimeout(() => {
+    const sh = document.getElementById('shortcutsHint');
+    sh.style.opacity = '0';
+}, 8000);
+</script>
+</body>
+</html>

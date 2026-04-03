@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>יממה שמשית מול יממה כוכבית - 3D | PhysiTal</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Rubik',sans-serif;}
+#container{position:relative;width:100vw;height:100vh;cursor:crosshair;}
+
+/* ── Context Menu ── */
+#ctxMenu{position:fixed;z-index:1000;background:rgba(18,18,28,0.92);backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:6px 0;min-width:210px;
+  display:none;box-shadow:0 8px 32px rgba(0,0,0,0.5);direction:rtl;}
+#ctxMenu .item{padding:10px 18px;color:#ccc;font-size:14px;cursor:pointer;display:flex;
+  align-items:center;gap:8px;flex-direction:row-reverse;transition:background 0.15s;}
+#ctxMenu .item:hover{background:rgba(255,255,255,0.08);color:#fff;}
+#ctxMenu .item.active{color:#7eb8ff;}
+#ctxMenu .divider{height:1px;background:rgba(255,255,255,0.06);margin:4px 0;}
+
+/* ── Dialogues ── */
+.dialogue{position:fixed;z-index:500;background:rgba(18,18,28,0.92);backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,0.08);border-radius:14px;min-width:300px;max-width:460px;
+  display:none;box-shadow:0 12px 48px rgba(0,0,0,0.5);direction:rtl;color:#ccc;
+  font-size:13px;line-height:1.7;}
+.dialogue .dlg-header{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px 10px;cursor:grab;user-select:none;flex-direction:row-reverse;}
+.dialogue .dlg-header h3{margin:0;font-size:15px;font-weight:600;color:#fff;}
+.dialogue .dlg-close{background:none;border:none;color:#666;font-size:18px;cursor:pointer;
+  padding:0 4px;transition:color 0.2s;}
+.dialogue .dlg-close:hover{color:#fff;}
+.dialogue .dlg-body{padding:4px 18px 18px;max-height:60vh;overflow-y:auto;}
+.dialogue .dlg-body p{margin-bottom:8px;}
+.dialogue .dlg-body h4{color:#7eb8ff;font-size:13px;margin:12px 0 6px;font-weight:500;}
+
+/* ── Controls ── */
+.ctrl-row{display:flex;align-items:center;justify-content:space-between;margin:8px 0;
+  flex-direction:row-reverse;}
+.ctrl-row label{font-size:12px;color:#aaa;min-width:80px;text-align:right;}
+.ctrl-row input[type=range]{direction:ltr;flex:1;margin:0 10px;accent-color:#7eb8ff;
+  -webkit-appearance:none;height:4px;background:rgba(255,255,255,0.12);border-radius:2px;outline:none;}
+.ctrl-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:#7eb8ff;cursor:pointer;border:2px solid rgba(18,18,28,0.9);}
+.ctrl-row .val{font-size:12px;color:#7eb8ff;min-width:45px;text-align:left;
+  font-variant-numeric:tabular-nums;}
+
+.btn-group{display:flex;gap:6px;margin:10px 0;flex-direction:row-reverse;flex-wrap:wrap;}
+.btn-group button{flex:1;padding:8px 12px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;
+  background:rgba(255,255,255,0.04);color:#ccc;font-family:'Rubik',sans-serif;font-size:12px;
+  cursor:pointer;transition:all 0.2s;min-width:70px;}
+.btn-group button:hover{background:rgba(255,255,255,0.1);}
+.btn-group button.active{background:rgba(126,184,255,0.15);border-color:rgba(126,184,255,0.4);
+  color:#7eb8ff;}
+
+.checkbox-row{display:flex;align-items:center;gap:8px;margin:6px 0;
+  flex-direction:row-reverse;font-size:12px;}
+.checkbox-row input{accent-color:#7eb8ff;width:14px;height:14px;}
+
+/* ── HUD ── */
+#hud{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;
+  display:flex;gap:24px;direction:rtl;pointer-events:none;}
+.hud-item{text-align:center;font-size:11px;color:rgba(255,255,255,0.5);pointer-events:none;}
+.hud-item .hud-val{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;
+  margin-bottom:2px;text-shadow:0 2px 10px rgba(0,0,0,0.8);}
+.hud-solar .hud-val{color:#FFD866;}
+.hud-sidereal .hud-val{color:#7eb8ff;}
+.hud-diff .hud-val{color:#ff8a80;font-size:16px;}
+
+/* ── Mode indicator ── */
+#modeIndicator{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;
+  font-size:12px;font-weight:500;color:rgba(255,255,255,0.6);pointer-events:none;
+  text-align:center;text-shadow:0 1px 4px rgba(0,0,0,0.8);transition:opacity 3s;}
+
+/* ── Keyboard shortcuts overlay ── */
+#shortcutsHint{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:50;
+  font-size:11px;color:rgba(255,255,255,0.3);pointer-events:none;text-align:center;direction:rtl;
+  transition:opacity 0.5s;}
+#shortcutsHint kbd{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
+  border-radius:3px;padding:1px 5px;font-family:'Rubik',monospace;font-size:10px;margin:0 2px;}
+
+/* ── Annotation popup ── */
+#annotation{position:fixed;z-index:60;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:rgba(18,18,28,0.88);backdrop-filter:blur(16px);border:1px solid rgba(126,184,255,0.2);
+  border-radius:12px;padding:16px 24px;max-width:360px;text-align:center;direction:rtl;
+  color:#e0e0e0;font-size:14px;line-height:1.6;pointer-events:none;opacity:0;
+  transition:opacity 0.5s;display:none;}
+#annotation.show{display:block;opacity:1;}
+#annotation.hide{opacity:0;}
+#annotation .ann-icon{font-size:28px;margin-bottom:8px;}
+#annotation .ann-title{color:#7eb8ff;font-weight:600;font-size:15px;margin-bottom:4px;}
+
+/* ── Scrollbar ── */
+.dlg-body::-webkit-scrollbar{width:4px;}
+.dlg-body::-webkit-scrollbar-track{background:transparent;}
+.dlg-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<div id="container"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-item hud-solar"><div class="hud-val" id="hudSolar">0.000</div>ימים שמשיים</div>
+  <div class="hud-item hud-sidereal"><div class="hud-val" id="hudSidereal">0.000</div>ימים כוכביים</div>
+  <div class="hud-item hud-diff"><div class="hud-val" id="hudDiff">0</div>הפרש מצטבר (דקות)</div>
+</div>
+<div id="modeIndicator">קליק ימני לתפריט | גרירה לסיבוב 3D | Space = השהה | R = אפס</div>
+<div id="shortcutsHint"><kbd>Space</kbd> השהה &nbsp; <kbd>R</kbd> אפס &nbsp; <kbd>1</kbd>/<kbd>2</kbd> מודל &nbsp; <kbd>T</kbd> הטיית ציר &nbsp; <kbd>E</kbd> מישור משווה</div>
+
+<!-- Annotation popup -->
+<div id="annotation">
+  <div class="ann-icon"></div>
+  <div class="ann-title"></div>
+  <div class="ann-body"></div>
+</div>
+
+<!-- Context Menu -->
+<div id="ctxMenu">
+  <div class="item" data-dlg="instructions">📖 הוראות</div>
+  <div class="divider"></div>
+  <div class="item" data-dlg="controls">🎛️ בקרים</div>
+  <div class="item" data-dlg="view">👁️ תצוגה</div>
+  <div class="item" data-dlg="camera">📷 מצלמה</div>
+  <div class="divider"></div>
+  <div class="item" data-dlg="docs">📄 תיעוד</div>
+</div>
+
+<!-- ═══ Instructions Dialogue ═══ -->
+<div class="dialogue" id="dlg-instructions" style="top:80px;right:30px;">
+<div class="dlg-header"><h3>הוראות</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<h4>מה זה?</h4>
+<p>סימולציה תלת-ממדית המציגה את כדור הארץ סובב סביב השמש, וממחישה את ההבדל בין <strong style="color:#FFD866">יממה שמשית</strong> (Solar Day) ל<strong style="color:#7eb8ff">יממה כוכבית</strong> (Sidereal Day).</p>
+<h4>יממה כוכבית (Sidereal Day)</h4>
+<p>הזמן שלוקח לכדור הארץ לבצע סיבוב מלא של 360° סביב צירו ביחס לכוכבים הרחוקים.<br>
+<strong>משך: 23h 56m 4.09s = 86,164.09 שניות</strong></p>
+<h4>יממה שמשית (Solar Day)</h4>
+<p>הזמן בין שתי "צהרי שמש" רצופות — כלומר עד שאותה נקודה על פני כדור הארץ מצביעה שוב ישירות אל השמש.<br>
+<strong>משך: 24h 0m 0s = 86,400 שניות</strong></p>
+<h4>ההפרש והסמן המסתובב</h4>
+<p>על כדור הארץ מותקן <strong style="color:#ff3333">סמן אדום</strong> (קו חצות). בהתחלה הוא מצביע על השמש ועל כוכב ההתייחסות הרחוק. ברגע שהסמן משלים סיבוב של 360° במרחב הוא מגיע לקו הכחול (יממה כוכבית). כדי להצביע בחזרה על השמש, הוא צריך להסתובב עוד קצת — ואז הוא פוגע בקו הצהוב (יממה שמשית).</p>
+<h4>הטיית ציר הסיבוב</h4>
+<p>ציר הסיבוב של כדור הארץ מוטה ב-23.44° ביחס למישור המסלול. אפשר להפעיל הטייה זו דרך <strong>בקרים → הטיית ציר</strong> או המקש <kbd>T</kbd>. ההטייה גורמת לעונות השנה אבל לא משפיעה על ההפרש בין יממה שמשית ליממה כוכבית.</p>
+<h4>שימוש במרחב 3D</h4>
+<p>🖱️ קליק שמאלי + גרירה — סיבוב המצלמה<br>
+🖱️ גלגלת — התקרבות / התרחקות<br>
+🖱️ Alt + גרירה — הזזת מוקד המצלמה (Pan)<br>
+⌨️ <kbd>Space</kbd> — השהה / המשך<br>
+⌨️ <kbd>R</kbd> — אפס סימולציה<br>
+⌨️ <kbd>1</kbd> / <kbd>2</kbd> — Toy Model / Real Model<br>
+⌨️ <kbd>T</kbd> — הטיית ציר 23.44°<br>
+⌨️ <kbd>E</kbd> — מישור משווה<br>
+⌨️ <kbd>L</kbd> — שבילי מיקום</p>
+</div>
+</div>
+
+<!-- ═══ Controls Dialogue ═══ -->
+<div class="dialogue" id="dlg-controls" style="top:80px;left:30px;">
+<div class="dlg-header"><h3>בקרים</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<h4>מודל</h4>
+<div class="btn-group" id="modelBtns">
+  <button class="active" data-model="toy">Toy Model</button>
+  <button data-model="real">Real Model</button>
+</div>
+<h4>מהירות סימולציה</h4>
+<div class="ctrl-row">
+  <label>מהירות</label>
+  <input type="range" id="speedSlider" min="0" max="100" value="30" step="1" style="direction:ltr;">
+  <span class="val" id="speedVal">1.0x</span>
+</div>
+<div class="btn-group">
+  <button id="btnPause">⏸ השהה</button>
+  <button id="btnReset">🔄 אפס</button>
+</div>
+<h4>סיבוב ידני</h4>
+<div class="ctrl-row">
+  <label>מיקום במסלול</label>
+  <input type="range" id="orbitSlider" min="0" max="360" value="0" step="0.1" style="direction:ltr;">
+  <span class="val" id="orbitVal">0°</span>
+</div>
+<h4>הטיית ציר</h4>
+<div class="checkbox-row"><input type="checkbox" id="chkTilt"><label for="chkTilt">הטיית ציר כדור הארץ (23.44°)</label></div>
+<div class="ctrl-row" id="tiltSliderRow" style="display:none;">
+  <label>זווית הטייה</label>
+  <input type="range" id="tiltSlider" min="0" max="45" value="23.44" step="0.01" style="direction:ltr;">
+  <span class="val" id="tiltVal">23.44°</span>
+</div>
+<h4>אפקטים</h4>
+<div class="checkbox-row"><input type="checkbox" id="chkTrails"><label for="chkTrails">שבילי מיקום (Time Lapse)</label></div>
+</div>
+</div>
+
+<!-- ═══ View Dialogue ═══ -->
+<div class="dialogue" id="dlg-view" style="top:200px;right:30px;">
+<div class="dlg-header"><h3>תצוגה</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<div class="checkbox-row"><input type="checkbox" id="chkRotLine" checked><label for="chkRotLine">סמן סיבוב כדור הארץ (אדום)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkSunRay" checked><label for="chkSunRay">קו לשמש (צהוב)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkStarRef" checked><label for="chkStarRef">קו התייחסות כוכבי (כחול)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkOrbit" checked><label for="chkOrbit">מסלול</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkStars" checked><label for="chkStars">כוכבים ברקע</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkGhostsSidereal" checked><label for="chkGhostsSidereal">סמני יממה כוכבית (כחול)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkGhostsSolar" checked><label for="chkGhostsSolar">סמני יממה שמשית (צהוב)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkLabels" checked><label for="chkLabels">תוויות</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkEquatorialPlane"><label for="chkEquatorialPlane">מישור משווה כדור הארץ</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkOrbitalPlane"><label for="chkOrbitalPlane">מישור מסלול (Ecliptic)</label></div>
+<div class="checkbox-row"><input type="checkbox" id="chkDust" checked><label for="chkDust">אבק קוסמי</label></div>
+</div>
+</div>
+
+<!-- ═══ Camera Dialogue ═══ -->
+<div class="dialogue" id="dlg-camera" style="top:200px;left:30px;">
+<div class="dlg-header"><h3>מצלמה</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<h4>מעקב 3D</h4>
+<div class="btn-group" id="trackBtns">
+  <button class="active" data-track="none">חופשי</button>
+  <button data-track="sun">☀ שמש</button>
+  <button data-track="earth">🌍 כדור הארץ</button>
+</div>
+<h4>זום (מרחק)</h4>
+<div class="ctrl-row">
+  <label>מרחק מהמוקד</label>
+  <input type="range" id="zoomSlider" min="0" max="100" value="50" step="1" style="direction:ltr;">
+  <span class="val" id="zoomVal">1.0x</span>
+</div>
+<div class="btn-group">
+  <button id="btnZoomReset">🔄 מבט על</button>
+  <button id="btnZoomEarth">🌍 זום קרוב לכדו"א</button>
+</div>
+</div>
+</div>
+
+<!-- ═══ Documentation Dialogue ═══ -->
+<div class="dialogue" id="dlg-docs" style="top:120px;left:60px;">
+<div class="dlg-header"><h3>תיעוד</h3><button class="dlg-close">&times;</button></div>
+<div class="dlg-body">
+<p style="color:#7eb8ff;font-weight:500;border-bottom:1px solid rgba(126,184,255,0.2);padding-bottom:8px;margin-bottom:10px;">
+נוצר על ידי פיזיטל עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי.</p>
+<h4>על הסימולציה</h4>
+<p>סימולציית תלת-ממד (3D) המבוססת על Three.js r128, הממחישה את ההבדל בין יממה שמשית ליממה כוכבית. כוללת שני מודלים — Toy Model (13 ימים/שנה) להמחשה ברורה, ו-Real Model (365.26 ימים/שנה) עם יחסי גודל מדויקים.</p>
+<h4>מאחורי הקלעים</h4>
+<p>• תאורת נקודה מהשמש יוצרת יום ולילה אמיתי על כדור הארץ<br>
+• טקסטורת כדור הארץ ברזולוציה גבוהה (2048px) מ-Three.js<br>
+• שמש פרוצדורלית עם אפקט קורונה באמצעות Additive Blending<br>
+• הטיית ציר (23.44°) ניתנת להפעלה להמחשת עונות השנה<br>
+• מישור משווה שקוף ומישור מסלול להמחשה גיאומטרית<br>
+• שבילי מיקום (afterimage) ליצירת אפקט time-lapse<br>
+• Logarithmic Depth Buffer לטיפול בהבדלי סקלות קיצוניים<br>
+• אבק קוסמי במישור המסלול לאווירה</p>
+<h4>קונסטנטות פיזיקליות</h4>
+<p>• יממה כוכבית: 23h 56m 4.0905s = 86,164.0905s<br>
+• יממה שמשית: 24h 0m 0s = 86,400s<br>
+• הפרש ליממה: ~3 דקות 56 שניות<br>
+• הטיית ציר: 23.44°<br>
+• שנה טרופית: 365.2422 ימים שמשיים</p>
+<h4>טכנולוגיות</h4>
+<p>Three.js r128 | Vanilla JS | Google Fonts (Rubik) | Single HTML File</p>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  PhysiTal Solar Day vs Sidereal Day — Enhanced 3D Simulation
+//  Built on Three.js r128
+// ═══════════════════════════════════════════════════════════════════
+
+// ===== TEXTURES & HELPERS =====
+const textureLoader = new THREE.TextureLoader();
+
+function createSunTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024; canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffaa00';
+    ctx.fillRect(0, 0, 1024, 1024);
+    ctx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 300; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 1024;
+        const r = Math.random() * 80 + 20;
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+        grad.addColorStop(0, 'rgba(255,255,200,0.5)');
+        grad.addColorStop(1, 'rgba(255,100,0,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'multiply';
+    for (let i = 0; i < 100; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 1024;
+        const r = Math.random() * 30 + 5;
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+        grad.addColorStop(0, 'rgba(200,50,0,0.4)');
+        grad.addColorStop(1, 'rgba(255,200,0,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    return new THREE.CanvasTexture(canvas);
+}
+
+function createGlowTexture(color1, color2, color3, size) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const half = size / 2;
+    const grad = ctx.createRadialGradient(half, half, 0, half, half, half);
+    grad.addColorStop(0, color1);
+    grad.addColorStop(0.2, color2);
+    grad.addColorStop(0.5, color3);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(canvas);
+}
+
+function createTextSprite(text, colorHex) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.font = 'Bold 40px Rubik, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 8;
+    ctx.fillStyle = '#' + colorHex.toString(16).padStart(6, '0');
+    ctx.fillText(text, 128, 64);
+    const texture = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+    return new THREE.Sprite(mat);
+}
+
+// ===== THREE.JS SETUP =====
+const container = document.getElementById('container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05060f);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+container.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.0001, 100000);
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ===== LIGHTING =====
+const ambientLight = new THREE.AmbientLight(0x222833, 0.4);
+scene.add(ambientLight);
+const sunLight = new THREE.PointLight(0xfff8e0, 2.0, 0);
+scene.add(sunLight);
+
+// ===== MODEL PARAMETERS =====
+const SIDEREAL_DAY_SEC = 86164.0905;
+const SOLAR_DAY_SEC = 86400;
+const TROPICAL_YEAR_SEC = 365.2422 * SOLAR_DAY_SEC;
+const SIDEREAL_DAYS_PER_YEAR = TROPICAL_YEAR_SEC / SIDEREAL_DAY_SEC;
+const AXIAL_TILT_RAD = 23.44 * Math.PI / 180;
+
+const config = {
+    toy: { orbitR: 150, sunR: 12, earthR: 4, daysPerYear: 13, cameraFarRadius: 350 },
+    real: {
+        orbitR: 150, sunR: 0.7, earthR: 0.0064,
+        daysPerYear: SIDEREAL_DAYS_PER_YEAR, cameraFarRadius: 350
+    }
+};
+
+const state = {
+    model: 'toy', paused: false, speed: 1.0,
+    orbitalAngle: 0, rotationAngle: 0,
+    totalOrbitalRevs: 0, totalRotationRevs: 0,
+    time: 0, manualOrbit: false,
+    tiltEnabled: false, tiltAngle: AXIAL_TILT_RAD,
+    trailsEnabled: false, equatorialPlaneVisible: false,
+    orbitalPlaneVisible: false
+};
+
+const ROT_OFFSET = Math.PI;
+
+// ===== SCENE OBJECTS =====
+
+// 1. Starfield
+const starGeo = new THREE.BufferGeometry();
+const starPos = [], starColors = [], starSizes = [];
+for (let i = 0; i < 3000; i++) {
+    const r = 800 + Math.random() * 1200;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(Math.random() * 2 - 1);
+    starPos.push(r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
+    const shade = 0.5 + Math.random() * 0.5;
+    const tint = Math.random();
+    if (tint < 0.1) starColors.push(1.0, 0.8, 0.6);       // warm
+    else if (tint < 0.2) starColors.push(0.7, 0.8, 1.0);   // cool
+    else starColors.push(shade, shade, 1.0);                 // blue-white
+    starSizes.push(1.0 + Math.random() * 2.5);
+}
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+starGeo.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
+const starMat = new THREE.PointsMaterial({ size: 2.0, vertexColors: true, transparent: true, opacity: 0.8 });
+const starfield = new THREE.Points(starGeo, starMat);
+scene.add(starfield);
+
+// 2. Sun with enhanced corona
+const sunGroup = new THREE.Group();
+scene.add(sunGroup);
+
+const sunTex = createSunTexture();
+const sunGeo = new THREE.SphereGeometry(1, 64, 64);
+const sunMat = new THREE.MeshBasicMaterial({ map: sunTex });
+const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+sunGroup.add(sunMesh);
+
+// Inner glow sprite
+const innerGlowTex = createGlowTexture(
+    'rgba(255,230,150,1)', 'rgba(255,180,60,0.6)', 'rgba(255,120,20,0.15)', 256);
+const sunInnerGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: innerGlowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+}));
+sunGroup.add(sunInnerGlow);
+
+// Outer corona sprite
+const coronaTex = createGlowTexture(
+    'rgba(255,200,80,0.5)', 'rgba(255,130,30,0.2)', 'rgba(255,80,0,0.05)', 512);
+const sunCorona = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: coronaTex, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.7, depthWrite: false
+}));
+sunGroup.add(sunCorona);
+
+// Faint outer halo
+const haloTex = createGlowTexture(
+    'rgba(255,180,100,0.15)', 'rgba(255,120,40,0.06)', 'rgba(255,80,0,0.01)', 512);
+const sunHalo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: haloTex, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.5, depthWrite: false
+}));
+sunGroup.add(sunHalo);
+
+// 3. Orbit Line
+const orbitMat = new THREE.LineDashedMaterial({ color: 0x888888, dashSize: 2, gapSize: 4, transparent: true, opacity: 0.4 });
+const orbitGeo = new THREE.BufferGeometry();
+const orbitPts = [];
+for (let i = 0; i <= 128; i++) {
+    const a = (i / 128) * Math.PI * 2;
+    orbitPts.push(Math.cos(a), 0, -Math.sin(a));
+}
+orbitGeo.setAttribute('position', new THREE.Float32BufferAttribute(orbitPts, 3));
+const orbitLine = new THREE.Line(orbitGeo, orbitMat);
+orbitLine.computeLineDistances();
+orbitLine.frustumCulled = false;
+scene.add(orbitLine);
+
+// 4. Earth system
+const earthPivot = new THREE.Group();
+scene.add(earthPivot);
+
+// Tilt group inside earthPivot - this rotates to show axial tilt
+const earthTiltGroup = new THREE.Group();
+earthPivot.add(earthTiltGroup);
+
+// Earth mesh inside tilt group
+const earthTex = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/planets/earth_atmos_2048.jpg');
+const earthMat = new THREE.MeshStandardMaterial({ map: earthTex, roughness: 0.8, metalness: 0.1 });
+const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), earthMat);
+earthTiltGroup.add(earthMesh);
+
+// Earth location glow
+const earthGlowCanvas = document.createElement('canvas');
+earthGlowCanvas.width = 128; earthGlowCanvas.height = 128;
+const egCtx = earthGlowCanvas.getContext('2d');
+const eGrd = egCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+eGrd.addColorStop(0, 'rgba(138,180,248,0.8)');
+eGrd.addColorStop(0.4, 'rgba(138,180,248,0.3)');
+eGrd.addColorStop(1, 'rgba(138,180,248,0)');
+egCtx.fillStyle = eGrd;
+egCtx.fillRect(0, 0, 128, 128);
+const earthGlowTex = new THREE.CanvasTexture(earthGlowCanvas);
+const earthGlowMat = new THREE.SpriteMaterial({
+    map: earthGlowTex, transparent: true, opacity: 0.5,
+    blending: THREE.AdditiveBlending, depthTest: false
+});
+const earthGlow = new THREE.Sprite(earthGlowMat);
+earthPivot.add(earthGlow);
+
+// Meridian line (noon marker) - inside tilt group
+const meridianGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 8);
+meridianGeo.translate(0, 0.5, 0);
+meridianGeo.rotateZ(-Math.PI / 2);
+const meridianMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+const meridianLine = new THREE.Mesh(meridianGeo, meridianMat);
+earthTiltGroup.add(meridianLine);
+
+// Axial tilt indicator line (visible when tilt is enabled)
+const tiltAxisGeo = new THREE.CylinderGeometry(0.02, 0.02, 1, 8);
+const tiltAxisMat = new THREE.MeshBasicMaterial({ color: 0x44ff88, transparent: true, opacity: 0.6 });
+const tiltAxisLine = new THREE.Mesh(tiltAxisGeo, tiltAxisMat);
+tiltAxisLine.visible = false;
+earthTiltGroup.add(tiltAxisLine);
+
+// 5. Equatorial Plane disc (togglable)
+const eqPlaneGeo = new THREE.RingGeometry(0, 1, 64);
+eqPlaneGeo.rotateX(-Math.PI / 2);
+const eqPlaneMat = new THREE.MeshBasicMaterial({
+    color: 0x44aaff, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false
+});
+const equatorialPlane = new THREE.Mesh(eqPlaneGeo, eqPlaneMat);
+equatorialPlane.visible = false;
+earthTiltGroup.add(equatorialPlane);
+
+// Equatorial ring edge
+const eqRingGeo = new THREE.RingGeometry(0.98, 1.0, 64);
+eqRingGeo.rotateX(-Math.PI / 2);
+const eqRingMat = new THREE.MeshBasicMaterial({
+    color: 0x44aaff, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false
+});
+const equatorialRing = new THREE.Mesh(eqRingGeo, eqRingMat);
+equatorialRing.visible = false;
+earthTiltGroup.add(equatorialRing);
+
+// 6. Orbital Plane (Ecliptic) - large semi-transparent disc at y=0
+const eclipticGeo = new THREE.RingGeometry(0, 1, 128);
+eclipticGeo.rotateX(-Math.PI / 2);
+const eclipticMat = new THREE.MeshBasicMaterial({
+    color: 0xffaa44, transparent: true, opacity: 0.04, side: THREE.DoubleSide, depthWrite: false
+});
+const eclipticPlane = new THREE.Mesh(eclipticGeo, eclipticMat);
+eclipticPlane.visible = false;
+scene.add(eclipticPlane);
+
+// 7. Dynamic Lines
+const lineMatSun = new THREE.LineBasicMaterial({ color: 0xFFD866, transparent: true, opacity: 0.5 });
+const sunRayGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+const sunRayLine = new THREE.Line(sunRayGeo, lineMatSun);
+sunRayLine.frustumCulled = false;
+scene.add(sunRayLine);
+
+const lineMatStar = new THREE.LineBasicMaterial({ color: 0x7eb8ff, transparent: true, opacity: 0.5 });
+const starRayGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+const starRayLine = new THREE.Line(starRayGeo, lineMatStar);
+starRayLine.frustumCulled = false;
+scene.add(starRayLine);
+
+// 8. Ghosts (day markers)
+const ghostGroup = new THREE.Group();
+scene.add(ghostGroup);
+let ghostsData = [];
+let siderealDayCount = 0;
+let solarDayCount = 0;
+
+function addGhost(orbAng, arrowAng, type, dayNum) {
+    const p = config[state.model];
+    const isSidereal = type === 'sidereal';
+    const colorHex = isSidereal ? 0x7eb8ff : 0xFFD866;
+    const pos = new THREE.Vector3(p.orbitR * Math.cos(orbAng), 0, -p.orbitR * Math.sin(orbAng));
+    const ghostSub = new THREE.Group();
+    ghostSub.position.copy(pos);
+
+    const ringGeo = new THREE.RingGeometry(p.earthR * 1.5, p.earthR * 1.8, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+    ghostSub.add(new THREE.Mesh(ringGeo, ringMat));
+
+    const dir = new THREE.Vector3(Math.cos(arrowAng), 0, -Math.sin(arrowAng)).normalize();
+    const arrHelper = new THREE.ArrowHelper(dir, new THREE.Vector3(), p.earthR * 6, colorHex, p.earthR * 1.2, p.earthR * 0.8);
+    ghostSub.add(arrHelper);
+
+    const sprite = createTextSprite(dayNum.toString(), colorHex);
+    sprite.position.set(0, p.earthR * 3, 0);
+    sprite.scale.set(p.earthR * 4, p.earthR * 2, 1);
+    ghostSub.add(sprite);
+
+    ghostSub.userData = { type, sprite };
+    ghostGroup.add(ghostSub);
+    ghostsData.push(ghostSub);
+}
+
+// 9. Trail afterimages
+const trailGroup = new THREE.Group();
+scene.add(trailGroup);
+let trailData = [];
+const MAX_TRAILS = 200;
+let trailTimer = 0;
+const TRAIL_INTERVAL = 0.15; // seconds between trail drops
+
+function addTrailGhost() {
+    if (!state.trailsEnabled) return;
+    const p = config[state.model];
+    const pos = new THREE.Vector3(
+        p.orbitR * Math.cos(state.orbitalAngle), 0,
+        -p.orbitR * Math.sin(state.orbitalAngle)
+    );
+
+    const ghostMat = new THREE.MeshBasicMaterial({
+        color: 0x4488cc, transparent: true, opacity: 0.25, depthWrite: false
+    });
+    const ghostMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), ghostMat);
+    ghostMesh.scale.set(p.earthR, p.earthR, p.earthR);
+    ghostMesh.position.copy(pos);
+
+    // Apply tilt to the trail ghost if tilt is enabled
+    if (state.tiltEnabled) {
+        ghostMesh.rotation.z = state.tiltAngle;
+    }
+
+    trailGroup.add(ghostMesh);
+    trailData.push({ mesh: ghostMesh, age: 0, maxAge: 8.0 });
+
+    // Limit trail count
+    while (trailData.length > MAX_TRAILS) {
+        const old = trailData.shift();
+        trailGroup.remove(old.mesh);
+        old.mesh.geometry.dispose();
+        old.mesh.material.dispose();
+    }
+}
+
+function updateTrails(dt) {
+    for (let i = trailData.length - 1; i >= 0; i--) {
+        trailData[i].age += dt;
+        const t = trailData[i].age / trailData[i].maxAge;
+        if (t >= 1) {
+            trailGroup.remove(trailData[i].mesh);
+            trailData[i].mesh.geometry.dispose();
+            trailData[i].mesh.material.dispose();
+            trailData.splice(i, 1);
+        } else {
+            trailData[i].mesh.material.opacity = 0.25 * (1 - t * t);
+        }
+    }
+}
+
+// 10. Cosmic dust particles in orbital plane
+const dustCount = 600;
+const dustGeo = new THREE.BufferGeometry();
+const dustPositions = [];
+const dustVelocities = [];
+for (let i = 0; i < dustCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 40 + Math.random() * 200;
+    const x = radius * Math.cos(angle);
+    const z = -radius * Math.sin(angle);
+    const y = (Math.random() - 0.5) * 8;
+    dustPositions.push(x, y, z);
+    dustVelocities.push(
+        (Math.random() - 0.5) * 0.02,
+        (Math.random() - 0.5) * 0.005,
+        (Math.random() - 0.5) * 0.02
+    );
+}
+dustGeo.setAttribute('position', new THREE.Float32BufferAttribute(dustPositions, 3));
+const dustMat = new THREE.PointsMaterial({
+    color: 0x8899bb, size: 0.8, transparent: true, opacity: 0.25,
+    blending: THREE.AdditiveBlending, depthWrite: false
+});
+const dustParticles = new THREE.Points(dustGeo, dustMat);
+scene.add(dustParticles);
+
+function updateDust(dt) {
+    const pos = dustParticles.geometry.attributes.position.array;
+    for (let i = 0; i < dustCount; i++) {
+        const idx = i * 3;
+        pos[idx] += dustVelocities[idx] * dt * 60;
+        pos[idx + 1] += dustVelocities[idx + 1] * dt * 60;
+        pos[idx + 2] += dustVelocities[idx + 2] * dt * 60;
+        // Gentle orbital drift
+        const dx = pos[idx], dz = pos[idx + 2];
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist > 0) {
+            const orbitalSpeed = 0.0003 / Math.max(dist / 150, 0.3);
+            pos[idx] += -dz / dist * orbitalSpeed * dt * 60;
+            pos[idx + 2] += dx / dist * orbitalSpeed * dt * 60;
+        }
+        // Reset if too far
+        if (dist > 280 || dist < 30) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = 40 + Math.random() * 200;
+            pos[idx] = r * Math.cos(angle);
+            pos[idx + 1] = (Math.random() - 0.5) * 8;
+            pos[idx + 2] = -r * Math.sin(angle);
+        }
+    }
+    dustParticles.geometry.attributes.position.needsUpdate = true;
+}
+
+// 11. Labels
+const sunLabel = createTextSprite('☀ שמש', 0xFFD866);
+scene.add(sunLabel);
+const earthLabel = createTextSprite('🌍 כדו"א', 0x7eb8ff);
+earthPivot.add(earthLabel);
+const starRefLabel = createTextSprite('⭐ כוכב התייחסות', 0x7eb8ff);
+scene.add(starRefLabel);
+
+// ===== CAMERA CONTROLLER WITH SMOOTH TRANSITIONS =====
+const camCtrl = {
+    target: new THREE.Vector3(),
+    targetSmooth: new THREE.Vector3(),
+    panOffset: new THREE.Vector3(),
+    radius: 150, targetRadius: 150,
+    theta: Math.PI / 4, targetTheta: Math.PI / 4,
+    phi: Math.PI / 3, targetPhi: Math.PI / 3,
+    trackMode: 'none',
+    isDragging: false, isPanning: false,
+    lastMouseX: 0, lastMouseY: 0,
+    transitionSpeed: 0.08
+};
+
+function resetCamera() {
+    const p = config[state.model];
+    camCtrl.targetRadius = p.cameraFarRadius;
+    camCtrl.trackMode = 'none';
+    camCtrl.panOffset.set(0, 0, 0);
+    camCtrl.targetTheta = Math.PI / 4;
+    camCtrl.targetPhi = Math.PI / 4;
+    updateTrackBtns('none');
+    updateZoomSliderFromRadius();
+}
+
+function updateTrackBtns(mode) {
+    document.querySelectorAll('#trackBtns button').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`#trackBtns button[data-track="${mode}"]`);
+    if (btn) btn.classList.add('active');
+}
+
+function updateZoomSliderFromRadius() {
+    const p = config[state.model];
+    const minR = p.earthR * 2;
+    const maxR = p.cameraFarRadius * 1.5;
+    const t = Math.log(camCtrl.targetRadius / minR) / Math.log(maxR / minR);
+    document.getElementById('zoomSlider').value = Math.max(0, Math.min(100, t * 100));
+    document.getElementById('zoomVal').textContent = (100 / camCtrl.targetRadius).toFixed(2) + 'x';
+}
+
+function updateRadiusFromZoomSlider(val) {
+    const p = config[state.model];
+    const minR = p.earthR * 2;
+    const maxR = p.cameraFarRadius * 1.5;
+    camCtrl.targetRadius = minR * Math.pow(maxR / minR, val / 100);
+    document.getElementById('zoomVal').textContent = (100 / camCtrl.targetRadius).toFixed(2) + 'x';
+}
+
+// Mouse controls
+container.addEventListener('mousedown', e => {
+    if (e.button === 2) return;
+    if (e.altKey) { camCtrl.isPanning = true; }
+    else { camCtrl.isDragging = true; }
+    camCtrl.lastMouseX = e.clientX;
+    camCtrl.lastMouseY = e.clientY;
+    container.style.cursor = 'grabbing';
+});
+
+window.addEventListener('mousemove', e => {
+    if (camCtrl.isDragging) {
+        const dx = e.clientX - camCtrl.lastMouseX;
+        const dy = e.clientY - camCtrl.lastMouseY;
+        camCtrl.targetTheta -= dx * 0.005;
+        camCtrl.targetPhi -= dy * 0.005;
+        camCtrl.targetPhi = Math.max(0.01, Math.min(Math.PI - 0.01, camCtrl.targetPhi));
+    } else if (camCtrl.isPanning) {
+        const dx = e.clientX - camCtrl.lastMouseX;
+        const dy = e.clientY - camCtrl.lastMouseY;
+        const right = new THREE.Vector3(
+            Math.sin(camCtrl.theta - Math.PI / 2), 0,
+            Math.cos(camCtrl.theta - Math.PI / 2)
+        ).normalize();
+        const panFactor = camCtrl.radius * 0.002;
+        camCtrl.panOffset.addScaledVector(right, -dx * panFactor);
+        const fwd = new THREE.Vector3(
+            Math.cos(camCtrl.theta), 0, -Math.sin(camCtrl.theta)
+        ).normalize();
+        camCtrl.panOffset.addScaledVector(fwd, dy * panFactor);
+    }
+    camCtrl.lastMouseX = e.clientX;
+    camCtrl.lastMouseY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => {
+    camCtrl.isDragging = false;
+    camCtrl.isPanning = false;
+    container.style.cursor = 'crosshair';
+});
+
+container.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+    const p = config[state.model];
+    camCtrl.targetRadius = Math.max(
+        p.earthR * 1.2,
+        Math.min(p.cameraFarRadius * 2, camCtrl.targetRadius * factor)
+    );
+    updateZoomSliderFromRadius();
+}, { passive: false });
+
+// ===== ANNOTATIONS SYSTEM =====
+const annotations = {
+    shown: new Set(),
+    queue: [],
+    currentTimeout: null,
+
+    show(id, icon, title, body, duration) {
+        if (this.shown.has(id)) return;
+        this.shown.add(id);
+        this.queue.push({ icon, title, body, duration: duration || 4000 });
+        if (!this.currentTimeout) this._next();
+    },
+
+    _next() {
+        if (this.queue.length === 0) { this.currentTimeout = null; return; }
+        const { icon, title, body, duration } = this.queue.shift();
+        const el = document.getElementById('annotation');
+        el.querySelector('.ann-icon').textContent = icon;
+        el.querySelector('.ann-title').textContent = title;
+        el.querySelector('.ann-body').textContent = body;
+        el.classList.remove('hide');
+        el.classList.add('show');
+        this.currentTimeout = setTimeout(() => {
+            el.classList.add('hide');
+            setTimeout(() => {
+                el.classList.remove('show', 'hide');
+                this._next();
+            }, 600);
+        }, duration);
+    }
+};
+
+// ===== CORE LOGIC =====
+function applyModelParameters() {
+    const p = config[state.model];
+
+    sunMesh.scale.set(p.sunR, p.sunR, p.sunR);
+    sunInnerGlow.scale.set(p.sunR * 2.5, p.sunR * 2.5, 1);
+    sunCorona.scale.set(p.sunR * 5, p.sunR * 5, 1);
+    sunHalo.scale.set(p.sunR * 8, p.sunR * 8, 1);
+
+    earthMesh.scale.set(p.earthR, p.earthR, p.earthR);
+    meridianLine.scale.set(p.earthR * 6, p.earthR * 6, p.earthR * 6);
+
+    // Tilt axis indicator
+    tiltAxisLine.scale.set(p.earthR * 2, p.earthR * 12, p.earthR * 2);
+
+    // Equatorial plane
+    equatorialPlane.scale.set(p.earthR * 4, p.earthR * 4, p.earthR * 4);
+    equatorialRing.scale.set(p.earthR * 4, p.earthR * 4, p.earthR * 4);
+
+    // Ecliptic plane
+    eclipticPlane.scale.set(p.orbitR * 1.2, p.orbitR * 1.2, p.orbitR * 1.2);
+
+    orbitLine.scale.set(p.orbitR, 1, p.orbitR);
+
+    sunLabel.scale.set(p.sunR * 2.5, p.sunR * 1.25, 1);
+    sunLabel.position.set(0, p.sunR * 1.5, 0);
+
+    earthLabel.scale.set(p.earthR * 6, p.earthR * 3, 1);
+    earthLabel.position.set(0, p.earthR * 3, 0);
+
+    earthGlow.scale.set(p.earthR * 10, p.earthR * 10, 1);
+
+    resetSim();
+    resetCamera();
+}
+
+function resetSim() {
+    state.orbitalAngle = 0;
+    state.rotationAngle = 0;
+    state.totalOrbitalRevs = 0;
+    state.totalRotationRevs = 0;
+    state.time = 0;
+    siderealDayCount = 0;
+    solarDayCount = 0;
+    annotations.shown.clear();
+
+    // Clear ghosts
+    for (let i = ghostGroup.children.length - 1; i >= 0; i--) {
+        ghostGroup.remove(ghostGroup.children[i]);
+    }
+    ghostsData = [];
+
+    // Clear trails
+    for (let i = trailData.length - 1; i >= 0; i--) {
+        trailGroup.remove(trailData[i].mesh);
+        trailData[i].mesh.geometry.dispose();
+        trailData[i].mesh.material.dispose();
+    }
+    trailData = [];
+    trailTimer = 0;
+
+    // Initial ghosts at t=0
+    addGhost(0, Math.PI, 'sidereal', 0);
+    addGhost(0, Math.PI, 'solar', 0);
+
+    // Update orbit slider
+    document.getElementById('orbitSlider').value = 0;
+    document.getElementById('orbitVal').textContent = '0°';
+}
+
+// ===== MAIN LOOP =====
+const clock = new THREE.Clock();
+let sunRotation = 0;
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    const dtRaw = clock.getDelta();
+    const dt = Math.min(dtRaw, 0.05);
+
+    if (!state.paused && !state.manualOrbit) {
+        const p = config[state.model];
+        const rotSpeed = Math.PI * 2 * 0.5;
+        const orbSpeed = rotSpeed / p.daysPerYear;
+        const effectiveDt = dt * state.speed;
+
+        state.rotationAngle += rotSpeed * effectiveDt;
+        state.orbitalAngle += orbSpeed * effectiveDt;
+        state.time += effectiveDt;
+
+        state.totalRotationRevs = state.rotationAngle / (Math.PI * 2);
+        state.totalOrbitalRevs = state.orbitalAngle / (Math.PI * 2);
+
+        // Trail drops
+        if (state.trailsEnabled) {
+            trailTimer += effectiveDt;
+            if (trailTimer >= TRAIL_INTERVAL) {
+                addTrailGhost();
+                trailTimer -= TRAIL_INTERVAL;
+            }
+        }
+
+        // Sidereal Day check
+        if (Math.floor(state.totalRotationRevs) > siderealDayCount) {
+            siderealDayCount = Math.floor(state.totalRotationRevs);
+            addGhost(state.orbitalAngle, Math.PI, 'sidereal', siderealDayCount);
+
+            // Annotation on first sidereal day
+            if (siderealDayCount === 1) {
+                annotations.show('first_sidereal', '🌀',
+                    'יממה כוכבית ראשונה!',
+                    'כדור הארץ השלים סיבוב מלא של 360° ביחס לכוכבים. שימו לב שהסמן האדום לא מצביע עדיין על השמש — צריך עוד קצת!',
+                    5000);
+            }
+        }
+
+        // Solar Day check
+        const solarPhase = (state.rotationAngle - state.orbitalAngle) / (Math.PI * 2);
+        if (Math.floor(solarPhase) > solarDayCount) {
+            solarDayCount = Math.floor(solarPhase);
+            const x = p.orbitR * Math.cos(state.orbitalAngle);
+            const z = -p.orbitR * Math.sin(state.orbitalAngle);
+            const sunAngle = Math.atan2(z, -x);
+            addGhost(state.orbitalAngle, sunAngle, 'solar', solarDayCount);
+
+            // Annotation on first solar day
+            if (solarDayCount === 1) {
+                annotations.show('first_solar', '☀️',
+                    'יממה שמשית ראשונה!',
+                    'עכשיו הסמן האדום מצביע שוב על השמש. שימו לב שזה לקח קצת יותר מ-360° — ההפרש הוא כ-3 דקות ו-56 שניות.',
+                    5000);
+            }
+
+            // Annotation halfway through year
+            if (state.model === 'toy' && solarDayCount === 6) {
+                annotations.show('halfway', '📊',
+                    'חצי שנה!',
+                    'ב-6 ימים שמשיים, יש כבר הפרש מצטבר של כ-24 דקות בין ימים שמשיים לכוכביים.',
+                    4000);
+            }
+        }
+    }
+
+    // Update transforms
+    const p = config[state.model];
+    const eX = p.orbitR * Math.cos(state.orbitalAngle);
+    const eZ = -p.orbitR * Math.sin(state.orbitalAngle);
+    earthPivot.position.set(eX, 0, eZ);
+
+    // Axial tilt
+    const tiltAngle = state.tiltEnabled ? state.tiltAngle : 0;
+    // Tilt is around Z axis (in the plane of the orbit, perpendicular to orbital motion)
+    // The tilt direction stays fixed in space (points toward Polaris)
+    // To keep the tilt fixed in space, we must counter-rotate relative to orbital angle
+    earthTiltGroup.rotation.set(0, 0, 0);
+    // Apply tilt in a direction that stays fixed in inertial space
+    // First rotate by negative orbital angle to get into body frame,
+    // apply tilt, then rotate back
+    const tiltQuat = new THREE.Quaternion();
+    // The tilt axis is perpendicular to the orbital plane normal and fixed in space.
+    // We tilt around the X-axis in the frame co-rotating with the orbit,
+    // so the visual axis always points "north" regardless of orbital position.
+    earthTiltGroup.rotation.z = tiltAngle;
+
+    // Earth self-rotation (around local Y)
+    earthMesh.rotation.y = state.rotationAngle + ROT_OFFSET;
+    meridianLine.rotation.y = state.rotationAngle + ROT_OFFSET;
+
+    // Tilt axis visibility
+    tiltAxisLine.visible = state.tiltEnabled;
+
+    // Sun slow rotation
+    sunRotation += dt * 0.05;
+    sunMesh.rotation.y = sunRotation;
+    // Animate corona pulse
+    const coronaPulse = 1.0 + Math.sin(state.time * 0.5) * 0.05;
+    sunCorona.scale.set(p.sunR * 5 * coronaPulse, p.sunR * 5 * coronaPulse, 1);
+    const haloPulse = 1.0 + Math.sin(state.time * 0.3 + 1.5) * 0.03;
+    sunHalo.scale.set(p.sunR * 8 * haloPulse, p.sunR * 8 * haloPulse, 1);
+
+    // Update trails
+    updateTrails(dt * state.speed);
+
+    // Update dust
+    if (dustParticles.visible) updateDust(dt);
+
+    // ── Visibility toggles ──
+    meridianLine.visible = document.getElementById('chkRotLine').checked;
+
+    const showSunRay = document.getElementById('chkSunRay').checked;
+    sunRayLine.visible = showSunRay;
+    if (showSunRay) {
+        sunRayLine.geometry.setFromPoints([
+            new THREE.Vector3(eX, 0, eZ),
+            new THREE.Vector3(0, 0, 0)
+        ]);
+    }
+
+    const showStarRef = document.getElementById('chkStarRef').checked;
+    starRayLine.visible = showStarRef;
+    starRefLabel.visible = showStarRef && document.getElementById('chkLabels').checked;
+    if (showStarRef) {
+        const starDirX = p.orbitR * 1.5;
+        starRayLine.geometry.setFromPoints([
+            new THREE.Vector3(eX, 0, eZ),
+            new THREE.Vector3(eX - starDirX, 0, eZ)
+        ]);
+        starRefLabel.position.set(eX - starDirX * 0.9, p.earthR * 5, eZ);
+        starRefLabel.scale.set(p.earthR * 8, p.earthR * 4, 1);
+    }
+
+    orbitLine.visible = document.getElementById('chkOrbit').checked;
+    starfield.visible = document.getElementById('chkStars').checked;
+
+    const showLabels = document.getElementById('chkLabels').checked;
+    sunLabel.visible = showLabels;
+    earthLabel.visible = showLabels;
+
+    const showSidGhosts = document.getElementById('chkGhostsSidereal').checked;
+    const showSolGhosts = document.getElementById('chkGhostsSolar').checked;
+    ghostsData.forEach(g => {
+        g.visible = (g.userData.type === 'sidereal' && showSidGhosts) ||
+                    (g.userData.type === 'solar' && showSolGhosts);
+        if (g.visible) g.userData.sprite.visible = showLabels;
+    });
+
+    // Equatorial plane
+    const showEq = document.getElementById('chkEquatorialPlane').checked;
+    equatorialPlane.visible = showEq;
+    equatorialRing.visible = showEq;
+
+    // Orbital/ecliptic plane
+    eclipticPlane.visible = document.getElementById('chkOrbitalPlane').checked;
+
+    // Dust
+    dustParticles.visible = document.getElementById('chkDust').checked;
+
+    // Trail visibility
+    trailGroup.visible = state.trailsEnabled;
+
+    // Earth glow based on distance
+    const distToEarth = camera.position.distanceTo(earthPivot.position);
+    earthGlow.material.opacity = Math.min(0.8, Math.max(0, (distToEarth - p.earthR * 10) / (p.earthR * 50)));
+
+    // ── Camera smooth update ──
+    const ts = camCtrl.transitionSpeed;
+    camCtrl.radius += (camCtrl.targetRadius - camCtrl.radius) * ts;
+    camCtrl.theta += (camCtrl.targetTheta - camCtrl.theta) * ts;
+    camCtrl.phi += (camCtrl.targetPhi - camCtrl.phi) * ts;
+
+    let baseTarget = new THREE.Vector3();
+    if (camCtrl.trackMode === 'earth') baseTarget.copy(earthPivot.position);
+    else if (camCtrl.trackMode === 'sun') baseTarget.set(0, 0, 0);
+
+    camCtrl.target.lerp(baseTarget, ts);
+    const finalTarget = camCtrl.target.clone().add(camCtrl.panOffset);
+
+    camera.position.x = finalTarget.x + camCtrl.radius * Math.sin(camCtrl.phi) * Math.cos(camCtrl.theta);
+    camera.position.y = finalTarget.y + camCtrl.radius * Math.cos(camCtrl.phi);
+    camera.position.z = finalTarget.z + camCtrl.radius * Math.sin(camCtrl.phi) * Math.sin(camCtrl.theta);
+    camera.lookAt(finalTarget);
+
+    renderer.render(scene, camera);
+
+    // ── HUD Update ──
+    const siderealDays = state.totalRotationRevs;
+    const solarDays = siderealDays > 0 ? siderealDays * (1 - 1 / p.daysPerYear) : 0;
+    const diffMinutes = (siderealDays - solarDays) * 24 * 60;
+
+    document.getElementById('hudSolar').textContent = solarDays.toFixed(3);
+    document.getElementById('hudSidereal').textContent = siderealDays.toFixed(3);
+    document.getElementById('hudDiff').textContent = diffMinutes.toFixed(1);
+}
+
+// ===== UI BINDINGS =====
+
+// ── Context Menu ──
+document.addEventListener('contextmenu', e => {
+    // Only show on canvas, not on dialogues
+    if (e.target.closest('.dialogue') || e.target.closest('#ctxMenu')) return;
+    e.preventDefault();
+    const menu = document.getElementById('ctxMenu');
+    menu.style.display = 'block';
+    let x = e.clientX, y = e.clientY;
+    if (x + 220 > window.innerWidth) x = window.innerWidth - 220;
+    if (y + 200 > window.innerHeight) y = window.innerHeight - 200;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+
+    menu.querySelectorAll('.item').forEach(item => {
+        const dlgId = item.dataset.dlg;
+        if (dlgId) {
+            const dlg = document.getElementById('dlg-' + dlgId);
+            item.classList.toggle('active', dlg && dlg.style.display === 'block');
+        }
+    });
+});
+
+document.addEventListener('click', e => {
+    const menu = document.getElementById('ctxMenu');
+    if (!menu.contains(e.target)) menu.style.display = 'none';
+});
+
+document.querySelectorAll('#ctxMenu .item').forEach(item => {
+    item.addEventListener('click', () => {
+        const dlgId = item.dataset.dlg;
+        if (dlgId) {
+            const dlg = document.getElementById('dlg-' + dlgId);
+            if (dlg) dlg.style.display = dlg.style.display === 'block' ? 'none' : 'block';
+        }
+        document.getElementById('ctxMenu').style.display = 'none';
+    });
+});
+
+// ── Dialogue Dragging ──
+document.querySelectorAll('.dialogue').forEach(dlg => {
+    const header = dlg.querySelector('.dlg-header');
+    const closeBtn = dlg.querySelector('.dlg-close');
+    let dragging = false, offX, offY;
+
+    header.addEventListener('mousedown', e => {
+        if (e.target === closeBtn) return;
+        dragging = true;
+        const rect = dlg.getBoundingClientRect();
+        dlg.style.right = 'auto';
+        dlg.style.bottom = 'auto';
+        dlg.style.transform = 'none';
+        dlg.style.left = rect.left + 'px';
+        dlg.style.top = rect.top + 'px';
+        offX = e.clientX - rect.left;
+        offY = e.clientY - rect.top;
+        header.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        dlg.style.left = (e.clientX - offX) + 'px';
+        dlg.style.top = (e.clientY - offY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        dragging = false;
+        header.style.cursor = 'grab';
+    });
+
+    closeBtn.addEventListener('click', () => dlg.style.display = 'none');
+
+    // Prevent simulation interaction while interacting with dialogues
+    dlg.addEventListener('wheel', e => e.stopPropagation());
+    dlg.addEventListener('mousedown', e => e.stopPropagation());
+});
+
+// ── Model Buttons ──
+document.querySelectorAll('#modelBtns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#modelBtns button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.model = btn.dataset.model;
+        applyModelParameters();
+        if (state.model === 'real') {
+            annotations.show('real_model', '🔬',
+                'Real Model',
+                'מודל ריאלי! יחסי הגודל בין השמש לכדור הארץ אמיתיים. כדור הארץ זעיר — השתמשו בזום כדי לראותו.',
+                4000);
+        }
+    });
+});
+
+// ── Speed Slider ──
+const speedSlider = document.getElementById('speedSlider');
+speedSlider.addEventListener('input', () => {
+    const v = parseFloat(speedSlider.value);
+    if (v === 0) state.speed = 0;
+    else state.speed = Math.pow(10, (v - 30) / 30);
+    document.getElementById('speedVal').textContent = state.speed.toFixed(2) + 'x';
+});
+
+// ── Pause/Reset ──
+const btnPause = document.getElementById('btnPause');
+btnPause.addEventListener('click', () => {
+    state.paused = !state.paused;
+    btnPause.textContent = state.paused ? '▶ המשך' : '⏸ השהה';
+});
+
+document.getElementById('btnReset').addEventListener('click', resetSim);
+
+// ── Orbit Slider ──
+const orbitSlider = document.getElementById('orbitSlider');
+orbitSlider.addEventListener('input', () => {
+    state.manualOrbit = true;
+    const deg = parseFloat(orbitSlider.value);
+    const p = config[state.model];
+    state.orbitalAngle = deg * Math.PI / 180;
+    state.rotationAngle = state.orbitalAngle * p.daysPerYear;
+    state.totalRotationRevs = state.rotationAngle / (Math.PI * 2);
+    state.totalOrbitalRevs = state.orbitalAngle / (Math.PI * 2);
+    document.getElementById('orbitVal').textContent = deg.toFixed(1) + '°';
+});
+orbitSlider.addEventListener('change', () => state.manualOrbit = false);
+
+// ── Tilt Toggle ──
+const chkTilt = document.getElementById('chkTilt');
+chkTilt.addEventListener('change', () => {
+    state.tiltEnabled = chkTilt.checked;
+    document.getElementById('tiltSliderRow').style.display = chkTilt.checked ? 'flex' : 'none';
+    if (chkTilt.checked) {
+        annotations.show('tilt_enabled', '🌐',
+            'הטיית ציר 23.44°',
+            'ציר כדור הארץ מוטה ביחס למישור המסלול. זו הסיבה לעונות השנה! שימו לב שההטייה לא משנה את ההפרש בין יממה שמשית ליממה כוכבית.',
+            4500);
+    }
+});
+
+const tiltSlider = document.getElementById('tiltSlider');
+tiltSlider.addEventListener('input', () => {
+    const deg = parseFloat(tiltSlider.value);
+    state.tiltAngle = deg * Math.PI / 180;
+    document.getElementById('tiltVal').textContent = deg.toFixed(2) + '°';
+});
+
+// ── Trails Toggle ──
+const chkTrails = document.getElementById('chkTrails');
+chkTrails.addEventListener('change', () => {
+    state.trailsEnabled = chkTrails.checked;
+});
+
+// ── Equatorial Plane shortcut sync ──
+document.getElementById('chkEquatorialPlane').addEventListener('change', function() {
+    state.equatorialPlaneVisible = this.checked;
+});
+
+// ── Camera Dialog ──
+document.querySelectorAll('#trackBtns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        camCtrl.trackMode = btn.dataset.track;
+        camCtrl.panOffset.set(0, 0, 0);
+        updateTrackBtns(camCtrl.trackMode);
+    });
+});
+
+const zoomSlider = document.getElementById('zoomSlider');
+zoomSlider.addEventListener('input', () => {
+    updateRadiusFromZoomSlider(parseFloat(zoomSlider.value));
+});
+
+document.getElementById('btnZoomReset').addEventListener('click', resetCamera);
+
+document.getElementById('btnZoomEarth').addEventListener('click', () => {
+    const p = config[state.model];
+    camCtrl.trackMode = 'earth';
+    camCtrl.panOffset.set(0, 0, 0);
+    camCtrl.targetRadius = p.earthR * 12;
+    camCtrl.targetPhi = Math.PI / 3;
+    updateTrackBtns('earth');
+    updateZoomSliderFromRadius();
+});
+
+// ===== KEYBOARD SHORTCUTS =====
+document.addEventListener('keydown', e => {
+    // Ignore if typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    switch (e.code) {
+        case 'Space':
+            e.preventDefault();
+            state.paused = !state.paused;
+            btnPause.textContent = state.paused ? '▶ המשך' : '⏸ השהה';
+            break;
+        case 'KeyR':
+            resetSim();
+            break;
+        case 'Digit1':
+            state.model = 'toy';
+            document.querySelectorAll('#modelBtns button').forEach(b => b.classList.remove('active'));
+            document.querySelector('#modelBtns button[data-model="toy"]').classList.add('active');
+            applyModelParameters();
+            break;
+        case 'Digit2':
+            state.model = 'real';
+            document.querySelectorAll('#modelBtns button').forEach(b => b.classList.remove('active'));
+            document.querySelector('#modelBtns button[data-model="real"]').classList.add('active');
+            applyModelParameters();
+            annotations.show('real_model', '🔬', 'Real Model',
+                'מודל ריאלי! יחסי הגודל בין השמש לכדור הארץ אמיתיים. כדור הארץ זעיר — השתמשו בזום כדי לראותו.', 4000);
+            break;
+        case 'KeyT':
+            chkTilt.checked = !chkTilt.checked;
+            chkTilt.dispatchEvent(new Event('change'));
+            break;
+        case 'KeyE':
+            const eqChk = document.getElementById('chkEquatorialPlane');
+            eqChk.checked = !eqChk.checked;
+            eqChk.dispatchEvent(new Event('change'));
+            break;
+        case 'KeyL':
+            chkTrails.checked = !chkTrails.checked;
+            chkTrails.dispatchEvent(new Event('change'));
+            break;
+    }
+});
+
+// ===== INIT =====
+applyModelParameters();
+requestAnimationFrame(animate);
+
+// Fade out hints
+setTimeout(() => {
+    document.getElementById('modeIndicator').style.opacity = '0';
+}, 6000);
+setTimeout(() => {
+    document.getElementById('shortcutsHint').style.opacity = '0';
+}, 10000);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhysiTal | שנה עברית - סקירה</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;900&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #050510;
+            color: #f3f4f6;
+            font-family: 'Rubik', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .year-type {
+            font-size: 18px;
+            color: #9ca3af;
+            margin-bottom: 32px;
+        }
+
+        .year-type .leap { color: #fbbf24; font-weight: 600; }
+
+        .months-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .month-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 16px 12px;
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            cursor: default;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .month-card.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .month-card:hover {
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-4px) scale(1.02);
+        }
+
+        .month-card.is-adar {
+            border-color: rgba(251, 191, 36, 0.3);
+            background: rgba(251, 191, 36, 0.05);
+        }
+
+        .month-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .month-days {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .month-days span {
+            font-weight: 600;
+            color: #a78bfa;
+        }
+
+        .moon-phase {
+            font-size: 32px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .month-greg {
+            font-size: 11px;
+            color: #4b5563;
+            margin-top: 6px;
+        }
+
+        .total-bar {
+            margin-top: 32px;
+            text-align: center;
+            opacity: 0;
+            transition: all 0.8s;
+        }
+
+        .total-bar.visible { opacity: 1; }
+
+        .total-days {
+            font-size: 48px;
+            font-weight: 900;
+            direction: ltr;
+        }
+
+        .total-days .actual { color: #a78bfa; }
+        .total-days .vs { color: #4b5563; font-weight: 400; font-size: 24px; }
+        .total-days .solar { color: #60a5fa; }
+
+        .total-label {
+            font-size: 16px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        .diff-badge {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .diff-badge.short {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .diff-badge.long {
+            background: rgba(34, 197, 94, 0.15);
+            color: #86efac;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        /* Year navigation */
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 8px;
+        }
+
+        .nav button {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #9ca3af;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .nav button:hover {
+            background: rgba(255,255,255,0.15);
+            color: white;
+        }
+
+        .watermark {
+            position: fixed;
+            bottom: 16px;
+            right: 24px;
+            font-size: 14px;
+            color: rgba(255,255,255,0.12);
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+
+        /* Stars */
+        .stars {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none; z-index: -1;
+        }
+        .star {
+            position: absolute; width: 2px; height: 2px;
+            background: white; border-radius: 50%;
+            animation: twinkle var(--duration) infinite alternate;
+        }
+        @keyframes twinkle {
+            0% { opacity: 0.15; }
+            100% { opacity: var(--max-opacity); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="nav">
+    <button onclick="changeYear(-1)">→</button>
+    <h1 id="title">שנת ה׳תשפ״ו</h1>
+    <button onclick="changeYear(1)">←</button>
+</div>
+<div class="year-type" id="yearType">שנה רגילה | 12 חודשים</div>
+
+<div class="months-grid" id="monthsGrid"></div>
+
+<div class="total-bar" id="totalBar">
+    <div class="total-days">
+        <span class="actual" id="totalActual">354</span>
+        <span class="vs"> / </span>
+        <span class="solar">365.25</span>
+    </div>
+    <div class="total-label">סה"כ ימים בשנה העברית מול שנת השמש</div>
+    <div class="diff-badge short" id="diffBadge">חסרים 11 ימים - לכן צריך שנה מעוברת!</div>
+</div>
+
+<div class="watermark">PHYSITAL</div>
+
+<script>
+    // Hebrew month data
+    const MONTHS_REGULAR = [
+        { name: 'תשרי', eng: 'Tishrei', days: 30, moon: '🌑', gregApprox: 'ספט-אוק' },
+        { name: 'חשוון', eng: 'Cheshvan', days: null, moon: '🌑', gregApprox: 'אוק-נוב' }, // 29 or 30
+        { name: 'כסלו', eng: 'Kislev', days: null, moon: '🌑', gregApprox: 'נוב-דצמ' }, // 29 or 30
+        { name: 'טבת', eng: 'Tevet', days: 29, moon: '🌑', gregApprox: 'דצמ-ינו' },
+        { name: 'שבט', eng: 'Shvat', days: 30, moon: '🌑', gregApprox: 'ינו-פבר' },
+        { name: 'אדר', eng: 'Adar', days: 29, moon: '🌑', gregApprox: 'פבר-מרץ' },
+        { name: 'ניסן', eng: 'Nisan', days: 30, moon: '🌑', gregApprox: 'מרץ-אפר' },
+        { name: 'אייר', eng: 'Iyyar', days: 29, moon: '🌑', gregApprox: 'אפר-מאי' },
+        { name: 'סיוון', eng: 'Sivan', days: 30, moon: '🌑', gregApprox: 'מאי-יוני' },
+        { name: 'תמוז', eng: 'Tamuz', days: 29, moon: '🌑', gregApprox: 'יוני-יולי' },
+        { name: 'אב', eng: 'Av', days: 30, moon: '🌑', gregApprox: 'יולי-אוג' },
+        { name: 'אלול', eng: 'Elul', days: 29, moon: '🌑', gregApprox: 'אוג-ספט' },
+    ];
+
+    const MONTHS_LEAP = [
+        { name: 'תשרי', eng: 'Tishrei', days: 30, moon: '🌑', gregApprox: 'ספט-אוק' },
+        { name: 'חשוון', eng: 'Cheshvan', days: null, moon: '🌑', gregApprox: 'אוק-נוב' },
+        { name: 'כסלו', eng: 'Kislev', days: null, moon: '🌑', gregApprox: 'נוב-דצמ' },
+        { name: 'טבת', eng: 'Tevet', days: 29, moon: '🌑', gregApprox: 'דצמ-ינו' },
+        { name: 'שבט', eng: 'Shvat', days: 30, moon: '🌑', gregApprox: 'ינו-פבר' },
+        { name: 'אדר א׳', eng: 'Adar I', days: 30, moon: '🌑', gregApprox: 'פבר-מרץ', isAdar: true },
+        { name: 'אדר ב׳', eng: 'Adar II', days: 29, moon: '🌑', gregApprox: 'מרץ-אפר', isAdar: true },
+        { name: 'ניסן', eng: 'Nisan', days: 30, moon: '🌑', gregApprox: 'אפר-מאי' },
+        { name: 'אייר', eng: 'Iyyar', days: 29, moon: '🌑', gregApprox: 'מאי-יוני' },
+        { name: 'סיוון', eng: 'Sivan', days: 30, moon: '🌑', gregApprox: 'יוני-יולי' },
+        { name: 'תמוז', eng: 'Tamuz', days: 29, moon: '🌑', gregApprox: 'יולי-אוג' },
+        { name: 'אב', eng: 'Av', days: 30, moon: '🌑', gregApprox: 'אוג-ספט' },
+        { name: 'אלול', eng: 'Elul', days: 29, moon: '🌑', gregApprox: 'ספט-אוק' },
+    ];
+
+    // Hebrew year classification
+    // Deficient (חסרה): Cheshvan=29, Kislev=29 → 353/383
+    // Regular (כסדרה): Cheshvan=29, Kislev=30 → 354/384
+    // Complete (שלמה): Cheshvan=30, Kislev=30 → 355/385
+
+    function isLeapYear(year) {
+        return [3, 6, 8, 11, 14, 17, 19].includes(year % 19);
+    }
+
+    // Simplified year-type calculation
+    function getYearType(year) {
+        // Use the day-of-week rules (simplified - accurate for most years)
+        const daysInYear = getDaysInYear(year);
+        if (isLeapYear(year)) {
+            if (daysInYear === 383) return 'deficient';
+            if (daysInYear === 384) return 'regular';
+            return 'complete'; // 385
+        } else {
+            if (daysInYear === 353) return 'deficient';
+            if (daysInYear === 354) return 'regular';
+            return 'complete'; // 355
+        }
+    }
+
+    // Calculate days in Hebrew year using Molad-based formula
+    function getDaysInYear(year) {
+        // Simplified: calculate from RH to next RH using the four gates
+        // For demo purposes, use a lookup-style approach
+        const molad = getMoladTishrei(year);
+        const nextMolad = getMoladTishrei(year + 1);
+        return nextMolad - molad;
+    }
+
+    function getMoladTishrei(year) {
+        // Molad of year 1: Monday, 5h, 204 halakim (parts)
+        // 1 halak = 1/1080 hour
+        // Synodic month = 29d 12h 793 halakim
+        const EPOCH = 347997; // Days from reference to Molad of year 1
+        const monthsElapsed = getMonthsFromEpoch(year);
+
+        // Each synodic month = 29 + 12/24 + 793/25920 days = 29.530594 days
+        const totalDays = Math.round(monthsElapsed * 29.530594 + EPOCH);
+        return totalDays;
+    }
+
+    function getMonthsFromEpoch(year) {
+        const cycles = Math.floor((year - 1) / 19);
+        const remainder = (year - 1) % 19;
+        let months = cycles * 235; // 235 months per 19-year cycle
+
+        const leapYearsInCycle = [3, 6, 8, 11, 14, 17, 19];
+        for (let i = 1; i <= remainder; i++) {
+            months += leapYearsInCycle.includes(i) ? 13 : 12;
+        }
+        return months;
+    }
+
+    let currentYear = 5786; // Current Hebrew year
+
+    function getGematria(num) {
+        const thousands = Math.floor(num / 1000);
+        const hundreds = num % 1000;
+        const hDigits = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'];
+        const hTens = ['', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ'];
+        const hHundreds = ['', 'ק', 'ר', 'ש', 'ת', 'תק', 'תר', 'תש', 'תת', 'תתק'];
+
+        let r = num % 1000;
+        let result = 'ה׳' + hHundreds[Math.floor(r / 100)];
+        r = r % 100;
+
+        if (r === 15) result += 'ט״ו';
+        else if (r === 16) result += 'ט״ז';
+        else {
+            let tens = hTens[Math.floor(r / 10)];
+            let units = hDigits[r % 10];
+            if (tens && units) result += tens + '״' + units;
+            else if (tens) result += tens + '׳';
+            else if (units) result += units + '׳';
+        }
+
+        return result;
+    }
+
+    function renderYear(year) {
+        const grid = document.getElementById('monthsGrid');
+        grid.innerHTML = '';
+
+        const leap = isLeapYear(year);
+        const months = leap ? [...MONTHS_LEAP] : [...MONTHS_REGULAR];
+
+        // Determine Cheshvan/Kislev days based on year type
+        // Simplified: use regular year as default
+        const yearType = 'regular'; // For visualization purposes
+        months[1].days = yearType === 'complete' ? 30 : 29; // Cheshvan
+        months[2].days = yearType === 'deficient' ? 29 : 30; // Kislev
+
+        let totalDays = 0;
+
+        months.forEach((m, i) => {
+            const card = document.createElement('div');
+            card.className = 'month-card' + (m.isAdar ? ' is-adar' : '');
+
+            totalDays += m.days;
+
+            card.innerHTML = `
+                <span class="moon-phase">🌑</span>
+                <div class="month-name">${m.name}</div>
+                <div class="month-days"><span>${m.days}</span> ימים</div>
+                <div class="month-greg">${m.gregApprox}</div>
+            `;
+
+            grid.appendChild(card);
+
+            // Stagger animation
+            setTimeout(() => {
+                card.classList.add('visible');
+            }, 100 + i * 120);
+        });
+
+        // Update title
+        document.getElementById('title').textContent = 'שנת ' + getGematria(year);
+
+        const typeText = leap ? 'שנה מעוברת | <span class="leap">13 חודשים</span>' : 'שנה רגילה | 12 חודשים';
+        document.getElementById('yearType').innerHTML = typeText;
+
+        // Update total
+        document.getElementById('totalActual').textContent = totalDays;
+
+        const diff = Math.round(365.25 - totalDays);
+        const badge = document.getElementById('diffBadge');
+        if (diff > 0) {
+            badge.className = 'diff-badge short';
+            badge.textContent = `חסרים ${diff} ימים - לכן צריך שנה מעוברת!`;
+        } else if (diff < 0) {
+            badge.className = 'diff-badge long';
+            badge.textContent = `עודף של ${Math.abs(diff)} ימים - השנה ארוכה מהשמש!`;
+        } else {
+            badge.className = 'diff-badge';
+            badge.textContent = 'בדיוק!';
+        }
+
+        // Show total bar after cards
+        setTimeout(() => {
+            document.getElementById('totalBar').classList.add('visible');
+        }, 100 + months.length * 120 + 400);
+    }
+
+    function changeYear(delta) {
+        currentYear += delta;
+        document.getElementById('totalBar').classList.remove('visible');
+        renderYear(currentYear);
+    }
+
+    // Stars
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 100; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.setProperty('--duration', (2 + Math.random() * 4) + 's');
+        star.style.setProperty('--max-opacity', (0.3 + Math.random() * 0.5));
+        starsContainer.appendChild(star);
+    }
+
+    // Bot API
+    window.physital = {
+        setYear: (y) => { currentYear = y; renderYear(y); },
+        getYear: () => currentYear
+    };
+
+    // Init
+    renderYear(currentYear);
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhysiTal | 365.25 ÷ 29.53 = ?</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;900&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #050510;
+            color: #f3f4f6;
+            font-family: 'Rubik', system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            position: relative;
+        }
+
+        .equation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            direction: ltr;
+            font-size: 72px;
+            font-weight: 700;
+            opacity: 0;
+        }
+
+        .number {
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+
+        .year-num { color: #60a5fa; }
+        .month-num { color: #a78bfa; }
+        .result-num { color: #fbbf24; }
+        .result-integer { color: #fbbf24; }
+        .result-fraction { color: #f97316; text-shadow: 0 0 30px rgba(249, 115, 22, 0.5); }
+        .operator { color: #6b7280; font-weight: 400; }
+        .equals { color: #6b7280; font-weight: 400; }
+
+        .label {
+            font-size: 18px;
+            font-weight: 400;
+            margin-top: 8px;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .year-label { color: #93c5fd; }
+        .month-label { color: #c4b5fd; }
+        .result-label { color: #fcd34d; }
+
+        .subtitle {
+            font-size: 28px;
+            color: #9ca3af;
+            margin-top: 48px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            direction: rtl;
+        }
+
+        .subtitle em {
+            color: #f97316;
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        /* Stars background */
+        .stars {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--duration) infinite alternate;
+        }
+        @keyframes twinkle {
+            0% { opacity: 0.2; }
+            100% { opacity: var(--max-opacity); }
+        }
+
+        /* Fraction highlight pulse */
+        @keyframes pulse-glow {
+            0%, 100% { text-shadow: 0 0 20px rgba(249, 115, 22, 0.3); }
+            50% { text-shadow: 0 0 40px rgba(249, 115, 22, 0.8), 0 0 80px rgba(249, 115, 22, 0.3); }
+        }
+        .highlight-fraction {
+            animation: pulse-glow 2s infinite;
+        }
+
+        /* Replay button */
+        .replay-btn {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #9ca3af;
+            padding: 10px 24px;
+            border-radius: 24px;
+            cursor: pointer;
+            font-family: 'Rubik', sans-serif;
+            font-size: 16px;
+            backdrop-filter: blur(8px);
+            transition: all 0.3s;
+            opacity: 0;
+        }
+        .replay-btn:hover {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        /* PhysiTal watermark */
+        .watermark {
+            position: fixed;
+            bottom: 16px;
+            right: 24px;
+            font-size: 14px;
+            color: rgba(255,255,255,0.15);
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="container">
+    <div class="equation" id="equation">
+        <div class="number-group">
+            <div class="number year-num" id="yearNum">365.25</div>
+            <div class="label year-label" id="yearLabel">ימים בשנה</div>
+        </div>
+        <div class="operator" id="divSign">÷</div>
+        <div class="number-group">
+            <div class="number month-num" id="monthNum">29.53</div>
+            <div class="label month-label" id="monthLabel">ימים בחודש סינודי</div>
+        </div>
+        <div class="equals" id="eqSign">=</div>
+        <div class="number-group">
+            <div class="number" id="resultNum">
+                <span class="result-integer">12</span><span class="result-fraction">.37</span>
+            </div>
+            <div class="label result-label" id="resultLabel">חודשים בשנה</div>
+        </div>
+    </div>
+
+    <div class="subtitle" id="subtitle">
+        לא 12 בדיוק. ה<em>"קצת"</em> הזה משנה הכל.
+    </div>
+</div>
+
+<button class="replay-btn" id="replayBtn" onclick="replay()">🔄 הפעל שוב</button>
+<div class="watermark">PHYSITAL</div>
+
+<script>
+    // Generate stars
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 150; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.setProperty('--duration', (2 + Math.random() * 4) + 's');
+        star.style.setProperty('--max-opacity', (0.4 + Math.random() * 0.6));
+        star.style.animationDelay = Math.random() * 3 + 's';
+        starsContainer.appendChild(star);
+    }
+
+    // Animation timeline
+    const eq = document.getElementById('equation');
+    const yearNum = document.getElementById('yearNum');
+    const monthNum = document.getElementById('monthNum');
+    const resultNum = document.getElementById('resultNum');
+    const yearLabel = document.getElementById('yearLabel');
+    const monthLabel = document.getElementById('monthLabel');
+    const resultLabel = document.getElementById('resultLabel');
+    const divSign = document.getElementById('divSign');
+    const eqSign = document.getElementById('eqSign');
+    const subtitle = document.getElementById('subtitle');
+    const replayBtn = document.getElementById('replayBtn');
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function animate() {
+        // Reset
+        eq.style.opacity = '0';
+        yearNum.style.opacity = '0';
+        monthNum.style.opacity = '0';
+        resultNum.style.opacity = '0';
+        divSign.style.opacity = '0';
+        eqSign.style.opacity = '0';
+        yearLabel.style.opacity = '0';
+        monthLabel.style.opacity = '0';
+        resultLabel.style.opacity = '0';
+        subtitle.style.opacity = '0';
+        subtitle.style.transform = 'translateY(20px)';
+        replayBtn.style.opacity = '0';
+        document.querySelector('.result-fraction').classList.remove('highlight-fraction');
+
+        await sleep(400);
+
+        // Show equation container
+        eq.style.opacity = '1';
+        eq.style.transition = 'opacity 0.5s';
+
+        // Step 1: Year number flies in
+        await sleep(300);
+        yearNum.style.opacity = '1';
+        yearNum.style.transform = 'scale(1.1)';
+        await sleep(200);
+        yearNum.style.transform = 'scale(1)';
+        await sleep(300);
+        yearLabel.style.opacity = '1';
+
+        // Step 2: Division sign
+        await sleep(500);
+        divSign.style.opacity = '1';
+        divSign.style.transition = 'opacity 0.4s';
+
+        // Step 3: Month number
+        await sleep(400);
+        monthNum.style.opacity = '1';
+        monthNum.style.transform = 'scale(1.1)';
+        await sleep(200);
+        monthNum.style.transform = 'scale(1)';
+        await sleep(300);
+        monthLabel.style.opacity = '1';
+
+        // Step 4: Equals sign
+        await sleep(600);
+        eqSign.style.opacity = '1';
+        eqSign.style.transition = 'opacity 0.4s';
+
+        // Step 5: Result - counting up animation
+        await sleep(400);
+        resultNum.style.opacity = '1';
+
+        // Count up effect
+        const targetWhole = 12;
+        const targetFrac = 37;
+        let currentVal = 0;
+        const countDuration = 1200;
+        const startTime = performance.now();
+
+        function countUp(now) {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / countDuration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+            const current = eased * 12.37;
+
+            const whole = Math.floor(current);
+            const frac = Math.round((current - whole) * 100);
+
+            resultNum.innerHTML = `<span class="result-integer">${whole}</span><span class="result-fraction">.${String(frac).padStart(2, '0')}</span>`;
+
+            if (progress < 1) {
+                requestAnimationFrame(countUp);
+            } else {
+                resultNum.innerHTML = `<span class="result-integer">12</span><span class="result-fraction">.37</span>`;
+                // Highlight the fraction
+                setTimeout(() => {
+                    document.querySelector('.result-fraction').classList.add('highlight-fraction');
+                    resultNum.style.transform = 'scale(1.15)';
+                    setTimeout(() => { resultNum.style.transform = 'scale(1)'; }, 400);
+                }, 200);
+            }
+        }
+        requestAnimationFrame(countUp);
+
+        await sleep(1600);
+        resultLabel.style.opacity = '1';
+
+        // Step 6: Subtitle
+        await sleep(800);
+        subtitle.style.opacity = '1';
+        subtitle.style.transform = 'translateY(0)';
+
+        // Show replay
+        await sleep(1500);
+        replayBtn.style.opacity = '1';
+        replayBtn.style.transition = 'opacity 0.5s';
+    }
+
+    function replay() {
+        replayBtn.style.opacity = '0';
+        animate();
+    }
+
+    // Bot API for Remotion/recording
+    window.physital = {
+        play: () => animate(),
+        reset: () => {
+            eq.style.opacity = '0';
+            subtitle.style.opacity = '0';
+        }
+    };
+
+    // Auto-start
+    animate();
+</script>
+</body>
+</html>

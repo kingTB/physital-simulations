@@ -1,0 +1,2018 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>למה השנה לא בדיוק 12 חודשים? | PhysiTal</title>
+<!--
+  PhysiTal Simulation Standard 2.0
+  ================================
+  NOTE: This file requires Three.js from CDN.
+  If opened via file://, Three.js may be blocked by CORS.
+  To run locally, use: python -m http.server 8000
+  Then open: http://localhost:8000/simulation.html
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="three.min.js"></script>
+<style>
+/* ============================== RESET & ROOT ============================== */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-dark:rgba(18,18,24,0.9);
+  --bg-glass:rgba(18,18,24,0.88);
+  --border:rgba(120,120,200,0.2);
+  --border-active:rgba(0,200,255,0.5);
+  --accent-gold:#f0c040;
+  --accent-cyan:#00e5ff;
+  --accent-blue:#4a9eff;
+  --accent-green:#00e676;
+  --accent-orange:#ff9100;
+  --accent-red:#ff5252;
+  --accent-purple:#b388ff;
+  --text:#e8e8f0;
+  --text-sec:#9898b0;
+  --text-dim:#606080;
+  --font:'Rubik',sans-serif;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:#080810;font-family:var(--font);color:var(--text)}
+canvas{display:block}
+
+/* ============================== THREE.JS FALLBACK ============================== */
+#threejs-fallback{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;
+  background:#080810;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:40px;direction:rtl;font-family:var(--font);
+}
+#threejs-fallback h1{color:var(--accent-gold);font-size:28px;margin-bottom:20px}
+#threejs-fallback p{color:var(--text-sec);font-size:16px;line-height:1.8;max-width:500px}
+#threejs-fallback code{
+  display:block;background:rgba(40,40,80,0.6);border:1px solid var(--border);
+  border-radius:8px;padding:12px 20px;margin:16px auto;color:var(--accent-cyan);
+  font-size:14px;direction:ltr;text-align:left;max-width:400px;
+}
+
+/* ============================== CONTEXT MENU ============================== */
+#ctx-menu{
+  display:none;position:fixed;z-index:10000;
+  background:var(--bg-dark);backdrop-filter:blur(24px);
+  border:1px solid var(--border);border-radius:12px;
+  padding:6px 0;min-width:200px;direction:rtl;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+}
+.ctx-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 18px;cursor:pointer;font-size:14px;
+  color:var(--text);transition:background 0.15s;
+}
+.ctx-item:hover{background:rgba(100,100,200,0.15)}
+.ctx-sep{height:1px;background:var(--border);margin:4px 12px}
+
+/* ============================== DIALOGUE BASE ============================== */
+.dialogue{
+  display:none;position:fixed;z-index:5000;
+  background:var(--bg-glass);backdrop-filter:blur(24px);
+  border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 12px 48px rgba(0,0,0,0.5);
+  min-width:280px;max-width:420px;direction:rtl;
+  overflow:hidden;
+}
+.dialogue.open{display:block}
+.dlg-header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 16px;background:rgba(30,30,50,0.6);
+  cursor:move;user-select:none;border-bottom:1px solid var(--border);
+}
+.dlg-title{font-size:14px;font-weight:600;color:var(--accent-gold);display:flex;align-items:center;gap:8px}
+.dlg-close{
+  width:28px;height:28px;border-radius:8px;border:none;
+  background:rgba(255,80,80,0.15);color:var(--accent-red);
+  cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;
+  transition:background 0.2s;
+}
+.dlg-close:hover{background:rgba(255,80,80,0.3)}
+.dlg-body{padding:16px;max-height:60vh;overflow-y:auto}
+.dlg-body::-webkit-scrollbar{width:4px}
+.dlg-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ============================== CONTROLS WITHIN DIALOGUES ============================== */
+.ctrl-group{margin-bottom:16px}
+.ctrl-label{font-size:12px;color:var(--text-sec);margin-bottom:8px;display:block;font-weight:500}
+.ctrl-row{display:flex;gap:6px;flex-wrap:wrap}
+
+.btn{
+  background:rgba(60,60,120,0.4);border:1px solid var(--border);
+  color:var(--text);padding:7px 14px;border-radius:8px;
+  cursor:pointer;font-size:12px;font-family:var(--font);
+  transition:all 0.2s;user-select:none;
+}
+.btn:hover{background:rgba(80,80,160,0.5);border-color:var(--accent-cyan)}
+.btn.active{
+  background:rgba(0,229,255,0.15);border-color:var(--accent-cyan);
+  color:var(--accent-cyan);box-shadow:0 0 12px rgba(0,229,255,0.12);
+}
+.btn-wide{width:100%;text-align:center;padding:9px 14px;font-weight:500}
+.toggle-pair{display:flex;gap:0;width:100%}
+.toggle-pair .btn{flex:1;border-radius:0;text-align:center}
+.toggle-pair .btn:first-child{border-radius:8px 0 0 8px}
+.toggle-pair .btn:last-child{border-radius:0 8px 8px 0}
+
+/* ============================== PHYSI-SLIDER ============================== */
+.physi-slider{margin-bottom:14px}
+.physi-slider-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.physi-slider-label{font-size:12px;color:var(--text-sec);font-weight:500}
+.physi-slider-val{
+  font-size:13px;color:var(--accent-cyan);font-weight:600;
+  min-width:40px;text-align:left;direction:ltr;
+}
+.physi-slider-play{
+  width:24px;height:24px;border-radius:6px;border:1px solid var(--border);
+  background:rgba(60,60,120,0.4);color:var(--accent-green);cursor:pointer;
+  font-size:12px;display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s;margin-inline-start:6px;
+}
+.physi-slider-play:hover{background:rgba(60,60,120,0.7)}
+.physi-slider-track{
+  position:relative;width:100%;height:6px;
+  background:rgba(60,60,120,0.4);border-radius:3px;cursor:pointer;
+}
+.physi-slider-fill{
+  position:absolute;top:0;right:0;height:100%;
+  background:linear-gradient(90deg,var(--accent-cyan),var(--accent-blue));
+  border-radius:3px;pointer-events:none;
+}
+.physi-slider-thumb{
+  position:absolute;top:50%;width:14px;height:14px;
+  background:var(--accent-cyan);border:2px solid #fff;border-radius:50%;
+  transform:translate(50%,-50%);cursor:grab;
+  box-shadow:0 0 8px rgba(0,229,255,0.4);z-index:1;
+}
+.physi-slider-thumb:active{cursor:grabbing}
+
+/* ============================== DATA/INFO PANEL ============================== */
+.info-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:5px 0;border-bottom:1px solid rgba(100,100,180,0.1);font-size:12px;
+}
+.info-row:last-child{border:none}
+.info-key{color:var(--text-sec)}
+.info-val{color:var(--accent-cyan);direction:ltr;font-weight:500}
+.info-val.gold{color:var(--accent-gold)}
+.info-val.green{color:var(--accent-green)}
+.info-val.orange{color:var(--accent-orange)}
+.info-divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:10px 0}
+
+/* ============================== TOGGLE SWITCH ============================== */
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 0;
+}
+.toggle-label{font-size:13px;color:var(--text)}
+.toggle-switch{
+  width:40px;height:22px;border-radius:11px;
+  background:rgba(60,60,120,0.5);border:1px solid var(--border);
+  cursor:pointer;position:relative;transition:all 0.25s;
+}
+.toggle-switch.on{background:rgba(0,229,255,0.25);border-color:var(--accent-cyan)}
+.toggle-knob{
+  position:absolute;top:2px;right:2px;width:16px;height:16px;
+  border-radius:50%;background:#fff;transition:all 0.25s;
+}
+.toggle-switch.on .toggle-knob{right:auto;left:2px}
+
+/* ============================== EDUCATIONAL MILESTONE ============================== */
+#edu-overlay{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:4000;
+  background:var(--bg-glass);backdrop-filter:blur(24px);
+  border:1px solid var(--accent-gold);border-radius:14px;
+  padding:16px 32px;text-align:center;max-width:650px;
+  opacity:0;transition:opacity 0.6s,transform 0.6s;pointer-events:none;
+  box-shadow:0 0 40px rgba(240,192,64,0.1);direction:rtl;
+}
+#edu-overlay.visible{opacity:1;pointer-events:auto}
+.edu-text{font-size:15px;font-weight:500;line-height:1.7}
+.edu-text .num{color:var(--accent-gold);font-weight:700}
+.edu-text .em{color:var(--accent-cyan);font-weight:700}
+
+/* ============================== RECORDING FRAME ============================== */
+#rec-frame{
+  display:none;position:fixed;z-index:4500;
+  border:2px dashed var(--accent-red);background:transparent;
+  pointer-events:none;
+}
+#rec-frame.active{display:block}
+#rec-controls{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  z-index:4600;display:none;gap:8px;align-items:center;
+  background:var(--bg-glass);backdrop-filter:blur(24px);
+  border:1px solid var(--border);border-radius:12px;padding:8px 16px;
+}
+#rec-controls.active{display:flex}
+.rec-btn{
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--border);
+  background:rgba(60,60,120,0.4);color:var(--text);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:14px;
+  transition:all 0.2s;
+}
+.rec-btn:hover{background:rgba(80,80,160,0.6)}
+.rec-btn.recording{background:rgba(255,50,50,0.3);border-color:var(--accent-red);animation:pulse 1s infinite}
+.rec-timer{color:var(--accent-red);font-size:13px;font-weight:600;direction:ltr;min-width:50px;text-align:center}
+.rec-aspect{
+  display:flex;gap:4px;margin-right:8px;padding-right:8px;
+  border-right:1px solid var(--border);
+}
+.rec-aspect .btn{padding:4px 8px;font-size:11px}
+
+@keyframes pulse{0%,100%{opacity:0.7}50%{opacity:1}}
+
+/* ============================== LOADING ============================== */
+#loading-screen{
+  position:fixed;top:0;left:0;right:0;bottom:0;z-index:99998;
+  background:#080810;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;transition:opacity 0.8s;
+}
+#loading-screen.hidden{opacity:0;pointer-events:none}
+.ld-ring{
+  width:50px;height:50px;border:3px solid var(--border);
+  border-top-color:var(--accent-cyan);border-radius:50%;
+  animation:spin 0.8s linear infinite;
+}
+.ld-text{color:var(--text-sec);font-size:14px;margin-top:16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<!-- ==================== THREE.JS FALLBACK ==================== -->
+<div id="threejs-fallback">
+  <h1>PhysiTal Simulation</h1>
+  <p>הסימולציה דורשת טעינת Three.js מהרשת.<br>
+  אם פתחת את הקובץ ישירות (file://), יש להפעיל שרת מקומי:</p>
+  <code>python -m http.server 8000</code>
+  <p>ואז לפתוח בדפדפן:<br><code>http://localhost:8000/simulation.html</code></p>
+</div>
+
+<!-- ==================== LOADING SCREEN ==================== -->
+<div id="loading-screen">
+  <div class="ld-ring"></div>
+  <div class="ld-text">טוען סימולציה...</div>
+</div>
+
+<!-- ==================== CANVAS CONTAINER ==================== -->
+<div id="canvas-container"></div>
+
+<!-- ==================== CONTEXT MENU ==================== -->
+<div id="ctx-menu">
+  <div class="ctx-item" data-dlg="instructions">📖 הוראות</div>
+  <div class="ctx-item" data-dlg="controls">⚙️ בקרים</div>
+  <div class="ctx-item" data-dlg="view">👁️ תצוגה</div>
+  <div class="ctx-item" data-dlg="camera">🎥 מצלמה</div>
+  <div class="ctx-item" data-dlg="data">📊 נתונים</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-dlg="recording">🔴 הקלטה</div>
+  <div class="ctx-item" data-dlg="settings">⚙️ הגדרות</div>
+  <div class="ctx-item" data-dlg="docs">📄 תיעוד</div>
+</div>
+
+<!-- ==================== DIALOGUE: INSTRUCTIONS ==================== -->
+<div class="dialogue" id="dlg-instructions">
+  <div class="dlg-header">
+    <div class="dlg-title">📖 הוראות</div>
+    <button class="dlg-close">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <div style="font-size:13px;line-height:1.8;color:var(--text)">
+      <p style="margin-bottom:12px;color:var(--accent-gold);font-weight:600;font-size:15px">
+        למה השנה לא בדיוק 12 חודשים?
+      </p>
+      <p style="margin-bottom:10px">
+        הסימולציה מדגימה את הפער בין <span style="color:var(--accent-cyan);font-weight:600">שנת השמש</span>
+        (365.25 ימים) לבין <span style="color:var(--text);font-weight:600">12 חודשי ירח</span> (354.37 ימים).
+      </p>
+      <p style="margin-bottom:10px">
+        הפער של ~11 ימים בשנה מצטבר, ולכן בלוח העברי מוסיפים חודש עיבור (אדר ב') כל 2-3 שנים.
+      </p>
+      <div style="margin-top:14px;padding:10px;background:rgba(60,60,120,0.3);border-radius:8px;font-size:12px">
+        <div style="font-weight:600;margin-bottom:6px;color:var(--accent-cyan)">שליטה:</div>
+        <div>🖱️ גרירה שמאלית — סיבוב מצלמה</div>
+        <div>🔄 גלגלת — זום</div>
+        <div>⌨️ רווח — השהה/המשך</div>
+        <div>🖱️ לחיצה ימנית — תפריט</div>
+        <div>R — אפס סימולציה</div>
+        <div>T — שבילים</div>
+        <div>G — רשת</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DIALOGUE: CONTROLS ==================== -->
+<div class="dialogue" id="dlg-controls">
+  <div class="dlg-header">
+    <div class="dlg-title">⚙️ בקרים</div>
+    <button class="dlg-close">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <!-- Speed slider -->
+    <div class="physi-slider" id="slider-speed">
+      <div class="physi-slider-header">
+        <span class="physi-slider-label">מהירות סימולציה</span>
+        <div style="display:flex;align-items:center">
+          <span class="physi-slider-val">1</span>
+          <button class="physi-slider-play" title="אנימציית ערך">▶</button>
+        </div>
+      </div>
+      <div class="physi-slider-track" data-min="1" data-max="500" data-value="1" data-param="speed">
+        <div class="physi-slider-fill"></div>
+        <div class="physi-slider-thumb"></div>
+      </div>
+    </div>
+
+    <!-- Earth orbit radius slider (toy mode) -->
+    <div class="physi-slider" id="slider-earth-radius">
+      <div class="physi-slider-header">
+        <span class="physi-slider-label">רדיוס מסלול ארץ</span>
+        <div style="display:flex;align-items:center">
+          <span class="physi-slider-val">40</span>
+          <button class="physi-slider-play" title="אנימציית ערך">▶</button>
+        </div>
+      </div>
+      <div class="physi-slider-track" data-min="20" data-max="100" data-value="40" data-param="earthOrbitRadius">
+        <div class="physi-slider-fill"></div>
+        <div class="physi-slider-thumb"></div>
+      </div>
+    </div>
+
+    <!-- Moon orbit radius slider (toy mode) -->
+    <div class="physi-slider" id="slider-moon-radius">
+      <div class="physi-slider-header">
+        <span class="physi-slider-label">רדיוס מסלול ירח</span>
+        <div style="display:flex;align-items:center">
+          <span class="physi-slider-val">6</span>
+          <button class="physi-slider-play" title="אנימציית ערך">▶</button>
+        </div>
+      </div>
+      <div class="physi-slider-track" data-min="3" data-max="15" data-value="6" data-param="moonOrbitRadius">
+        <div class="physi-slider-fill"></div>
+        <div class="physi-slider-thumb"></div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">מצב קנה מידה</div>
+      <div class="toggle-pair" id="scale-toggle">
+        <div class="btn active" data-val="toy">צעצוע</div>
+        <div class="btn" data-val="real">ריאלי</div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">מערכת ייחוס</div>
+      <div class="toggle-pair" id="frame-toggle">
+        <div class="btn active" data-val="helio">הליוצנטרי</div>
+        <div class="btn" data-val="geo">גיאוצנטרי</div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">קפיצה לנקודת ציון</div>
+      <div class="ctrl-row">
+        <button class="btn" onclick="app.jumpTo(354.37)">12 ח' ירח</button>
+        <button class="btn" onclick="app.jumpTo(365.25)">שנה</button>
+        <button class="btn" onclick="app.jumpTo(730.5)">שנתיים</button>
+      </div>
+    </div>
+
+    <div class="ctrl-row" style="margin-top:8px">
+      <button class="btn btn-wide" onclick="app.togglePlay()" id="btn-playpause">⏸ השהה</button>
+    </div>
+    <div class="ctrl-row" style="margin-top:6px">
+      <button class="btn btn-wide" onclick="app.reset()" style="color:var(--accent-orange)">↻ אפס</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DIALOGUE: VIEW ==================== -->
+<div class="dialogue" id="dlg-view">
+  <div class="dlg-header">
+    <div class="dlg-title">👁️ תצוגה</div>
+    <button class="dlg-close">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <div class="toggle-row">
+      <span class="toggle-label">שבילים</span>
+      <div class="toggle-switch on" data-toggle="trails"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">רשת</span>
+      <div class="toggle-switch" data-toggle="grid"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">תוויות</span>
+      <div class="toggle-switch on" data-toggle="labels"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">מסלולים מלאים</span>
+      <div class="toggle-switch on" data-toggle="orbits"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">זוהר שמש</span>
+      <div class="toggle-switch on" data-toggle="sunGlow"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">כוכבים</span>
+      <div class="toggle-switch on" data-toggle="stars"><div class="toggle-knob"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DIALOGUE: CAMERA ==================== -->
+<div class="dialogue" id="dlg-camera">
+  <div class="dlg-header">
+    <div class="dlg-title">🎥 מצלמה</div>
+    <button class="dlg-close">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <div class="ctrl-group">
+      <div class="ctrl-label">תצוגות מוגדרות</div>
+      <div class="ctrl-row">
+        <button class="btn" onclick="app.cameraPreset('top')">מלמעלה</button>
+        <button class="btn" onclick="app.cameraPreset('angle')">זווית</button>
+        <button class="btn" onclick="app.cameraPreset('side')">מהצד</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">מעקב</div>
+      <div class="ctrl-row">
+        <button class="btn" onclick="app.setFollow('none')" id="follow-none">ללא</button>
+        <button class="btn" onclick="app.setFollow('earth')" id="follow-earth">כדור הארץ</button>
+        <button class="btn active" onclick="app.setFollow('none')" id="follow-moon">ירח</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DIALOGUE: DATA ==================== -->
+<div class="dialogue" id="dlg-data">
+  <div class="dlg-header">
+    <div class="dlg-title">📊 נתונים</div>
+    <button class="dlg-close">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <div style="font-size:12px;color:var(--accent-gold);font-weight:600;margin-bottom:8px">נתוני מסלול</div>
+    <div class="info-row"><span class="info-key">שנת שמש</span><span class="info-val gold">365.25 ימים</span></div>
+    <div class="info-row"><span class="info-key">חודש סינודי</span><span class="info-val">29.530 ימים</span></div>
+    <div class="info-row"><span class="info-key">חודש סידראלי</span><span class="info-val">27.322 ימים</span></div>
+    <div class="info-row"><span class="info-key">חודשים בשנה</span><span class="info-val orange">12.369</span></div>
+    <div class="info-row"><span class="info-key">פער שנתי</span><span class="info-val" style="color:var(--accent-red)">~11 ימים</span></div>
+    <div class="info-divider"></div>
+    <div style="font-size:12px;color:var(--accent-cyan);font-weight:600;margin-bottom:8px">מונים חיים</div>
+    <div class="info-row"><span class="info-key">ימים</span><span class="info-val" id="live-days">0.00</span></div>
+    <div class="info-row"><span class="info-key">חודשי ירח (סינודי)</span><span class="info-val" id="live-synodic">0.00</span></div>
+    <div class="info-row"><span class="info-key">חודשי ירח (סידראלי)</span><span class="info-val" id="live-sidereal">0.00</span></div>
+    <div class="info-row"><span class="info-key">שנים</span><span class="info-val gold" id="live-years">0.000</span></div>
+    <div class="info-row"><span class="info-key">פער מצטבר</span><span class="info-val" style="color:var(--accent-red)" id="live-gap">0.0 ימים</span></div>
+  </div>
+</div>
+
+<!-- ==================== DIALOGUE: RECORDING ==================== -->
+<div class="dialogue" id="dlg-recording">
+  <div class="dlg-header">
+    <div class="dlg-title">🔴 הקלטה</div>
+    <button class="dlg-close">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <div class="ctrl-group">
+      <div class="ctrl-label">יחס גובה-רוחב</div>
+      <div class="ctrl-row rec-aspect-btns">
+        <button class="btn active" data-aspect="16:9" onclick="app.rec.setAspect('16:9',this)">16:9</button>
+        <button class="btn" data-aspect="9:16" onclick="app.rec.setAspect('9:16',this)">9:16</button>
+        <button class="btn" data-aspect="1:1" onclick="app.rec.setAspect('1:1',this)">1:1</button>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">מסגרת הקלטה</span>
+      <div class="toggle-switch" data-toggle="recFrame"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="ctrl-row" style="margin-top:12px">
+      <button class="btn" onclick="app.rec.screenshot()" style="flex:1">📷 צילום מסך</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DIALOGUE: SETTINGS ==================== -->
+<div class="dialogue" id="dlg-settings">
+  <div class="dlg-header">
+    <div class="dlg-title">⚙️ הגדרות</div>
+    <button class="dlg-close">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <div class="ctrl-group">
+      <div class="ctrl-label">ערכת נושא</div>
+      <div class="toggle-pair" id="theme-toggle">
+        <div class="btn active" data-val="dark">כהה</div>
+        <div class="btn" data-val="light">בהיר</div>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">שפה</div>
+      <div class="toggle-pair" id="lang-toggle">
+        <div class="btn active" data-val="he">עברית</div>
+        <div class="btn" data-val="en">English</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DIALOGUE: DOCUMENTATION ==================== -->
+<div class="dialogue" id="dlg-docs">
+  <div class="dlg-header">
+    <div class="dlg-title">📄 תיעוד</div>
+    <button class="dlg-close">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <div style="font-size:13px;line-height:1.8">
+      <p style="color:var(--accent-gold);font-weight:600;margin-bottom:8px">אודות</p>
+      <p style="margin-bottom:12px">
+        סימולציה אינטראקטיבית תלת-ממדית המדגימה את הפער בין שנת השמש לחודשי הירח.
+      </p>
+      <p style="margin-bottom:12px">
+        נוצר על ידי <span style="color:var(--accent-cyan);font-weight:600">פיזיטל</span> עבור שוחרי פיזיקה ביקום ומסופק תחת רישיון שימוש חופשי.
+      </p>
+      <div style="margin-top:14px;padding:10px;background:rgba(60,60,120,0.3);border-radius:8px;font-size:12px">
+        <div style="font-weight:600;margin-bottom:6px;color:var(--accent-cyan)">טכנולוגיה</div>
+        <div>Three.js r152 &bull; WebGL &bull; Vanilla JS</div>
+        <div style="margin-top:4px;color:var(--text-dim)">PhysiTal Simulation Standard 2.0</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== RECORDING FRAME OVERLAY ==================== -->
+<div id="rec-frame"></div>
+
+<!-- ==================== EDUCATIONAL MILESTONE OVERLAY ==================== -->
+<div id="edu-overlay">
+  <div class="edu-text" id="edu-text"></div>
+</div>
+
+<!-- ==================== PROGRESS ARC CANVAS ==================== -->
+<canvas id="progress-canvas" width="140" height="140" style="position:fixed;bottom:12px;left:12px;z-index:3000;pointer-events:none"></canvas>
+
+<script>
+// ============================================================
+//  CHECK THREE.JS AVAILABILITY
+// ============================================================
+if (typeof THREE === 'undefined') {
+  document.getElementById('threejs-fallback').style.display = 'flex';
+  document.getElementById('loading-screen').style.display = 'none';
+  throw new Error('Three.js not loaded. Please serve via HTTP.');
+}
+
+// ============================================================
+//  SEEDED PRNG - mulberry32
+// ============================================================
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const seededRandom = mulberry32(42);
+
+// ============================================================
+//  PHYSICAL CONSTANTS
+// ============================================================
+const PHYS = {
+  earthOrbitPeriod: 365.25,        // days
+  earthEcc: 0.0167,                // eccentricity
+  moonSiderealPeriod: 27.322,      // days
+  moonSynodicPeriod: 29.530,       // days
+  moonEcc: 0.0549,                 // eccentricity
+  moonInclination: 5.14 * Math.PI / 180, // radians
+  monthsPerYear: 12.3683,
+  annualGapDays: 10.875,
+};
+
+// ============================================================
+//  APP STATE
+// ============================================================
+const app = {
+  params: {
+    speed: 1,
+    earthOrbitRadius: 40,
+    moonOrbitRadius: 6,
+  },
+  state: {
+    paused: false,
+    time: 0,             // simulation days
+    scaleMode: 'toy',    // 'toy' | 'real'
+    frameMode: 'helio',  // 'helio' | 'geo'
+    follow: 'none',      // 'none' | 'earth' | 'moon'
+    trails: true,
+    grid: false,
+    labels: true,
+    orbits: true,
+    sunGlow: true,
+    stars: true,
+    recFrame: false,
+    theme: 'dark',
+    lang: 'he',
+  },
+  milestonesShown: { 354: false, 365: false, 730: false },
+  three: {},  // will hold Three.js objects
+};
+
+// ============================================================
+//  KEPLER EQUATION SOLVER
+// ============================================================
+function solveKepler(M, e, iterations) {
+  iterations = iterations || 10;
+  let E = M;
+  for (let i = 0; i < iterations; i++) {
+    E = E - (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  }
+  return E;
+}
+
+function keplerPosition(time, period, semiMajor, ecc, inclination) {
+  const M = (2 * Math.PI * time) / period; // Mean anomaly
+  const E = solveKepler(M, ecc);            // Eccentric anomaly
+  const cosE = Math.cos(E);
+  const sinE = Math.sin(E);
+
+  // Position in orbital plane
+  const x = semiMajor * (cosE - ecc);
+  const y = semiMajor * Math.sqrt(1 - ecc * ecc) * sinE;
+
+  // Apply inclination (rotate around X-axis)
+  const inc = inclination || 0;
+  const z = y * Math.sin(inc);
+  const yRot = y * Math.cos(inc);
+
+  return new THREE.Vector3(x, z, yRot);
+}
+
+// ============================================================
+//  SCALE HELPERS
+// ============================================================
+function getScaleParams() {
+  if (app.state.scaleMode === 'toy') {
+    return {
+      earthOrbitRadius: app.params.earthOrbitRadius,
+      moonOrbitRadius: app.params.moonOrbitRadius,
+      sunRadius: 5,
+      earthRadius: 1.8,
+      moonRadius: 0.6,
+    };
+  } else {
+    // Proportional (still visible) scale
+    const AU = 60; // 1 AU = 60 units
+    return {
+      earthOrbitRadius: AU,
+      moonOrbitRadius: AU * 0.00257, // real ratio ~0.00257 AU - too small, scale up
+      sunRadius: AU * 0.00465 * 10,   // 10x exaggerated
+      earthRadius: AU * 0.0000426 * 50, // 50x exaggerated
+      moonRadius: AU * 0.0000116 * 50,
+    };
+  }
+}
+
+// Use toy scale for moon orbit in 'real' mode because true scale is invisible
+function getEffectiveScaleParams() {
+  const s = getScaleParams();
+  if (app.state.scaleMode === 'real') {
+    s.moonOrbitRadius = 2.5;
+    s.earthRadius = 0.8;
+    s.moonRadius = 0.3;
+  }
+  return s;
+}
+
+// ============================================================
+//  PROCEDURAL TEXTURES
+// ============================================================
+function createSunTexture(size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // Base gradient
+  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  grad.addColorStop(0, '#fff8e0');
+  grad.addColorStop(0.3, '#ffcc00');
+  grad.addColorStop(0.6, '#ff8800');
+  grad.addColorStop(1, '#cc4400');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Noise/granulation
+  for (let i = 0; i < 3000; i++) {
+    const x = seededRandom() * size;
+    const y = seededRandom() * size;
+    const r = seededRandom() * 3 + 1;
+    const bright = seededRandom() * 0.3;
+    ctx.fillStyle = `rgba(255,255,200,${bright})`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Sunspots
+  for (let i = 0; i < 8; i++) {
+    const x = size * 0.3 + seededRandom() * size * 0.4;
+    const y = size * 0.3 + seededRandom() * size * 0.4;
+    const r = seededRandom() * 8 + 3;
+    ctx.fillStyle = 'rgba(80,30,0,0.4)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createEarthTexture(size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size * 2;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // Ocean base
+  ctx.fillStyle = '#1a4a8a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Continents (simplified shapes)
+  ctx.fillStyle = '#2d7a3a';
+  const continents = [
+    // North America
+    [[120,30],[160,25],[180,40],[170,65],[150,70],[130,55],[110,45]],
+    // South America
+    [[140,80],[155,75],[165,95],[160,120],[145,130],[135,115],[130,90]],
+    // Europe
+    [[210,30],[240,25],[245,40],[235,50],[215,48]],
+    // Africa
+    [[220,55],[245,50],[260,60],[265,85],[250,110],[230,105],[215,80]],
+    // Asia
+    [[250,20],[310,15],[340,30],[330,55],[300,60],[280,55],[260,40]],
+    // Australia
+    [[310,90],[340,85],[350,100],[340,110],[315,105]],
+    // Antarctica
+    [[100,135],[200,140],[300,138],[350,140],[380,135],[350,145],[200,148],[100,145]],
+  ];
+
+  continents.forEach(pts => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.fill();
+    // Add desert regions
+    ctx.fillStyle = '#8a7a3a';
+    ctx.globalAlpha = 0.3;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#2d7a3a';
+  });
+
+  // Ice caps
+  ctx.fillStyle = '#ddeeff';
+  ctx.fillRect(0, 0, canvas.width, 8);
+  ctx.fillRect(0, canvas.height - 12, canvas.width, 12);
+
+  // Cloud wisps
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 40; i++) {
+    const x = seededRandom() * canvas.width;
+    const y = seededRandom() * canvas.height;
+    const w = seededRandom() * 60 + 20;
+    const h = seededRandom() * 8 + 3;
+    ctx.beginPath();
+    ctx.ellipse(x, y, w, h, seededRandom() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createMoonTexture(size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // Base grey
+  ctx.fillStyle = '#a0a0a8';
+  ctx.fillRect(0, 0, size, size);
+
+  // Dark maria (seas)
+  const maria = [
+    [size*0.35, size*0.3, 30],
+    [size*0.55, size*0.25, 25],
+    [size*0.45, size*0.5, 35],
+    [size*0.6, size*0.55, 20],
+    [size*0.3, size*0.6, 22],
+  ];
+  maria.forEach(([x, y, r]) => {
+    ctx.fillStyle = 'rgba(80,80,90,0.5)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Craters
+  for (let i = 0; i < 60; i++) {
+    const x = seededRandom() * size;
+    const y = seededRandom() * size;
+    const r = seededRandom() * 8 + 2;
+    ctx.strokeStyle = `rgba(70,70,80,${seededRandom()*0.4+0.2})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // Crater shadow
+    ctx.fillStyle = `rgba(60,60,70,${seededRandom()*0.2})`;
+    ctx.beginPath();
+    ctx.arc(x+1, y+1, r*0.7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createGlowTexture(size, color1, color2) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  grad.addColorStop(0, color1);
+  grad.addColorStop(0.4, color1);
+  grad.addColorStop(1, color2 || 'transparent');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+
+// ============================================================
+//  THREE.JS SETUP
+// ============================================================
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x080810);
+container.appendChild(renderer.domElement);
+
+// Orbit Controls (manual implementation since we can't import OrbitControls module)
+const orbitState = {
+  isDragging: false,
+  prevMouse: { x: 0, y: 0 },
+  spherical: { radius: 80, phi: Math.PI / 3, theta: 0 },
+  target: new THREE.Vector3(0, 0, 0),
+  damping: 0.05,
+  velocity: { phi: 0, theta: 0 },
+};
+
+function updateCameraFromSpherical() {
+  const s = orbitState.spherical;
+  const sinPhi = Math.sin(s.phi);
+  const cosPhi = Math.cos(s.phi);
+  const sinTheta = Math.sin(s.theta);
+  const cosTheta = Math.cos(s.theta);
+
+  camera.position.set(
+    orbitState.target.x + s.radius * sinPhi * cosTheta,
+    orbitState.target.y + s.radius * cosPhi,
+    orbitState.target.z + s.radius * sinPhi * sinTheta
+  );
+  camera.lookAt(orbitState.target);
+}
+
+// ============================================================
+//  LIGHTING
+// ============================================================
+const ambientLight = new THREE.AmbientLight(0x222244, 0.5);
+scene.add(ambientLight);
+
+const sunLight = new THREE.PointLight(0xffffcc, 2, 300);
+sunLight.position.set(0, 0, 0);
+scene.add(sunLight);
+
+// ============================================================
+//  STARFIELD
+// ============================================================
+const starGeometry = new THREE.BufferGeometry();
+const starCount = 3000;
+const starPositions = new Float32Array(starCount * 3);
+const starSizes = new Float32Array(starCount);
+for (let i = 0; i < starCount; i++) {
+  const r = 400 + seededRandom() * 600;
+  const theta = seededRandom() * Math.PI * 2;
+  const phi = Math.acos(2 * seededRandom() - 1);
+  starPositions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+  starPositions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+  starPositions[i*3+2] = r * Math.cos(phi);
+  starSizes[i] = seededRandom() * 2 + 0.5;
+}
+starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+starGeometry.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+
+const starMaterial = new THREE.PointsMaterial({
+  color: 0xffffff,
+  size: 1.5,
+  sizeAttenuation: true,
+  transparent: true,
+  opacity: 0.8,
+});
+const starField = new THREE.Points(starGeometry, starMaterial);
+scene.add(starField);
+app.three.starField = starField;
+
+// ============================================================
+//  SUN
+// ============================================================
+const sc0 = getEffectiveScaleParams();
+const sunGeo = new THREE.SphereGeometry(sc0.sunRadius, 48, 48);
+const sunMat = new THREE.MeshBasicMaterial({ map: createSunTexture(512) });
+const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+scene.add(sunMesh);
+app.three.sunMesh = sunMesh;
+
+// Sun glow
+const sunGlowTex = createGlowTexture(128, 'rgba(255,200,50,0.6)', 'rgba(255,100,0,0)');
+const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: sunGlowTex, transparent: true, opacity: 0.4,
+  blending: THREE.AdditiveBlending,
+}));
+sunGlow.scale.set(sc0.sunRadius * 4, sc0.sunRadius * 4, 1);
+scene.add(sunGlow);
+app.three.sunGlow = sunGlow;
+
+// Sun corona
+const sunCoronaTex = createGlowTexture(128, 'rgba(255,180,60,0.3)', 'rgba(255,80,0,0)');
+const sunCorona = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: sunCoronaTex, transparent: true, opacity: 0.15,
+  blending: THREE.AdditiveBlending,
+}));
+sunCorona.scale.set(sc0.sunRadius * 7, sc0.sunRadius * 7, 1);
+scene.add(sunCorona);
+app.three.sunCorona = sunCorona;
+
+// ============================================================
+//  EARTH GROUP (Earth + Moon orbit around this)
+// ============================================================
+const earthGroup = new THREE.Group();
+scene.add(earthGroup);
+app.three.earthGroup = earthGroup;
+
+const earthGeo = new THREE.SphereGeometry(sc0.earthRadius, 32, 32);
+const earthMat = new THREE.MeshPhongMaterial({
+  map: createEarthTexture(512),
+  shininess: 25,
+  specular: 0x111133,
+});
+const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+// Axial tilt
+earthMesh.rotation.z = 23.44 * Math.PI / 180;
+earthGroup.add(earthMesh);
+app.three.earthMesh = earthMesh;
+
+// Earth atmosphere glow
+const earthGlowTex = createGlowTexture(64, 'rgba(100,180,255,0.4)', 'rgba(50,100,200,0)');
+const earthGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: earthGlowTex, transparent: true, opacity: 0.3,
+  blending: THREE.AdditiveBlending,
+}));
+earthGlow.scale.set(sc0.earthRadius * 3.5, sc0.earthRadius * 3.5, 1);
+earthGroup.add(earthGlow);
+
+// ============================================================
+//  MOON
+// ============================================================
+const moonGeo = new THREE.SphereGeometry(sc0.moonRadius, 24, 24);
+const moonMat = new THREE.MeshPhongMaterial({
+  map: createMoonTexture(256),
+  shininess: 5,
+});
+const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+earthGroup.add(moonMesh);
+app.three.moonMesh = moonMesh;
+
+// ============================================================
+//  ORBITAL PATH LINES
+// ============================================================
+function createEllipsePoints(semiMajor, ecc, inclination, segments) {
+  segments = segments || 128;
+  const points = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = (i / segments) * PHYS.earthOrbitPeriod;
+    points.push(keplerPosition(t, PHYS.earthOrbitPeriod, semiMajor, ecc, inclination || 0));
+  }
+  return points;
+}
+
+let earthOrbitLine, moonOrbitLine;
+
+function createOrbitLines() {
+  // Remove old
+  if (earthOrbitLine) { scene.remove(earthOrbitLine); earthOrbitLine.geometry.dispose(); }
+  if (moonOrbitLine) { scene.remove(moonOrbitLine); moonOrbitLine.geometry.dispose(); }
+
+  const sc = getEffectiveScaleParams();
+
+  // Earth orbit around Sun
+  const earthPts = createEllipsePoints(sc.earthOrbitRadius, PHYS.earthEcc, 0);
+  const earthOrbitGeo = new THREE.BufferGeometry().setFromPoints(earthPts);
+  earthOrbitLine = new THREE.Line(earthOrbitGeo, new THREE.LineBasicMaterial({
+    color: 0x2244aa, transparent: true, opacity: 0.3,
+  }));
+  scene.add(earthOrbitLine);
+
+  // Moon orbit around Earth (will follow earthGroup)
+  const moonPts = createEllipsePoints(sc.moonOrbitRadius, PHYS.moonEcc, PHYS.moonInclination);
+  const moonOrbitGeo = new THREE.BufferGeometry().setFromPoints(moonPts);
+  moonOrbitLine = new THREE.Line(moonOrbitGeo, new THREE.LineBasicMaterial({
+    color: 0x666688, transparent: true, opacity: 0.25,
+  }));
+  earthGroup.add(moonOrbitLine);
+
+  app.three.earthOrbitLine = earthOrbitLine;
+  app.three.moonOrbitLine = moonOrbitLine;
+}
+
+createOrbitLines();
+
+// ============================================================
+//  GRID
+// ============================================================
+const gridHelper = new THREE.GridHelper(200, 40, 0x222255, 0x111133);
+gridHelper.visible = app.state.grid;
+scene.add(gridHelper);
+app.three.gridHelper = gridHelper;
+
+// ============================================================
+//  LABELS (CSS2D-like using sprite)
+// ============================================================
+function createTextSprite(text, color) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 256;
+  canvas.height = 64;
+  ctx.font = 'bold 28px Rubik, sans-serif';
+  ctx.fillStyle = color || '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 32);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: false,
+  }));
+  sprite.scale.set(8, 2, 1);
+  return sprite;
+}
+
+const sunLabel = createTextSprite('☀ שמש', '#ffcc44');
+sunLabel.position.set(0, 8, 0);
+scene.add(sunLabel);
+
+const earthLabel = createTextSprite('🌍 ארץ', '#4488ff');
+earthLabel.position.set(0, 4, 0);
+earthGroup.add(earthLabel);
+
+const moonLabel = createTextSprite('🌙 ירח', '#bbbbcc');
+moonLabel.position.set(0, 2, 0);
+// Moon label follows moonMesh in update
+
+app.three.labels = { sun: sunLabel, earth: earthLabel, moon: moonLabel };
+
+// ============================================================
+//  TRAILS
+// ============================================================
+const TRAIL_MAX = 2000;
+const earthTrailPositions = new Float32Array(TRAIL_MAX * 3);
+const moonTrailPositions = new Float32Array(TRAIL_MAX * 3);
+let trailIndex = 0;
+let trailCount = 0;
+
+const earthTrailGeo = new THREE.BufferGeometry();
+earthTrailGeo.setAttribute('position', new THREE.BufferAttribute(earthTrailPositions, 3));
+earthTrailGeo.setDrawRange(0, 0);
+const earthTrail = new THREE.Line(earthTrailGeo, new THREE.LineBasicMaterial({
+  color: 0x4488ff, transparent: true, opacity: 0.5,
+}));
+scene.add(earthTrail);
+
+const moonTrailGeo = new THREE.BufferGeometry();
+moonTrailGeo.setAttribute('position', new THREE.BufferAttribute(moonTrailPositions, 3));
+moonTrailGeo.setDrawRange(0, 0);
+const moonTrail = new THREE.Line(moonTrailGeo, new THREE.LineBasicMaterial({
+  color: 0xaaaacc, transparent: true, opacity: 0.4,
+}));
+scene.add(moonTrail);
+
+app.three.earthTrail = earthTrail;
+app.three.moonTrail = moonTrail;
+
+function resetTrails() {
+  trailIndex = 0;
+  trailCount = 0;
+  earthTrailGeo.setDrawRange(0, 0);
+  moonTrailGeo.setDrawRange(0, 0);
+}
+
+// ============================================================
+//  STARTING POSITION MARKER
+// ============================================================
+const startMarkerGeo = new THREE.SphereGeometry(0.3, 16, 16);
+const startMarkerMat = new THREE.MeshBasicMaterial({ color: 0x00e676, transparent: true, opacity: 0.8 });
+const startMarker = new THREE.Mesh(startMarkerGeo, startMarkerMat);
+
+const startGlowTex = createGlowTexture(64, '#00e676', '#004422');
+const startGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: startGlowTex, transparent: true, opacity: 0.4,
+  blending: THREE.AdditiveBlending,
+}));
+startGlow.scale.set(3, 3, 1);
+
+function updateStartMarker() {
+  const sc = getEffectiveScaleParams();
+  const pos = keplerPosition(0, PHYS.earthOrbitPeriod, sc.earthOrbitRadius, PHYS.earthEcc, 0);
+  startMarker.position.copy(pos);
+  startGlow.position.copy(pos);
+}
+updateStartMarker();
+scene.add(startMarker);
+scene.add(startGlow);
+
+// ============================================================
+//  SIMULATION UPDATE
+// ============================================================
+let lastTrailTime = 0;
+
+function updateSimulation(dt) {
+  if (app.state.paused) return;
+
+  const spd = app.params.speed;
+  app.state.time += spd * dt;
+
+  const sc = getEffectiveScaleParams();
+  const time = app.state.time;
+
+  // Earth position (around Sun)
+  const earthPos = keplerPosition(time, PHYS.earthOrbitPeriod, sc.earthOrbitRadius, PHYS.earthEcc, 0);
+
+  // Moon position (around Earth)
+  const moonLocalPos = keplerPosition(time, PHYS.moonSiderealPeriod, sc.moonOrbitRadius, PHYS.moonEcc, PHYS.moonInclination);
+
+  if (app.state.frameMode === 'helio') {
+    earthGroup.position.copy(earthPos);
+    moonMesh.position.copy(moonLocalPos);
+    orbitState.target.set(0, 0, 0);
+  } else {
+    // Geocentric: Earth stays at origin, Sun moves
+    earthGroup.position.set(0, 0, 0);
+    sunMesh.position.copy(earthPos.clone().negate());
+    sunGlow.position.copy(sunMesh.position);
+    sunCorona.position.copy(sunMesh.position);
+    sunLight.position.copy(sunMesh.position);
+    sunLabel.position.copy(sunMesh.position.clone().add(new THREE.Vector3(0, 8, 0)));
+    moonMesh.position.copy(moonLocalPos);
+    // Update orbit line position
+    if (earthOrbitLine) earthOrbitLine.position.copy(sunMesh.position);
+    startMarker.position.copy(
+      keplerPosition(0, PHYS.earthOrbitPeriod, sc.earthOrbitRadius, PHYS.earthEcc, 0).negate().add(earthPos)
+    );
+    startGlow.position.copy(startMarker.position);
+    orbitState.target.set(0, 0, 0);
+  }
+
+  // Camera follow
+  if (app.state.follow === 'earth') {
+    if (app.state.frameMode === 'helio') {
+      orbitState.target.copy(earthGroup.position);
+    }
+  } else if (app.state.follow === 'moon') {
+    const moonWorldPos = new THREE.Vector3();
+    moonMesh.getWorldPosition(moonWorldPos);
+    orbitState.target.copy(moonWorldPos);
+  }
+
+  // Update trails
+  if (app.state.trails && time - lastTrailTime > 0.5) {
+    lastTrailTime = time;
+    const earthWorldPos = new THREE.Vector3();
+    earthMesh.getWorldPosition(earthWorldPos);
+    const moonWorldPos = new THREE.Vector3();
+    moonMesh.getWorldPosition(moonWorldPos);
+
+    const idx = trailIndex % TRAIL_MAX;
+    earthTrailPositions[idx*3] = earthWorldPos.x;
+    earthTrailPositions[idx*3+1] = earthWorldPos.y;
+    earthTrailPositions[idx*3+2] = earthWorldPos.z;
+    moonTrailPositions[idx*3] = moonWorldPos.x;
+    moonTrailPositions[idx*3+1] = moonWorldPos.y;
+    moonTrailPositions[idx*3+2] = moonWorldPos.z;
+
+    trailIndex++;
+    trailCount = Math.min(trailCount + 1, TRAIL_MAX);
+    earthTrailGeo.setDrawRange(0, trailCount);
+    moonTrailGeo.setDrawRange(0, trailCount);
+    earthTrailGeo.attributes.position.needsUpdate = true;
+    moonTrailGeo.attributes.position.needsUpdate = true;
+  }
+
+  // Moon label follows moon
+  moonLabel.position.copy(moonMesh.position.clone().add(new THREE.Vector3(0, 2, 0)));
+
+  // Helio-mode reset positions
+  if (app.state.frameMode === 'helio') {
+    sunMesh.position.set(0, 0, 0);
+    sunGlow.position.set(0, 0, 0);
+    sunCorona.position.set(0, 0, 0);
+    sunLight.position.set(0, 0, 0);
+    sunLabel.position.set(0, 8, 0);
+    if (earthOrbitLine) earthOrbitLine.position.set(0, 0, 0);
+    updateStartMarker();
+  }
+
+  // Update live data
+  updateLiveData();
+
+  // Check milestones
+  checkMilestones();
+}
+
+// ============================================================
+//  LIVE DATA UPDATE
+// ============================================================
+function updateLiveData() {
+  const t = app.state.time;
+  const daysEl = document.getElementById('live-days');
+  const synEl = document.getElementById('live-synodic');
+  const sidEl = document.getElementById('live-sidereal');
+  const yearsEl = document.getElementById('live-years');
+  const gapEl = document.getElementById('live-gap');
+
+  if (daysEl) daysEl.textContent = t.toFixed(2);
+  if (synEl) synEl.textContent = (t / PHYS.moonSynodicPeriod).toFixed(2);
+  if (sidEl) sidEl.textContent = (t / PHYS.moonSiderealPeriod).toFixed(2);
+  if (yearsEl) yearsEl.textContent = (t / PHYS.earthOrbitPeriod).toFixed(3);
+
+  const completedYears = Math.floor(t / PHYS.earthOrbitPeriod);
+  const lunarMonthsInYears = completedYears * 12;
+  const lunarDays = lunarMonthsInYears * PHYS.moonSynodicPeriod;
+  const solarDays = completedYears * PHYS.earthOrbitPeriod;
+  const gap = solarDays - lunarDays;
+  if (gapEl) gapEl.textContent = gap.toFixed(1) + ' ימים';
+}
+
+// ============================================================
+//  EDUCATIONAL MILESTONES
+// ============================================================
+function checkMilestones() {
+  const t = app.state.time;
+  const overlay = document.getElementById('edu-overlay');
+  const textEl = document.getElementById('edu-text');
+  if (!overlay || !textEl) return;
+
+  if (!app.milestonesShown[354] && t >= 354.37) {
+    app.milestonesShown[354] = true;
+    showMilestone(
+      '12 חודשי ירח עברו, אבל <span class="em">כדור הארץ עדיין לא השלים את מסלולו!</span>' +
+      '<br>נותרו עוד כ-<span class="num">11 ימים</span> עד סיום השנה.'
+    );
+  }
+  if (!app.milestonesShown[365] && t >= 365.25) {
+    app.milestonesShown[365] = true;
+    showMilestone(
+      'שנה שלמה! 🎉 אבל חלפו <span class="num">12.37</span> חודשי ירח, ' +
+      '<span class="em">לא בדיוק 12</span>.' +
+      '<br>הפער: כ-<span class="num">11 ימים</span>.'
+    );
+  }
+  if (!app.milestonesShown[730] && t >= 730.5) {
+    app.milestonesShown[730] = true;
+    showMilestone(
+      'אחרי שנתיים, הפער הצטבר ל-<span class="num">~22 ימים</span> — כמעט חודש שלם!' +
+      '<br><span class="em">לכן בלוח העברי מוסיפים את אדר ב׳.</span>'
+    );
+  }
+}
+
+function showMilestone(html) {
+  const overlay = document.getElementById('edu-overlay');
+  const textEl = document.getElementById('edu-text');
+  textEl.innerHTML = html;
+  overlay.classList.add('visible');
+  setTimeout(() => overlay.classList.remove('visible'), 8000);
+}
+
+// ============================================================
+//  PROGRESS ARC
+// ============================================================
+function drawProgressArc() {
+  const canvas = document.getElementById('progress-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h / 2, r = 55;
+  const yearProgress = (app.state.time % PHYS.earthOrbitPeriod) / PHYS.earthOrbitPeriod;
+  const lunarProgress = (app.state.time % PHYS.moonSynodicPeriod) / PHYS.moonSynodicPeriod;
+
+  // Background circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(100,100,200,0.15)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  // Year arc (gold)
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + yearProgress * Math.PI * 2);
+  ctx.strokeStyle = '#f0c040';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Lunar month arc (inner, cyan)
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 10, -Math.PI/2, -Math.PI/2 + lunarProgress * Math.PI * 2);
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Center text
+  ctx.fillStyle = '#e8e8f0';
+  ctx.font = 'bold 14px Rubik, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText((app.state.time / PHYS.earthOrbitPeriod).toFixed(2), cx, cy - 4);
+  ctx.fillStyle = '#9898b0';
+  ctx.font = '10px Rubik, sans-serif';
+  ctx.fillText('שנים', cx, cy + 12);
+
+  // Markers for 12 lunar months
+  for (let i = 0; i < 12; i++) {
+    const angle = -Math.PI/2 + (i / 12) * Math.PI * 2;
+    const mx = cx + (r + 4) * Math.cos(angle);
+    const my = cy + (r + 4) * Math.sin(angle);
+    ctx.fillStyle = 'rgba(200,200,220,0.3)';
+    ctx.beginPath();
+    ctx.arc(mx, my, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ============================================================
+//  CONTEXT MENU SYSTEM
+// ============================================================
+const ctxMenu = document.getElementById('ctx-menu');
+
+document.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  ctxMenu.style.display = 'block';
+  // Position the menu
+  const x = e.clientX;
+  const y = e.clientY;
+  const menuW = ctxMenu.offsetWidth;
+  const menuH = ctxMenu.offsetHeight;
+  const winW = window.innerWidth;
+  const winH = window.innerHeight;
+
+  ctxMenu.style.left = (x + menuW > winW ? winW - menuW - 8 : x) + 'px';
+  ctxMenu.style.top = (y + menuH > winH ? winH - menuH - 8 : y) + 'px';
+});
+
+document.addEventListener('click', (e) => {
+  if (!ctxMenu.contains(e.target)) {
+    ctxMenu.style.display = 'none';
+  }
+});
+
+document.querySelectorAll('.ctx-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const dlgId = item.dataset.dlg;
+    ctxMenu.style.display = 'none';
+    openDialogue(dlgId);
+  });
+});
+
+// ============================================================
+//  DIALOGUE SYSTEM
+// ============================================================
+const dialoguePositions = {};
+
+function openDialogue(id) {
+  const dlg = document.getElementById('dlg-' + id);
+  if (!dlg) return;
+
+  if (dlg.classList.contains('open')) {
+    dlg.classList.remove('open');
+    return;
+  }
+
+  dlg.classList.add('open');
+
+  // Position if not already positioned
+  if (!dialoguePositions[id]) {
+    const w = dlg.offsetWidth;
+    const h = dlg.offsetHeight;
+    const cx = window.innerWidth / 2 - w / 2;
+    const cy = window.innerHeight / 2 - h / 2;
+    dlg.style.left = cx + 'px';
+    dlg.style.top = cy + 'px';
+    dlg.style.right = 'auto';
+    dlg.style.bottom = 'auto';
+    dlg.style.transform = 'none';
+    dialoguePositions[id] = true;
+  }
+}
+
+// Close buttons
+document.querySelectorAll('.dlg-close').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.closest('.dialogue').classList.remove('open');
+  });
+});
+
+// Prevent clicks through dialogues to 3D scene
+document.querySelectorAll('.dialogue').forEach(dlg => {
+  dlg.addEventListener('mousedown', (e) => e.stopPropagation());
+  dlg.addEventListener('contextmenu', (e) => e.stopPropagation());
+});
+
+// ============================================================
+//  DRAGGABLE DIALOGUES
+// ============================================================
+document.querySelectorAll('.dlg-header').forEach(header => {
+  let isDragging = false;
+  let startX, startY, origLeft, origTop;
+
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('dlg-close')) return;
+    isDragging = true;
+    const dlg = header.parentElement;
+    const rect = dlg.getBoundingClientRect();
+
+    // CRITICAL: unset constraints and set explicit position
+    dlg.style.right = 'auto';
+    dlg.style.bottom = 'auto';
+    dlg.style.transform = 'none';
+    dlg.style.left = rect.left + 'px';
+    dlg.style.top = rect.top + 'px';
+
+    origLeft = rect.left;
+    origTop = rect.top;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    const dlg = header.parentElement;
+    dlg.style.left = (origLeft + dx) + 'px';
+    dlg.style.top = (origTop + dy) + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+});
+
+// ============================================================
+//  PHYSI-SLIDER SYSTEM
+// ============================================================
+document.querySelectorAll('.physi-slider-track').forEach(track => {
+  const thumb = track.querySelector('.physi-slider-thumb');
+  const fill = track.querySelector('.physi-slider-fill');
+  const container = track.closest('.physi-slider');
+  const valDisplay = container.querySelector('.physi-slider-val');
+  const playBtn = container.querySelector('.physi-slider-play');
+
+  const min = parseFloat(track.dataset.min);
+  const max = parseFloat(track.dataset.max);
+  let value = parseFloat(track.dataset.value);
+  const param = track.dataset.param;
+
+  let animating = false;
+  let animDir = 1;
+
+  function updateSlider(v) {
+    value = Math.max(min, Math.min(max, v));
+    const pct = (value - min) / (max - min);
+    // RTL: fill goes from right
+    fill.style.width = (pct * 100) + '%';
+    fill.style.right = '0';
+    fill.style.left = 'auto';
+    thumb.style.right = (pct * 100) + '%';
+    thumb.style.left = 'auto';
+    valDisplay.textContent = Math.round(value);
+    track.dataset.value = value;
+    if (param && app.params.hasOwnProperty(param)) {
+      app.params[param] = value;
+    }
+  }
+
+  updateSlider(value);
+
+  let isDragging = false;
+
+  function onDrag(e) {
+    const rect = track.getBoundingClientRect();
+    // RTL: right side = 0, left side = max
+    const pct = 1 - Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    updateSlider(min + pct * (max - min));
+  }
+
+  track.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    onDrag(e);
+    e.stopPropagation();
+  });
+
+  thumb.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    e.stopPropagation();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (isDragging) onDrag(e);
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  // Play button animation
+  playBtn.addEventListener('click', () => {
+    animating = !animating;
+    playBtn.textContent = animating ? '⏸' : '▶';
+    playBtn.style.color = animating ? 'var(--accent-orange)' : 'var(--accent-green)';
+  });
+
+  // Animate slider value
+  function animateSlider() {
+    if (animating) {
+      value += animDir * (max - min) * 0.005;
+      if (value >= max) { value = max; animDir = -1; }
+      if (value <= min) { value = min; animDir = 1; }
+      updateSlider(value);
+    }
+    requestAnimationFrame(animateSlider);
+  }
+  animateSlider();
+});
+
+// ============================================================
+//  TOGGLE PAIRS
+// ============================================================
+document.getElementById('scale-toggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn');
+  if (!btn) return;
+  document.querySelectorAll('#scale-toggle .btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  app.setScale(btn.dataset.val);
+});
+
+document.getElementById('frame-toggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn');
+  if (!btn) return;
+  document.querySelectorAll('#frame-toggle .btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  app.setFrame(btn.dataset.val);
+});
+
+document.getElementById('theme-toggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn');
+  if (!btn) return;
+  document.querySelectorAll('#theme-toggle .btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  app.state.theme = btn.dataset.val;
+  // Light theme adjustments
+  if (btn.dataset.val === 'light') {
+    renderer.setClearColor(0xeeeef0);
+    document.body.style.background = '#eeeef0';
+  } else {
+    renderer.setClearColor(0x080810);
+    document.body.style.background = '#080810';
+  }
+});
+
+document.getElementById('lang-toggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn');
+  if (!btn) return;
+  document.querySelectorAll('#lang-toggle .btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  app.state.lang = btn.dataset.val;
+});
+
+// ============================================================
+//  TOGGLE SWITCHES
+// ============================================================
+document.querySelectorAll('.toggle-switch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    const key = sw.dataset.toggle;
+    sw.classList.toggle('on');
+    const isOn = sw.classList.contains('on');
+
+    switch(key) {
+      case 'trails':
+        app.state.trails = isOn;
+        earthTrail.visible = isOn;
+        moonTrail.visible = isOn;
+        break;
+      case 'grid':
+        app.state.grid = isOn;
+        gridHelper.visible = isOn;
+        break;
+      case 'labels':
+        app.state.labels = isOn;
+        sunLabel.visible = isOn;
+        earthLabel.visible = isOn;
+        moonLabel.visible = isOn;
+        break;
+      case 'orbits':
+        app.state.orbits = isOn;
+        if (earthOrbitLine) earthOrbitLine.visible = isOn;
+        if (moonOrbitLine) moonOrbitLine.visible = isOn;
+        break;
+      case 'sunGlow':
+        app.state.sunGlow = isOn;
+        sunGlow.visible = isOn;
+        sunCorona.visible = isOn;
+        break;
+      case 'stars':
+        app.state.stars = isOn;
+        starField.visible = isOn;
+        break;
+      case 'recFrame':
+        app.state.recFrame = isOn;
+        document.getElementById('rec-frame').classList.toggle('active', isOn);
+        updateRecFrame();
+        break;
+    }
+  });
+});
+
+// ============================================================
+//  CAMERA PRESETS & FOLLOW
+// ============================================================
+app.cameraPreset = function(preset) {
+  switch(preset) {
+    case 'top':
+      orbitState.spherical.phi = 0.01;
+      orbitState.spherical.theta = 0;
+      orbitState.spherical.radius = 100;
+      break;
+    case 'angle':
+      orbitState.spherical.phi = Math.PI / 3;
+      orbitState.spherical.theta = Math.PI / 4;
+      orbitState.spherical.radius = 80;
+      break;
+    case 'side':
+      orbitState.spherical.phi = Math.PI / 2;
+      orbitState.spherical.theta = 0;
+      orbitState.spherical.radius = 80;
+      break;
+  }
+  updateCameraFromSpherical();
+};
+
+app.setFollow = function(mode) {
+  app.state.follow = mode;
+  document.querySelectorAll('#dlg-camera .ctrl-row .btn').forEach(b => b.classList.remove('active'));
+  const btnId = 'follow-' + mode;
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.add('active');
+};
+// Initialize follow buttons
+document.getElementById('follow-none').classList.add('active');
+document.getElementById('follow-moon').classList.remove('active');
+
+// ============================================================
+//  APP METHODS
+// ============================================================
+app.togglePlay = function() {
+  app.state.paused = !app.state.paused;
+  const btn = document.getElementById('btn-playpause');
+  if (btn) {
+    btn.textContent = app.state.paused ? '▶ המשך' : '⏸ השהה';
+  }
+};
+
+app.reset = function() {
+  app.state.time = 0;
+  app.state.paused = false;
+  app.milestonesShown = { 354: false, 365: false, 730: false };
+  resetTrails();
+  lastTrailTime = 0;
+  const btn = document.getElementById('btn-playpause');
+  if (btn) btn.textContent = '⏸ השהה';
+};
+
+app.setScale = function(mode) {
+  app.state.scaleMode = mode;
+  // Rebuild orbit lines and markers for new scale
+  createOrbitLines();
+  updateStartMarker();
+
+  // Resize celestial bodies
+  const sc = getEffectiveScaleParams();
+  sunMesh.geometry.dispose();
+  sunMesh.geometry = new THREE.SphereGeometry(sc.sunRadius, 48, 48);
+  earthMesh.geometry.dispose();
+  earthMesh.geometry = new THREE.SphereGeometry(sc.earthRadius, 32, 32);
+  moonMesh.geometry.dispose();
+  moonMesh.geometry = new THREE.SphereGeometry(sc.moonRadius, 24, 24);
+
+  sunGlow.scale.set(sc.sunRadius * 4, sc.sunRadius * 4, 1);
+  sunCorona.scale.set(sc.sunRadius * 7, sc.sunRadius * 7, 1);
+
+  // Show/hide toy-mode sliders
+  const sliderEarth = document.getElementById('slider-earth-radius');
+  const sliderMoon = document.getElementById('slider-moon-radius');
+  if (sliderEarth) sliderEarth.style.display = mode === 'toy' ? 'block' : 'none';
+  if (sliderMoon) sliderMoon.style.display = mode === 'toy' ? 'block' : 'none';
+
+  resetTrails();
+};
+
+app.setFrame = function(mode) {
+  app.state.frameMode = mode;
+  resetTrails();
+};
+
+app.jumpTo = function(targetDays) {
+  if (app.state.time >= targetDays) return; // already past
+  const wasPlaying = !app.state.paused;
+  app.state.paused = false;
+
+  const oldSpeed = app.params.speed;
+  const remaining = targetDays - app.state.time;
+  app.params.speed = Math.max(200, remaining / 1.5);
+
+  const checkInterval = setInterval(() => {
+    if (app.state.time >= targetDays) {
+      app.params.speed = oldSpeed;
+      // Update speed slider display
+      updateSpeedSliderDisplay(oldSpeed);
+      if (!wasPlaying) {
+        app.state.paused = true;
+        const btn = document.getElementById('btn-playpause');
+        if (btn) btn.textContent = '▶ המשך';
+      }
+      clearInterval(checkInterval);
+    }
+  }, 30);
+};
+
+function updateSpeedSliderDisplay(val) {
+  const track = document.querySelector('#slider-speed .physi-slider-track');
+  if (!track) return;
+  const min = parseFloat(track.dataset.min);
+  const max = parseFloat(track.dataset.max);
+  const pct = (val - min) / (max - min);
+  const fill = track.querySelector('.physi-slider-fill');
+  const thumb = track.querySelector('.physi-slider-thumb');
+  const valDisplay = track.closest('.physi-slider').querySelector('.physi-slider-val');
+  fill.style.width = (pct * 100) + '%';
+  thumb.style.right = (pct * 100) + '%';
+  valDisplay.textContent = Math.round(val);
+  track.dataset.value = val;
+  app.params.speed = val;
+}
+
+// ============================================================
+//  RECORDING SYSTEM
+// ============================================================
+app.rec = {
+  aspect: '16:9',
+  setAspect: function(ratio, btn) {
+    this.aspect = ratio;
+    document.querySelectorAll('.rec-aspect-btns .btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    updateRecFrame();
+  },
+  screenshot: function() {
+    renderer.render(scene, camera);
+    const dataURL = renderer.domElement.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = 'physital-simulation-' + Date.now() + '.png';
+    link.href = dataURL;
+    link.click();
+  },
+};
+
+function updateRecFrame() {
+  const frame = document.getElementById('rec-frame');
+  if (!app.state.recFrame) { frame.classList.remove('active'); return; }
+  frame.classList.add('active');
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let w, h;
+  const parts = app.rec.aspect.split(':');
+  const ratio = parseFloat(parts[0]) / parseFloat(parts[1]);
+
+  if (ratio >= 1) {
+    w = Math.min(vw * 0.8, vh * 0.8 * ratio);
+    h = w / ratio;
+  } else {
+    h = Math.min(vh * 0.8, vw * 0.8 / ratio);
+    w = h * ratio;
+  }
+
+  frame.style.width = w + 'px';
+  frame.style.height = h + 'px';
+  frame.style.left = ((vw - w) / 2) + 'px';
+  frame.style.top = ((vh - h) / 2) + 'px';
+}
+
+// ============================================================
+//  ORBIT CONTROLS (Manual mouse-based)
+// ============================================================
+const canvasEl = renderer.domElement;
+
+canvasEl.addEventListener('mousedown', (e) => {
+  if (e.button === 0) { // left click
+    orbitState.isDragging = true;
+    orbitState.prevMouse.x = e.clientX;
+    orbitState.prevMouse.y = e.clientY;
+  }
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!orbitState.isDragging) return;
+  const dx = e.clientX - orbitState.prevMouse.x;
+  const dy = e.clientY - orbitState.prevMouse.y;
+
+  orbitState.spherical.theta -= dx * 0.005;
+  orbitState.spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05,
+    orbitState.spherical.phi - dy * 0.005));
+
+  orbitState.prevMouse.x = e.clientX;
+  orbitState.prevMouse.y = e.clientY;
+});
+
+document.addEventListener('mouseup', () => {
+  orbitState.isDragging = false;
+});
+
+canvasEl.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  orbitState.spherical.radius *= 1 + e.deltaY * 0.001;
+  orbitState.spherical.radius = Math.max(5, Math.min(500, orbitState.spherical.radius));
+}, { passive: false });
+
+// ============================================================
+//  KEYBOARD SHORTCUTS
+// ============================================================
+document.addEventListener('keydown', (e) => {
+  // Don't capture if typing in an input
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  switch(e.key) {
+    case ' ':
+      e.preventDefault();
+      app.togglePlay();
+      break;
+    case 'r': case 'R': app.reset(); break;
+    case 't': case 'T':
+      app.state.trails = !app.state.trails;
+      earthTrail.visible = app.state.trails;
+      moonTrail.visible = app.state.trails;
+      syncToggleSwitch('trails', app.state.trails);
+      break;
+    case 'g': case 'G':
+      app.state.grid = !app.state.grid;
+      gridHelper.visible = app.state.grid;
+      syncToggleSwitch('grid', app.state.grid);
+      break;
+    case 'l': case 'L':
+      app.state.labels = !app.state.labels;
+      sunLabel.visible = app.state.labels;
+      earthLabel.visible = app.state.labels;
+      moonLabel.visible = app.state.labels;
+      syncToggleSwitch('labels', app.state.labels);
+      break;
+    case '1': updateSpeedSliderDisplay(1); break;
+    case '2': updateSpeedSliderDisplay(10); break;
+    case '3': updateSpeedSliderDisplay(100); break;
+    case '4': updateSpeedSliderDisplay(500); break;
+  }
+});
+
+function syncToggleSwitch(key, val) {
+  const sw = document.querySelector(`.toggle-switch[data-toggle="${key}"]`);
+  if (sw) sw.classList.toggle('on', val);
+}
+
+// ============================================================
+//  ANIMATION LOOP
+// ============================================================
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta() * 60, 2); // normalize to ~60fps
+
+  updateSimulation(dt);
+
+  // Sun rotation glow effect
+  const t = performance.now() * 0.001;
+  if (app.state.sunGlow) {
+    sunGlow.material.opacity = 0.35 + 0.1 * Math.sin(t * 2);
+    sunCorona.material.opacity = 0.15 + 0.05 * Math.sin(t * 1.3);
+  }
+
+  // Earth axial rotation
+  if (!app.state.paused) {
+    earthMesh.rotation.y += 0.01 * app.params.speed * dt;
+  }
+
+  // Moon tidally locked (face Earth)
+  const moonWorldPos = new THREE.Vector3();
+  moonMesh.getWorldPosition(moonWorldPos);
+  const earthWorldPos = new THREE.Vector3();
+  earthMesh.getWorldPosition(earthWorldPos);
+  moonMesh.lookAt(earthMesh.position);
+
+  // Update camera
+  updateCameraFromSpherical();
+
+  // Progress arc
+  drawProgressArc();
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+//  WINDOW RESIZE
+// ============================================================
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateRecFrame();
+});
+
+// ============================================================
+//  BOT CONTROL API
+// ============================================================
+window.physital = {
+  isReady: true,
+  getParams: () => ({ ...app.params }),
+  setParams: (p) => { Object.assign(app.params, p); },
+  getState: () => ({ ...app.state }),
+  play: () => { app.state.paused = false; },
+  pause: () => { app.state.paused = true; },
+  reset: () => { app.reset(); },
+  setSpeed: (s) => { app.params.speed = s; updateSpeedSliderDisplay(s); },
+  setScale: (m) => { app.setScale(m); },
+  setFrame: (m) => { app.setFrame(m); },
+  jumpTo: (d) => { app.jumpTo(d); },
+  cameraPreset: (p) => { app.cameraPreset(p); },
+  screenshot: () => { app.rec.screenshot(); },
+};
+
+// ============================================================
+//  INIT
+// ============================================================
+function init() {
+  // Set initial camera
+  app.cameraPreset('angle');
+
+  // Hide loading screen
+  setTimeout(() => {
+    document.getElementById('loading-screen').classList.add('hidden');
+  }, 600);
+
+  // Show welcome milestone
+  setTimeout(() => {
+    showMilestone(
+      'ברוכים הבאים! צפו כיצד <span class="em">כדור הארץ</span> סובב סביב <span class="em">השמש</span>, ' +
+      'ו<span class="em">הירח</span> סובב סביב הארץ.' +
+      '<br>לחצו ימני לתפריט בקרה. הנקודה הירוקה מסמנת את נקודת ההתחלה.'
+    );
+  }, 1200);
+
+  // Start animation
+  animate();
+}
+
+init();
+</script>
+</body>
+</html>
