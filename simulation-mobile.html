@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0a1a">
+    <title>PhysiTal — שנה מול חודשים</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+
+<style>
+    :root {
+        --glass-bg: rgba(18, 18, 24, 0.92);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --accent: #60a5fa;
+        --accent-glow: rgba(96, 165, 250, 0.4);
+        --text-main: #e2e8f0;
+        --text-dim: #94a3b8;
+        --bg-dark: #0a0a1a;
+        --gold: #fbbf24;
+        --earth-blue: #3b82f6;
+        --moon-gray: #9ca3af;
+        --highlight: #f97316;
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-top: env(safe-area-inset-top, 0px);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+        background: var(--bg-dark);
+        color: var(--text-main);
+        font-family: 'Rubik', sans-serif;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        cursor: default;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        position: fixed;
+        top: 0; left: 0;
+    }
+
+    #three-container {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 0;
+    }
+
+    /* ── Top HUD Bar ── */
+    #top-bar {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 100;
+        padding: 6px 10px;
+        padding-top: calc(6px + var(--safe-top));
+        background: linear-gradient(to bottom, rgba(10,10,26,0.9) 0%, rgba(10,10,26,0.5) 60%, transparent 100%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        direction: rtl;
+        pointer-events: none;
+    }
+    #top-bar > * { pointer-events: auto; }
+
+    .top-brand {
+        font-family: 'Rubik', sans-serif;
+        font-weight: 700;
+        font-size: 0.85rem;
+        background: linear-gradient(135deg, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        flex-shrink: 0;
+    }
+
+    .top-hud {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.65rem;
+        direction: ltr;
+        flex-wrap: nowrap;
+        overflow: hidden;
+    }
+    .top-hud-item {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        white-space: nowrap;
+    }
+    .top-hud-value {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        font-size: 0.7rem;
+    }
+    .top-hud-ratio {
+        color: var(--highlight);
+        font-weight: 700;
+        font-size: 0.8rem;
+    }
+
+    /* ── Hamburger Menu Button ── */
+    #menu-btn {
+        position: fixed;
+        top: 6px;
+        top: calc(6px + var(--safe-top));
+        left: 10px;
+        z-index: 200;
+        width: 40px; height: 40px;
+        border-radius: 10px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    #menu-btn:active { transform: scale(0.9); background: rgba(96,165,250,0.2); }
+    .hamburger-icon { width: 18px; height: 12px; display: flex; flex-direction: column; justify-content: space-between; }
+    .hamburger-icon span { display: block; height: 2px; background: var(--text-main); border-radius: 1px; transition: all 0.3s; }
+    #menu-btn.open .hamburger-icon span:nth-child(1) { transform: rotate(45deg) translate(3.5px, 3.5px); }
+    #menu-btn.open .hamburger-icon span:nth-child(2) { opacity: 0; }
+    #menu-btn.open .hamburger-icon span:nth-child(3) { transform: rotate(-45deg) translate(3.5px, -3.5px); }
+
+    /* ── Side Menu ── */
+    #side-menu {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        width: 260px;
+        max-width: 78vw;
+        z-index: 150;
+        background: var(--glass-bg);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border-right: 1px solid var(--glass-border);
+        padding: 60px 16px 16px;
+        padding-top: calc(60px + var(--safe-top));
+        padding-bottom: calc(16px + var(--safe-bottom));
+        transform: translateX(-100%);
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow-y: auto;
+        direction: rtl;
+    }
+    #side-menu.open { transform: translateX(0); }
+    #menu-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 140;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.35s;
+    }
+    #menu-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .menu-section { margin-bottom: 16px; }
+    .menu-section-title {
+        font-size: 0.7rem;
+        color: var(--accent);
+        font-weight: 600;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .menu-check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 40px;
+        padding: 4px 0;
+        cursor: pointer;
+        color: var(--text-dim);
+        font-size: 0.8rem;
+        transition: color 0.2s;
+    }
+    .menu-check:active { color: var(--text-main); }
+    .menu-check input[type="checkbox"] {
+        accent-color: var(--accent);
+        width: 18px; height: 18px;
+        cursor: pointer;
+    }
+    .menu-toggle-group {
+        display: flex;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--glass-border);
+        margin-top: 4px;
+    }
+    .menu-toggle-opt {
+        flex: 1;
+        padding: 10px 6px;
+        background: rgba(255,255,255,0.04);
+        color: var(--text-dim);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.72rem;
+        transition: all 0.2s;
+        border: none;
+        text-align: center;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .menu-toggle-opt + .menu-toggle-opt { border-right: 1px solid var(--glass-border); }
+    .menu-toggle-opt:active { background: rgba(255,255,255,0.1); }
+    .menu-toggle-opt.active { background: rgba(96, 165, 250, 0.2); color: var(--accent); }
+    .menu-action {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 6px 4px;
+        cursor: pointer;
+        color: var(--text-dim);
+        font-size: 0.8rem;
+        transition: all 0.2s;
+        border-radius: 8px;
+    }
+    .menu-action:active { background: rgba(255,255,255,0.08); color: var(--text-main); }
+    .menu-action-icon { font-size: 1rem; width: 24px; text-align: center; }
+    .menu-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 6px 0; }
+
+    /* ── Dual Clock Widget ── */
+    #clock-widget {
+        position: fixed;
+        bottom: calc(80px + var(--safe-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 110;
+        pointer-events: none;
+    }
+
+    /* ── Speed +/- Buttons ── */
+    #speed-controls {
+        position: fixed;
+        bottom: calc(80px + var(--safe-bottom));
+        right: 10px;
+        z-index: 110;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+    .speed-mini-btn {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border);
+        color: var(--text-main);
+        font-size: 1.1rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s;
+        line-height: 1;
+    }
+    .speed-mini-btn:active { transform: scale(0.9); background: rgba(96,165,250,0.2); }
+    #speed-mini-label {
+        font-size: 0.6rem;
+        color: var(--accent);
+        font-weight: 600;
+        text-align: center;
+    }
+
+    /* ── Focus Indicator ── */
+    #focus-indicator {
+        position: fixed;
+        bottom: calc(80px + var(--safe-bottom));
+        left: 10px;
+        z-index: 110;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        font-size: 0.65rem;
+        color: var(--text-dim);
+        pointer-events: auto;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    #focus-indicator:active { background: rgba(96,165,250,0.15); }
+    #focus-indicator .focus-body { color: var(--accent); font-weight: 600; }
+
+    /* ── Bottom Sheet ── */
+    #bottom-sheet {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        z-index: 120;
+        background: var(--glass-bg);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border-top: 1px solid var(--glass-border);
+        border-radius: 16px 16px 0 0;
+        padding: 0 14px;
+        padding-bottom: var(--safe-bottom);
+        transform: translateY(calc(100% - 72px - var(--safe-bottom)));
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        max-height: 65vh;
+        overflow-y: auto;
+        direction: rtl;
+    }
+    #bottom-sheet.expanded { transform: translateY(0); }
+
+    .sheet-handle-area {
+        display: flex;
+        justify-content: center;
+        padding: 10px 0 6px;
+        cursor: grab;
+    }
+    .sheet-handle {
+        width: 32px; height: 4px;
+        background: rgba(255,255,255,0.25);
+        border-radius: 2px;
+    }
+
+    /* Always visible play controls */
+    .sheet-collapsed-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding-bottom: 10px;
+    }
+
+    .ctrl-btn-mobile {
+        min-width: 40px; min-height: 40px;
+        border-radius: 10px;
+        border: 1px solid var(--glass-border);
+        background: rgba(255,255,255,0.06);
+        color: var(--text-main);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.78rem;
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 12px;
+        white-space: nowrap;
+    }
+    .ctrl-btn-mobile:active { transform: scale(0.92); background: rgba(255,255,255,0.12); }
+
+    .play-btn-mobile {
+        width: 48px; height: 48px;
+        border-radius: 50%;
+        background: rgba(96, 165, 250, 0.15);
+        border: 2px solid var(--accent);
+        color: var(--accent);
+        font-size: 1.2rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s;
+        position: relative;
+    }
+    .play-btn-mobile:active { transform: scale(0.88); background: rgba(96, 165, 250, 0.3); }
+
+    /* ── Play button pulse animation ── */
+    @keyframes playPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.5); }
+        50% { box-shadow: 0 0 0 12px rgba(96, 165, 250, 0); }
+    }
+    .play-btn-mobile.pulsing {
+        animation: playPulse 1.2s ease-in-out infinite;
+    }
+
+    /* ── Play arrow indicator ── */
+    #play-arrow-hint {
+        position: fixed;
+        z-index: 125;
+        bottom: calc(72px + var(--safe-bottom) + 52px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.4s;
+    }
+    #play-arrow-hint.visible { opacity: 1; }
+    #play-arrow-hint .arrow-text {
+        font-size: 0.7rem;
+        color: var(--accent);
+        font-weight: 600;
+        white-space: nowrap;
+        text-shadow: 0 0 10px rgba(0,0,0,0.8);
+    }
+    @keyframes bounceDown {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(5px); }
+    }
+    #play-arrow-hint .arrow-icon {
+        font-size: 1.2rem;
+        animation: bounceDown 0.8s ease-in-out infinite;
+    }
+
+    /* ── Welcome Overlay ── */
+    #welcome-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 500;
+        background: rgba(10, 10, 26, 0.75);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 1;
+        transition: opacity 0.5s;
+    }
+    #welcome-overlay.hidden { opacity: 0; pointer-events: none; }
+    .welcome-card {
+        text-align: center;
+        direction: rtl;
+        max-width: 300px;
+        padding: 0 20px;
+    }
+    .welcome-card .welcome-emoji { font-size: 3rem; margin-bottom: 12px; }
+    .welcome-card h2 {
+        font-size: 1.1rem;
+        color: var(--text-main);
+        font-weight: 600;
+        margin-bottom: 8px;
+        line-height: 1.6;
+    }
+    .welcome-card p {
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        margin-bottom: 20px;
+        line-height: 1.6;
+    }
+    .welcome-play-btn {
+        width: 64px; height: 64px;
+        border-radius: 50%;
+        background: rgba(96, 165, 250, 0.2);
+        border: 2px solid var(--accent);
+        color: var(--accent);
+        font-size: 1.8rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        animation: playPulse 1.5s ease-in-out infinite;
+    }
+    .welcome-play-btn:active { transform: scale(0.9); background: rgba(96, 165, 250, 0.35); }
+
+    /* ── Inline toast hints (small, non-intrusive) ── */
+    .inline-hint {
+        position: fixed;
+        z-index: 130;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 6px 14px;
+        border-radius: 20px;
+        background: rgba(18, 18, 24, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.08);
+        font-size: 0.65rem;
+        color: var(--text-dim);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.5s, transform 0.5s;
+        white-space: nowrap;
+        direction: rtl;
+    }
+    .inline-hint.visible { opacity: 1; }
+    #hint-speed {
+        top: calc(50% + 30px);
+    }
+
+    /* ── Message popups (educational, semi-transparent) ── */
+    .sim-message {
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%) scale(0.9);
+        z-index: 300;
+        background: rgba(18, 18, 24, 0.82);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        border-radius: 14px;
+        padding: 18px 20px;
+        text-align: center;
+        box-shadow: 0 0 40px rgba(0,0,0,0.4);
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        direction: rtl;
+        width: calc(100vw - 50px);
+        max-width: 300px;
+    }
+    .sim-message.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+    .sim-message h3 { font-size: 0.95rem; font-weight: 600; color: var(--gold); margin-bottom: 6px; }
+    .sim-message p { font-size: 0.75rem; color: var(--text-dim); line-height: 1.7; }
+    .sim-message .msg-value {
+        font-size: 1.5rem; font-weight: 700;
+        color: var(--highlight);
+        margin: 6px 0;
+        font-variant-numeric: tabular-nums;
+        direction: ltr;
+    }
+    .sim-message .msg-ok-btn {
+        margin-top: 10px;
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: 1px solid var(--gold);
+        background: rgba(251, 191, 36, 0.12);
+        color: var(--gold);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.78rem;
+        min-height: 36px;
+        transition: all 0.2s;
+    }
+    .sim-message .msg-ok-btn:active { background: rgba(251, 191, 36, 0.25); transform: scale(0.95); }
+
+    /* Expanded controls */
+    .sheet-expanded-controls {
+        padding: 0 0 16px;
+        display: none;
+    }
+    #bottom-sheet.expanded .sheet-expanded-controls { display: block; }
+
+    .ctrl-section-title {
+        font-size: 0.7rem;
+        color: var(--accent);
+        font-weight: 600;
+        margin: 10px 0 6px;
+    }
+
+    .speed-slider-area { padding: 6px 0; }
+    .speed-label-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        font-size: 0.72rem;
+        color: var(--text-dim);
+    }
+    .speed-value { color: var(--accent); font-weight: 600; font-size: 0.85rem; }
+    .speed-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255,255,255,0.1);
+        outline: none;
+    }
+    .speed-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 2px solid rgba(255,255,255,0.3);
+        box-shadow: 0 2px 8px rgba(96,165,250,0.3);
+    }
+    .speed-slider::-moz-range-thumb {
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 2px solid rgba(255,255,255,0.3);
+    }
+    .speed-presets {
+        display: flex;
+        gap: 5px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+    }
+    .speed-preset-btn {
+        min-width: 40px; min-height: 34px;
+        border-radius: 8px;
+        border: 1px solid var(--glass-border);
+        background: rgba(255,255,255,0.04);
+        color: var(--text-dim);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.72rem;
+        transition: all 0.15s;
+        padding: 4px 8px;
+    }
+    .speed-preset-btn:active { background: rgba(255,255,255,0.1); }
+    .speed-preset-btn.active { background: rgba(96, 165, 250, 0.2); border-color: var(--accent); color: var(--accent); }
+
+    /* Detailed HUD */
+    .detailed-hud { padding: 8px 0; }
+    .dhud-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+        font-size: 0.78rem;
+    }
+    .dhud-label { color: var(--text-dim); }
+    .dhud-value { font-variant-numeric: tabular-nums; font-weight: 500; direction: ltr; }
+    .dhud-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 3px 0; }
+
+    /* Explanation Panel */
+    #explanation {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 250;
+        background: rgba(10,10,26,0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 56px 20px 36px;
+        padding-top: calc(56px + var(--safe-top));
+        padding-bottom: calc(36px + var(--safe-bottom));
+        overflow-y: auto;
+        direction: rtl;
+        display: none;
+        font-size: 0.85rem;
+        line-height: 1.8;
+        color: var(--text-dim);
+    }
+    #explanation.visible { display: block; }
+    #explanation h3 { color: var(--accent); font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
+    #explanation .math-highlight {
+        display: block;
+        background: rgba(0,0,0,0.3);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin: 12px 0;
+        direction: ltr;
+        text-align: center;
+        font-size: 1.1rem;
+        color: var(--accent);
+    }
+    .close-expl-btn {
+        position: fixed;
+        top: 12px;
+        top: calc(12px + var(--safe-top));
+        left: 12px;
+        width: 40px; height: 40px;
+        border-radius: 10px;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        color: var(--text-main);
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 260;
+    }
+
+    /* Body Labels */
+    .body-label {
+        position: fixed;
+        z-index: 50;
+        font-size: 0.65rem;
+        color: rgba(255,255,255,0.7);
+        pointer-events: none;
+        text-shadow: 0 0 8px rgba(0,0,0,0.8);
+        font-weight: 500;
+        white-space: nowrap;
+        transition: opacity 0.3s;
+    }
+
+    /* Ratio note */
+    .hud-ratio-note {
+        font-size: 0.62rem;
+        color: var(--text-dim);
+        text-align: center;
+        opacity: 0;
+        transition: opacity 0.5s;
+        padding: 3px 0 0;
+    }
+    .hud-ratio-note.visible { opacity: 1; }
+
+    /* Share Toast */
+    #share-toast {
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        z-index: 400;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        padding: 10px 18px;
+        font-size: 0.8rem;
+        color: var(--accent);
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.3s;
+        white-space: nowrap;
+    }
+    #share-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Responsive ── */
+    @media (max-width: 360px) {
+        .top-hud { gap: 5px; }
+        .top-hud-value { font-size: 0.65rem; }
+        .sheet-collapsed-controls { gap: 8px; }
+        .ctrl-btn-mobile { padding: 5px 8px; font-size: 0.72rem; }
+    }
+    @media (min-width: 430px) {
+        #bottom-sheet { max-width: 430px; left: 50%; transform: translateX(-50%) translateY(calc(100% - 72px)); }
+        #bottom-sheet.expanded { transform: translateX(-50%) translateY(0); }
+    }
+    @media (orientation: landscape) and (max-height: 500px) {
+        #top-bar { padding: 3px 10px; }
+        #bottom-sheet { transform: translateY(calc(100% - 56px)); }
+        .sheet-collapsed-controls { padding-bottom: 6px; }
+        .sheet-handle-area { padding: 5px 0 3px; }
+        .play-btn-mobile { width: 40px; height: 40px; font-size: 1rem; }
+    }
+</style>
+</head>
+<body>
+
+<div id="three-container"></div>
+
+<!-- Body Labels -->
+<div id="label-sun" class="body-label" style="color: #fbbf24;">☀ שמש</div>
+<div id="label-earth" class="body-label" style="color: #60a5fa;">🌍 כדוה"א</div>
+<div id="label-moon" class="body-label" style="color: #9ca3af;">☾ ירח</div>
+
+<!-- Welcome Overlay -->
+<div id="welcome-overlay">
+    <div class="welcome-card">
+        <div class="welcome-emoji">🌍🌙☀️</div>
+        <h2>למה אין בשנה בדיוק 12 חודשי ירח?</h2>
+        <p>לחצו על הכפתור כדי להתחיל<br>ולראות את התשובה בזמן אמת</p>
+        <div class="welcome-play-btn" id="welcome-play-btn">▶</div>
+    </div>
+</div>
+
+<!-- Play arrow hint (shown after dismissing messages) -->
+<div id="play-arrow-hint">
+    <span class="arrow-text">▶️ לחצו כדי להמשיך</span>
+    <span class="arrow-icon">⬇</span>
+</div>
+
+<!-- Speed help hint -->
+<div id="hint-speed" class="inline-hint">ניתן לשלוט במהירות עם כפתורי +/- מימין 👉</div>
+
+<!-- Educational messages (semi-transparent, pause sim) -->
+<div class="sim-message" id="msg-month1">
+    <h3>🌙 חודש ירחי ראשון!</h3>
+    <p>עבר חודש ירחי שלם — מירח חדש לירח חדש.<br>
+    חודש סינודי = <strong style="color:var(--accent);">29.53 ימים</strong></p>
+    <button class="msg-ok-btn" onclick="dismissMessage('msg-month1')">👍 הבנתי</button>
+</div>
+
+<div class="sim-message" id="msg-quarter">
+    <h3>🌍 רבע שנה!</h3>
+    <p>עברו כ-91 ימים. כדור הארץ עשה רבע הקפה סביב השמש,<br>
+    אבל כבר עברו <strong style="color:var(--accent);">~3.1 חודשי ירח</strong>!</p>
+    <button class="msg-ok-btn" onclick="dismissMessage('msg-quarter')">👍 ממשיכים</button>
+</div>
+
+<div class="sim-message" id="msg-halfyear">
+    <h3>☀️ חצי שנה!</h3>
+    <p>כדור הארץ עשה חצי הקפה.<br>
+    הירח סיים <strong style="color:var(--accent);">~6.7 הקפות</strong>.<br>
+    שימו לב — לא מספר שלם!</p>
+    <button class="msg-ok-btn" onclick="dismissMessage('msg-halfyear')">👍 מעניין</button>
+</div>
+
+<div class="sim-message" id="msg-12months">
+    <h3>📅 12 חודשי ירח!</h3>
+    <div class="msg-value">354.37 ימים</div>
+    <p>
+        עברו בדיוק 12 חודשי ירח (מולד ללבנה עד מולד).<br>
+        אבל כדור הארץ עשה רק <strong style="color:var(--accent);">~97%</strong> מההקפה סביב השמש!<br>
+        <span style="color: var(--text-dim); font-size: 0.7rem;">12 × 29.53 = 354.37 — חסרים עוד ~11 ימים לשנה שלמה!</span>
+    </p>
+    <button class="msg-ok-btn" onclick="dismissMessage('msg-12months')">👍 עכשיו מבינים!</button>
+</div>
+
+<div class="sim-message" id="msg-year">
+    <h3>🌟 שנה שלמה!</h3>
+    <div class="msg-value" id="msg-year-ratio">12.369</div>
+    <p>
+        בשנה אחת יש <strong>12.37 חודשי ירח</strong> (מולד למולד).<br>
+        זה <strong>לא מספר שלם</strong> — ולכן אין התאמה מושלמת!<br>
+        <span style="color: var(--accent);">365.25 ÷ 29.53 ≈ 12.369</span>
+    </p>
+    <button class="msg-ok-btn" onclick="dismissMessage('msg-year')">🎓 מדהים!</button>
+</div>
+
+<!-- Top Bar -->
+<div id="top-bar">
+    <div class="top-brand">פיזיטל</div>
+    <div class="top-hud">
+        <div class="top-hud-item">
+            <span class="top-hud-value" id="hud-days" style="color: var(--text-main);">0</span>
+            <span style="color:var(--text-dim);font-size:0.55rem;margin-right:1px;">ימים</span>
+        </div>
+        <div class="top-hud-item">
+            <span class="top-hud-value" id="hud-earth-orbits" style="color: #60a5fa;">0.000</span>
+            <span style="font-size:0.6rem;">🌍</span>
+        </div>
+        <div class="top-hud-item">
+            <span class="top-hud-value" id="hud-moon-orbits" style="color: #9ca3af;">0.000</span>
+            <span style="font-size:0.6rem;">☾</span>
+        </div>
+        <div class="top-hud-item">
+            <span class="top-hud-ratio" id="hud-ratio">--</span>
+        </div>
+    </div>
+</div>
+
+<!-- Hamburger -->
+<div id="menu-btn" onclick="toggleMenu()">
+    <div class="hamburger-icon"><span></span><span></span><span></span></div>
+</div>
+
+<!-- Menu Overlay -->
+<div id="menu-overlay" onclick="toggleMenu()"></div>
+
+<!-- Side Menu -->
+<div id="side-menu">
+    <div class="menu-section">
+        <div class="menu-section-title">👁 תצוגה</div>
+        <label class="menu-check"><input type="checkbox" id="chk-earth-trail" checked> מסלול כדוה"א</label>
+        <label class="menu-check"><input type="checkbox" id="chk-moon-trail" checked> מסלול הירח</label>
+        <label class="menu-check"><input type="checkbox" id="chk-grid" checked> רשת ייחוס</label>
+        <label class="menu-check"><input type="checkbox" id="chk-labels" checked> תוויות</label>
+        <label class="menu-check"><input type="checkbox" id="chk-orbits"> קווי מסלול</label>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-section">
+        <div class="menu-section-title">☀ מערכת ייחוס</div>
+        <div class="menu-toggle-group" id="ref-frame-toggle">
+            <button class="menu-toggle-opt active" data-mode="heliocentric">☀ סביב השמש</button>
+            <button class="menu-toggle-opt" data-mode="geocentric">🌍 סביב כדוה"א</button>
+        </div>
+    </div>
+    <div class="menu-section">
+        <div class="menu-section-title">📏 קנה מידה</div>
+        <div class="menu-toggle-group" id="scale-toggle">
+            <button class="menu-toggle-opt active" data-scale="toy">צעצוע</button>
+            <button class="menu-toggle-opt" data-scale="real">יחסי אמיתי</button>
+        </div>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-action" onclick="sim.jumpToYear(); toggleMenu();">
+        <span class="menu-action-icon">⏩</span><span>קפיצה לשנה שלמה</span>
+    </div>
+    <div class="menu-action" onclick="showExplanation()">
+        <span class="menu-action-icon">📖</span><span>הסבר מדעי</span>
+    </div>
+    <div class="menu-action" onclick="toggleFullscreen(); toggleMenu();">
+        <span class="menu-action-icon">⛶</span><span>מסך מלא</span>
+    </div>
+</div>
+
+<!-- Dual Clock Widget (months inside, years outside) -->
+<div id="clock-widget">
+    <svg width="70" height="70" viewBox="0 0 70 70">
+        <!-- Outer ring: Year progress (gold) -->
+        <circle cx="35" cy="35" r="32" fill="none" stroke="rgba(251,191,36,0.15)" stroke-width="4"/>
+        <circle id="clock-year-arc" cx="35" cy="35" r="32" fill="none"
+                stroke="#fbbf24" stroke-width="4"
+                stroke-dasharray="201.06 201.06" stroke-dashoffset="201.06"
+                stroke-linecap="round"
+                transform="rotate(-90 35 35)"/>
+        <!-- Inner ring: Month progress (blue) -->
+        <circle cx="35" cy="35" r="24" fill="none" stroke="rgba(96,165,250,0.15)" stroke-width="3.5"/>
+        <circle id="clock-month-arc" cx="35" cy="35" r="24" fill="none"
+                stroke="#60a5fa" stroke-width="3.5"
+                stroke-dasharray="150.80 150.80" stroke-dashoffset="150.80"
+                stroke-linecap="round"
+                transform="rotate(-90 35 35)"/>
+        <!-- Center labels -->
+        <text id="clock-year-text" x="35" y="31" text-anchor="middle" fill="#fbbf24" font-family="Rubik" font-size="10" font-weight="700">0</text>
+        <text x="35" y="40" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Rubik" font-size="6">שנים</text>
+        <text id="clock-month-text" x="35" y="50" text-anchor="middle" fill="#60a5fa" font-family="Rubik" font-size="7.5" font-weight="600">0</text>
+        <text x="35" y="57" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Rubik" font-size="5">חודשים</text>
+    </svg>
+</div>
+
+<!-- Speed +/- Controls -->
+<div id="speed-controls">
+    <div class="speed-mini-btn" onclick="sim.speedUp()">+</div>
+    <div id="speed-mini-label">10x</div>
+    <div class="speed-mini-btn" onclick="sim.speedDown()">−</div>
+</div>
+
+<!-- Focus Indicator -->
+<div id="focus-indicator" onclick="sim.cycleFocus()">
+    <span>מיקוד: </span><span class="focus-body" id="focus-label">כדוה"א</span>
+</div>
+
+<!-- Bottom Sheet -->
+<div id="bottom-sheet">
+    <div class="sheet-handle-area" id="sheet-handle">
+        <div class="sheet-handle"></div>
+    </div>
+    <div class="sheet-collapsed-controls">
+        <button class="ctrl-btn-mobile" onclick="sim.reset()">↺ איפוס</button>
+        <button class="play-btn-mobile" id="btn-play" onclick="sim.togglePlay()">▶</button>
+        <button class="ctrl-btn-mobile" id="btn-speed-display" onclick="toggleBottomSheet()">
+            <span id="speed-display">10x</span> ▲
+        </button>
+    </div>
+    <div class="sheet-expanded-controls">
+        <div class="ctrl-section-title">⚙ מהירות סימולציה</div>
+        <div class="speed-slider-area">
+            <div class="speed-label-row">
+                <span>מהירות</span>
+                <span class="speed-value" id="speed-value-label">10x</span>
+            </div>
+            <input type="range" class="speed-slider" id="speed-slider" min="0" max="5" step="1" value="1">
+            <div class="speed-presets" id="speed-presets">
+                <button class="speed-preset-btn" data-speed="1">1x</button>
+                <button class="speed-preset-btn active" data-speed="10">10x</button>
+                <button class="speed-preset-btn" data-speed="50">50x</button>
+                <button class="speed-preset-btn" data-speed="100">100x</button>
+                <button class="speed-preset-btn" data-speed="500">500x</button>
+            </div>
+        </div>
+        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 0;"></div>
+        <div class="ctrl-section-title">📊 נתוני מסלול</div>
+        <div class="detailed-hud">
+            <div class="dhud-row">
+                <span class="dhud-label">ימים שחלפו</span>
+                <span class="dhud-value" id="dhud-days">0.00</span>
+            </div>
+            <div class="dhud-divider"></div>
+            <div class="dhud-row">
+                <span class="dhud-label">הקפות כדוה"א</span>
+                <span class="dhud-value" id="dhud-earth-orbits" style="color: #60a5fa;">0.000</span>
+            </div>
+            <div class="dhud-row">
+                <span class="dhud-label">הקפות ירח</span>
+                <span class="dhud-value" id="dhud-moon-orbits" style="color: #9ca3af;">0.000</span>
+            </div>
+            <div class="dhud-divider"></div>
+            <div class="dhud-row">
+                <span class="dhud-label">יחס (ירח/כדוה"א)</span>
+                <span class="dhud-value" id="dhud-ratio" style="color: var(--highlight); font-weight: 700; font-size: 1rem;">--</span>
+            </div>
+            <div class="hud-ratio-note" id="hud-ratio-note">365.25 ÷ 29.53 = 12.37 — לא מספר שלם!</div>
+        </div>
+    </div>
+</div>
+
+<!-- Explanation Panel -->
+<div id="explanation">
+    <button class="close-expl-btn" onclick="hideExplanation()">✕</button>
+    <h3>📖 למה שנה ≠ 12 חודשי ירח?</h3>
+    <p>
+        כדור הארץ מסיים הקפה מלאה סביב השמש ב-<strong style="color:var(--earth-blue);">365.25 ימים</strong> (שנה).<br><br>
+        הירח חוזר לאותו מופע (ירח מלא → ירח מלא) כל <strong style="color:var(--moon-gray);">29.53 ימים</strong> (חודש סינודי).
+    </p>
+    <span class="math-highlight">365.25 ÷ 29.53 = 12.369...</span>
+    <p>
+        המספר <strong style="color:var(--highlight);">12.37</strong> אינו שלם! 12 חודשי ירח = 354.37 ימים, חסרים עוד <strong>~11 ימים</strong> עד שנה שלמה.<br><br>
+        זו הסיבה שלוח השנה הירחי (354 ימים ל-12 חודשים) מתחיל "לזוז" ביחס לעונות. התרבויות שונות פתרו בעיה זו בדרכים שונות: שנה מעוברת בלוח העברי, רמדאן הנודד באסלאם, ועוד.
+    </p>
+</div>
+
+<!-- Share Toast -->
+<div id="share-toast">✔ הקישור הועתק</div>
+
+<script>
+// ==================================================================
+// PhysiTal — Sun-Earth-Moon System Simulation (Mobile v4)
+// Welcome screen → play to start → educational messages pause sim
+// Instant clock reset (no drain animation) + play pulse after messages
+// ==================================================================
+
+const SPEED_STEPS = [1, 10, 50, 100, 500, 1000];
+
+// Clock SVG elements
+const clockYearArc = document.getElementById('clock-year-arc');
+const clockMonthArc = document.getElementById('clock-month-arc');
+const clockYearText = document.getElementById('clock-year-text');
+const clockMonthText = document.getElementById('clock-month-text');
+const YEAR_CIRCUMFERENCE = 2 * Math.PI * 32;
+const MONTH_CIRCUMFERENCE = 2 * Math.PI * 24;
+
+// Message milestone tracking
+// We track conjunctions (when Moon passes between Earth and Sun) to count synodic months.
+// The conjunction detector uses elongation angle crossing zero.
+let prevElongation = 0;
+let conjunctionCount = 0;
+
+const milestones = {
+    month1: { triggered: false, threshold: () => conjunctionCount >= 1, el: 'msg-month1' },
+    quarter: { triggered: false, threshold: () => sim.elapsedDays >= sim.EARTH_PERIOD * 0.25, el: 'msg-quarter' },
+    halfyear: { triggered: false, threshold: () => sim.elapsedDays >= sim.EARTH_PERIOD * 0.5, el: 'msg-halfyear' },
+    twelvemonths: { triggered: false, threshold: () => conjunctionCount >= 12, el: 'msg-12months' },
+    year: { triggered: false, threshold: () => sim.elapsedDays >= sim.EARTH_PERIOD, el: 'msg-year' }
+};
+
+let activeMessage = null;
+let speedHintShown = false;
+let welcomeDismissed = false;
+
+function showMessage(id) {
+    sim.playing = false;
+    document.getElementById('btn-play').textContent = '▶';
+    activeMessage = id;
+    document.getElementById(id).classList.add('visible');
+}
+
+function dismissMessage(id) {
+    document.getElementById(id).classList.remove('visible');
+    activeMessage = null;
+
+    // Show pulsing play button + arrow hint
+    const playBtn = document.getElementById('btn-play');
+    playBtn.classList.add('pulsing');
+    document.getElementById('play-arrow-hint').classList.add('visible');
+
+    // Show speed hint after first message
+    if (!speedHintShown && id === 'msg-month1') {
+        speedHintShown = true;
+        setTimeout(() => {
+            const hint = document.getElementById('hint-speed');
+            hint.classList.add('visible');
+            setTimeout(() => hint.classList.remove('visible'), 4000);
+        }, 800);
+    }
+
+    // Update year ratio in the year message
+    if (id === 'msg-year') {
+        const eO = sim.elapsedDays / sim.EARTH_PERIOD;
+        const mO = sim.elapsedDays / sim.SYNODIC_MONTH;
+        document.getElementById('msg-year-ratio').textContent = (mO / eO).toFixed(3);
+    }
+}
+
+function checkMilestones() {
+    if (activeMessage) return;
+    for (const key in milestones) {
+        const m = milestones[key];
+        if (!m.triggered && m.threshold()) {
+            m.triggered = true;
+            showMessage(m.el);
+            return;
+        }
+    }
+}
+
+const sim = {
+    // ── Physics Constants ──
+    EARTH_PERIOD: 365.25,
+    MOON_PERIOD: 27.321661,    // sidereal month (physical orbit)
+    SYNODIC_MONTH: 29.530589,  // synodic month (new moon to new moon, calendar-relevant)
+    SUN_RADIUS_KM: 696342,
+    EARTH_RADIUS_KM: 6371,
+    MOON_RADIUS_KM: 1737.4,
+    EARTH_SUN_DIST_KM: 149597870.7,
+    EARTH_MOON_DIST_KM: 384400,
+
+    // ── Toy Scale ──
+    toy: {
+        sunRadius: 6,
+        earthRadius: 3.2,
+        moonRadius: 1.6,
+        earthOrbitRadius: 45,
+        moonOrbitRadius: 11
+    },
+
+    // ── State ──
+    playing: false,  // starts paused — welcome screen first
+    speed: 10,
+    elapsedDays: 0,
+    scaleMode: 'toy',
+    refFrame: 'heliocentric',
+    focusTarget: 'earth',
+
+    // ── Trail data ──
+    earthTrail: [],
+    moonTrail: [],
+    maxTrailPoints: 4000,
+
+    // ── Three.js ──
+    scene: null, camera: null, renderer: null,
+    sunMesh: null, earthMesh: null, moonMesh: null,
+    sunGlow: null, earthGlow: null,
+    earthOrbitLine: null, moonOrbitLine: null,
+    earthTrailLine: null, moonTrailLine: null,
+    gridHelper: null, sunLight: null, ambientLight: null, starField: null,
+
+    real: {},
+
+    // ── Previous clock values (for instant reset detection) ──
+    prevYearFrac: 0,
+    prevMonthFrac: 0,
+
+    // ── Camera ──
+    cam: {
+        isDown: false,
+        isPinching: false,
+        lastX: 0, lastY: 0,
+        lastDist: 0,
+        theta: Math.PI / 4,
+        phi: Math.PI / 3.5,
+        radius: 25,
+        targetX: 0, targetY: 0, targetZ: 0,
+        smoothTargetX: 0, smoothTargetY: 0, smoothTargetZ: 0,
+        velTheta: 0, velPhi: 0,
+        damping: 0.92
+    },
+
+    init() {
+        this.computeRealScale();
+        this.initThree();
+        this.initBodies();
+        this.initTrails();
+        this.initOrbitGuides();
+        this.initGrid();
+        this.initStarfield();
+        this.initLighting();
+        this.initTouchControls();
+        this.initUI();
+        this.initWelcome();
+        this.animate(0);
+    },
+
+    initWelcome() {
+        const overlay = document.getElementById('welcome-overlay');
+        const btn = document.getElementById('welcome-play-btn');
+        btn.addEventListener('click', () => {
+            overlay.classList.add('hidden');
+            welcomeDismissed = true;
+            this.playing = true;
+            document.getElementById('btn-play').textContent = '⏸';
+        });
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            btn.click();
+        });
+    },
+
+    computeRealScale() {
+        const baseUnit = this.EARTH_SUN_DIST_KM / 100;
+        this.real = {
+            sunRadius: Math.max(this.SUN_RADIUS_KM / baseUnit, 0.5),
+            earthRadius: Math.max(this.EARTH_RADIUS_KM / baseUnit * 50, 0.15),
+            moonRadius: Math.max(this.MOON_RADIUS_KM / baseUnit * 50, 0.08),
+            earthOrbitRadius: 100,
+            moonOrbitRadius: this.EARTH_MOON_DIST_KM / baseUnit
+        };
+    },
+
+    getScale() {
+        return this.scaleMode === 'toy' ? this.toy : this.real;
+    },
+
+    initThree() {
+        const container = document.getElementById('three-container');
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x0a0a1a);
+
+        this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.01, 100000);
+        this.camera.position.set(0, 50, 70);
+
+        this.renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: false,
+            powerPreference: 'high-performance'
+        });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(this.renderer.domElement);
+
+        window.addEventListener('resize', () => {
+            this.camera.aspect = window.innerWidth / window.innerHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    },
+
+    initBodies() {
+        const s = this.getScale();
+
+        // ── Sun with shader ──
+        const sunGeo = new THREE.SphereGeometry(1, 40, 40);
+        const sunMat = new THREE.ShaderMaterial({
+            uniforms: {
+                color1: { value: new THREE.Color(0xffdd44) },
+                color2: { value: new THREE.Color(0xff6600) },
+                time: { value: 0 }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vPosition;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vPosition = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 color1;
+                uniform vec3 color2;
+                uniform float time;
+                varying vec3 vNormal;
+                varying vec3 vPosition;
+                void main() {
+                    float fresnel = pow(1.0 - abs(dot(vNormal, vec3(0,0,1))), 2.0);
+                    float noise = sin(vPosition.x*8.0+time)*sin(vPosition.y*8.0+time*0.7)*0.15;
+                    vec3 col = mix(color1, color2, fresnel+noise);
+                    gl_FragColor = vec4(col, 1.0);
+                }
+            `
+        });
+        this.sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        this.sunMesh.scale.setScalar(s.sunRadius);
+        this.scene.add(this.sunMesh);
+
+        // Sun glow sprite
+        const gc = document.createElement('canvas');
+        gc.width = gc.height = 256;
+        const gx = gc.getContext('2d');
+        const grad = gx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        grad.addColorStop(0, 'rgba(255,200,50,0.6)');
+        grad.addColorStop(0.3, 'rgba(255,150,30,0.3)');
+        grad.addColorStop(0.6, 'rgba(255,100,10,0.1)');
+        grad.addColorStop(1, 'rgba(255,80,0,0)');
+        gx.fillStyle = grad;
+        gx.fillRect(0, 0, 256, 256);
+        this.sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: new THREE.CanvasTexture(gc),
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        }));
+        this.sunGlow.scale.setScalar(s.sunRadius * 4);
+        this.scene.add(this.sunGlow);
+
+        // ── Earth ──
+        const earthGeo = new THREE.SphereGeometry(1, 32, 32);
+        const earthMat = new THREE.MeshPhongMaterial({
+            color: 0x2266dd,
+            emissive: 0x1a3366,
+            emissiveIntensity: 0.5,
+            shininess: 30
+        });
+        this.earthMesh = new THREE.Mesh(earthGeo, earthMat);
+        this.earthMesh.scale.setScalar(s.earthRadius);
+        this.scene.add(this.earthMesh);
+
+        // Earth glow
+        const egGeo = new THREE.SphereGeometry(1, 20, 20);
+        const egMat = new THREE.ShaderMaterial({
+            uniforms: { color: { value: new THREE.Color(0x4499ff) } },
+            vertexShader: `
+                varying vec3 vNormal;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 color;
+                varying vec3 vNormal;
+                void main() {
+                    float i = pow(0.6 - dot(vNormal, vec3(0,0,1)), 3.0);
+                    gl_FragColor = vec4(color, i * 0.6);
+                }
+            `,
+            side: THREE.BackSide,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        this.earthGlow = new THREE.Mesh(egGeo, egMat);
+        this.earthGlow.scale.setScalar(s.earthRadius * 1.3);
+        this.scene.add(this.earthGlow);
+
+        // ── Moon ──
+        const moonGeo = new THREE.SphereGeometry(1, 20, 20);
+        const moonMat = new THREE.MeshPhongMaterial({
+            color: 0xbbbbbb,
+            emissive: 0x444444,
+            emissiveIntensity: 0.4,
+            shininess: 5
+        });
+        this.moonMesh = new THREE.Mesh(moonGeo, moonMat);
+        this.moonMesh.scale.setScalar(s.moonRadius);
+        this.scene.add(this.moonMesh);
+    },
+
+    initTrails() {
+        const makeLine = (color, opacity) => {
+            const geo = new THREE.BufferGeometry();
+            const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity, linewidth: 1 });
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(this.maxTrailPoints * 3), 3));
+            geo.setDrawRange(0, 0);
+            const line = new THREE.Line(geo, mat);
+            this.scene.add(line);
+            return line;
+        };
+        this.earthTrailLine = makeLine(0x3b82f6, 0.6);
+        this.moonTrailLine = makeLine(0xffffff, 0.45);
+    },
+
+    initOrbitGuides() {
+        const s = this.getScale();
+        const makeCircle = (radius, color) => {
+            const pts = [];
+            for (let i = 0; i <= 360; i++) {
+                const a = (i * Math.PI) / 180;
+                pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+            }
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const line = new THREE.LineLoop(geo, new THREE.LineDashedMaterial({
+                color, transparent: true, opacity: 0.15, dashSize: 2, gapSize: 2
+            }));
+            line.computeLineDistances();
+            line.visible = false;
+            this.scene.add(line);
+            return line;
+        };
+        this.earthOrbitLine = makeCircle(s.earthOrbitRadius, 0x3b82f6);
+        this.moonOrbitLine = makeCircle(s.moonOrbitRadius, 0x9ca3af);
+    },
+
+    initGrid() {
+        const s = this.getScale();
+        const gridSize = s.earthOrbitRadius * 2.5;
+        this.gridHelper = new THREE.GridHelper(gridSize, 20, 0x1a1a3a, 0x111128);
+        this.gridHelper.material.transparent = true;
+        this.gridHelper.material.opacity = 0.25;
+        this.scene.add(this.gridHelper);
+    },
+
+    initStarfield() {
+        const n = 1500;
+        const pos = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) {
+            const r = 2000 + Math.random() * 3000;
+            const t = Math.random() * Math.PI * 2;
+            const p = Math.acos(2 * Math.random() - 1);
+            pos[i*3] = r*Math.sin(p)*Math.cos(t);
+            pos[i*3+1] = r*Math.sin(p)*Math.sin(t);
+            pos[i*3+2] = r*Math.cos(p);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        this.starField = new THREE.Points(geo, new THREE.PointsMaterial({
+            color: 0xffffff, size: 1.5, sizeAttenuation: true, transparent: true, opacity: 0.8
+        }));
+        this.scene.add(this.starField);
+    },
+
+    initLighting() {
+        this.sunLight = new THREE.PointLight(0xffeedd, 2.5, 0, 0.5);
+        this.sunLight.position.set(0, 0, 0);
+        this.scene.add(this.sunLight);
+        this.ambientLight = new THREE.AmbientLight(0x334466, 0.6);
+        this.scene.add(this.ambientLight);
+    },
+
+    // ── Positions ──
+    getEarthPos(days) {
+        const s = this.getScale();
+        const a = (2 * Math.PI * days) / this.EARTH_PERIOD;
+        return { x: Math.cos(a) * s.earthOrbitRadius, y: 0, z: Math.sin(a) * s.earthOrbitRadius };
+    },
+    getMoonRel(days) {
+        const s = this.getScale();
+        // Moon orbits with sidereal period (physical orbit around Earth)
+        // We place the moon so that at day=0 it is at conjunction (between Earth and Sun).
+        // Earth is at angle 0 (positive X from Sun) at day 0, so "toward the Sun"
+        // from Earth's perspective is the negative-X direction (toward origin).
+        // We want moonAngle=PI (pointing toward Sun) at day=0.
+        const a = Math.PI + (2 * Math.PI * days) / this.MOON_PERIOD;
+        return { x: Math.cos(a) * s.moonOrbitRadius, y: 0, z: Math.sin(a) * s.moonOrbitRadius };
+    },
+    getMoonAbs(days) {
+        const e = this.getEarthPos(days), m = this.getMoonRel(days);
+        return { x: e.x+m.x, y: e.y+m.y, z: e.z+m.z };
+    },
+
+    // ── Synodic month tracking (conjunction-based) ──
+    // Compute the elongation angle: the angle Sun-Earth-Moon.
+    // At conjunction (new moon) this is ~0 (or 2PI). At opposition (full moon) it's ~PI.
+    getElongation(days) {
+        // Earth's position angle around Sun
+        const earthAngle = (2 * Math.PI * days) / this.EARTH_PERIOD;
+        // Moon's sidereal angle relative to Earth (with PI offset so it starts at conjunction)
+        const moonRelAngle = Math.PI + (2 * Math.PI * days) / this.MOON_PERIOD;
+        // Direction from Earth to Sun (in heliocentric frame, Sun is at origin, Earth at earthAngle)
+        // So "toward Sun" from Earth = PI + earthAngle (opposite of Earth's position)
+        const toSunAngle = earthAngle + Math.PI;
+        // Elongation = how far the Moon is from the Sun direction, as seen from Earth
+        let elong = moonRelAngle - toSunAngle;
+        // Normalize to [0, 2PI)
+        elong = ((elong % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        return elong;
+    },
+    // Returns the synodic phase (0 to 1) — 0 = conjunction (new moon), 0.5 = opposition (full moon)
+    getSynodicPhase(days) {
+        return this.getElongation(days) / (2 * Math.PI);
+    },
+    // Count completed synodic months by tracking conjunctions
+    // We use the analytical formula: days / SYNODIC_MONTH, which is exact
+    // because the synodic period IS the conjunction-to-conjunction period by definition
+    getSynodicMonths(days) {
+        return days / this.SYNODIC_MONTH;
+    },
+
+    // ── Scale update ──
+    updateScale() {
+        const s = this.getScale();
+        this.sunMesh.scale.setScalar(s.sunRadius);
+        this.sunGlow.scale.setScalar(s.sunRadius * 4);
+        this.earthMesh.scale.setScalar(s.earthRadius);
+        this.earthGlow.scale.setScalar(s.earthRadius * 1.3);
+        this.moonMesh.scale.setScalar(s.moonRadius);
+
+        [this.earthOrbitLine, this.moonOrbitLine].forEach(l => {
+            if (l) { l.geometry.dispose(); l.material.dispose(); this.scene.remove(l); }
+        });
+        this.initOrbitGuides();
+
+        if (this.gridHelper) { this.gridHelper.geometry.dispose(); this.gridHelper.material.dispose(); this.scene.remove(this.gridHelper); }
+        this.initGrid();
+
+        const chkO = document.getElementById('chk-orbits');
+        const chkG = document.getElementById('chk-grid');
+        if (chkO) { this.earthOrbitLine.visible = chkO.checked; this.moonOrbitLine.visible = chkO.checked; }
+        if (chkG) this.gridHelper.visible = chkG.checked;
+
+        this.earthTrail = [];
+        this.moonTrail = [];
+
+        if (this.scaleMode === 'real') {
+            this.cam.radius = 200;
+            this.camera.near = 0.001;
+        } else {
+            this.cam.radius = 85;
+            this.camera.near = 0.01;
+        }
+        this.camera.far = 100000;
+        this.camera.updateProjectionMatrix();
+        this.updateCamera();
+    },
+
+    // ── Camera Focus ──
+    cycleFocus() {
+        const modes = ['system', 'earth', 'moon'];
+        const labels = { system: 'מערכת', earth: 'כדוה"א', moon: 'ירח' };
+        const idx = (modes.indexOf(this.focusTarget) + 1) % modes.length;
+        this.focusTarget = modes[idx];
+        document.getElementById('focus-label').textContent = labels[this.focusTarget];
+
+        if (this.focusTarget === 'earth' && this.scaleMode === 'toy') {
+            this.cam.radius = 25;
+        } else if (this.focusTarget === 'moon' && this.scaleMode === 'toy') {
+            this.cam.radius = 20;
+        } else if (this.scaleMode === 'toy') {
+            this.cam.radius = 85;
+        }
+    },
+
+    // ── Speed +/- ──
+    speedUp() {
+        const idx = SPEED_STEPS.indexOf(this.speed);
+        if (idx < SPEED_STEPS.length - 1) {
+            this.setSpeed(SPEED_STEPS[idx + 1]);
+        }
+    },
+    speedDown() {
+        const idx = SPEED_STEPS.indexOf(this.speed);
+        if (idx > 0) {
+            this.setSpeed(SPEED_STEPS[idx - 1]);
+        }
+    },
+
+    // ── Touch Controls ──
+    initTouchControls() {
+        const el = this.renderer.domElement;
+        let lastTapTime = 0, touchStart = 0, hasMoved = false;
+
+        el.addEventListener('touchstart', (e) => {
+            if (!welcomeDismissed) return;
+            e.preventDefault();
+            const t = e.touches;
+            if (t.length === 1) {
+                this.cam.isDown = true;
+                this.cam.isPinching = false;
+                this.cam.lastX = t[0].clientX;
+                this.cam.lastY = t[0].clientY;
+                this.cam.velTheta = 0;
+                this.cam.velPhi = 0;
+                touchStart = Date.now();
+                hasMoved = false;
+            } else if (t.length === 2) {
+                this.cam.isPinching = true;
+                this.cam.isDown = false;
+                const dx = t[0].clientX - t[1].clientX;
+                const dy = t[0].clientY - t[1].clientY;
+                this.cam.lastDist = Math.sqrt(dx*dx + dy*dy);
+            }
+        }, { passive: false });
+
+        el.addEventListener('touchmove', (e) => {
+            if (!welcomeDismissed) return;
+            e.preventDefault();
+            const t = e.touches;
+            if (this.cam.isPinching && t.length === 2) {
+                const dx = t[0].clientX - t[1].clientX;
+                const dy = t[0].clientY - t[1].clientY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const delta = dist - this.cam.lastDist;
+                this.cam.radius *= 1 - delta * 0.005;
+                const maxR = this.scaleMode === 'real' ? 5000 : 400;
+                this.cam.radius = Math.max(3, Math.min(maxR, this.cam.radius));
+                this.cam.lastDist = dist;
+                this.updateCamera();
+                hasMoved = true;
+            } else if (this.cam.isDown && t.length === 1) {
+                const dx = t[0].clientX - this.cam.lastX;
+                const dy = t[0].clientY - this.cam.lastY;
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved = true;
+                const sens = 0.005;
+                this.cam.theta -= dx * sens;
+                this.cam.phi -= dy * sens;
+                this.cam.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this.cam.phi));
+                this.cam.velTheta = -dx * sens;
+                this.cam.velPhi = -dy * sens;
+                this.cam.lastX = t[0].clientX;
+                this.cam.lastY = t[0].clientY;
+                this.updateCamera();
+            }
+        }, { passive: false });
+
+        el.addEventListener('touchend', (e) => {
+            if (!welcomeDismissed) return;
+            e.preventDefault();
+            if (e.touches.length === 0) {
+                this.cam.isDown = false;
+                this.cam.isPinching = false;
+                const now = Date.now();
+                if (!hasMoved && now - touchStart < 300) {
+                    if (now - lastTapTime < 300) {
+                        this.togglePlay();
+                        lastTapTime = 0;
+                    } else {
+                        lastTapTime = now;
+                    }
+                }
+            } else if (e.touches.length === 1) {
+                this.cam.isPinching = false;
+                this.cam.isDown = true;
+                this.cam.lastX = e.touches[0].clientX;
+                this.cam.lastY = e.touches[0].clientY;
+            }
+        }, { passive: false });
+
+        // Mouse fallback
+        el.addEventListener('mousedown', (e) => {
+            this.cam.isDown = true;
+            this.cam.lastX = e.clientX;
+            this.cam.lastY = e.clientY;
+            this.cam.velTheta = 0;
+            this.cam.velPhi = 0;
+        });
+        el.addEventListener('mousemove', (e) => {
+            if (!this.cam.isDown) return;
+            const dx = e.clientX - this.cam.lastX, dy = e.clientY - this.cam.lastY;
+            const s = 0.005;
+            this.cam.theta -= dx*s;
+            this.cam.phi -= dy*s;
+            this.cam.phi = Math.max(0.05, Math.min(Math.PI-0.05, this.cam.phi));
+            this.cam.velTheta = -dx*s;
+            this.cam.velPhi = -dy*s;
+            this.cam.lastX = e.clientX;
+            this.cam.lastY = e.clientY;
+            this.updateCamera();
+        });
+        el.addEventListener('mouseup', () => { this.cam.isDown = false; });
+        el.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            this.cam.radius *= 1 + e.deltaY * 0.001;
+            const maxR = this.scaleMode === 'real' ? 5000 : 400;
+            this.cam.radius = Math.max(3, Math.min(maxR, this.cam.radius));
+            this.updateCamera();
+        }, { passive: false });
+    },
+
+    updateCamera() {
+        const c = this.cam;
+        const x = c.smoothTargetX + c.radius * Math.sin(c.phi) * Math.sin(c.theta);
+        const y = c.smoothTargetY + c.radius * Math.cos(c.phi);
+        const z = c.smoothTargetZ + c.radius * Math.sin(c.phi) * Math.cos(c.theta);
+        this.camera.position.set(x, y, z);
+        this.camera.lookAt(c.smoothTargetX, c.smoothTargetY, c.smoothTargetZ);
+    },
+
+    // ── Animation ──
+    lastTime: -1,
+
+    animate(timestamp) {
+        requestAnimationFrame((t) => sim.animate(t));
+        if (this.lastTime < 0) { this.lastTime = timestamp; return; }
+        const rawDt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+        const dt = Math.min(rawDt, 0.1);
+
+        if (this.playing) {
+            const prevDays = this.elapsedDays;
+            this.elapsedDays += this.speed * dt;
+
+            // Detect conjunctions: elongation crossing from >PI to <PI (wrapping through 0/2PI)
+            if (prevDays > 0.5) { // skip the initial state
+                const elong = this.getElongation(this.elapsedDays);
+                // Conjunction = elongation near 0 (or 2PI). Detect wrap: prev was large, now is small
+                if (prevElongation > Math.PI && elong < Math.PI) {
+                    conjunctionCount++;
+                }
+                prevElongation = elong;
+            } else if (prevDays <= 0.5 && this.elapsedDays > 0.5) {
+                prevElongation = this.getElongation(this.elapsedDays);
+            }
+        }
+
+        // Sun shader
+        if (this.sunMesh.material.uniforms) this.sunMesh.material.uniforms.time.value = timestamp * 0.001;
+
+        const days = this.elapsedDays;
+        const ep = this.getEarthPos(days);
+        const mr = this.getMoonRel(days);
+        const ma = this.getMoonAbs(days);
+
+        // Position bodies
+        if (this.refFrame === 'heliocentric') {
+            this.sunMesh.position.set(0, 0, 0);
+            this.sunGlow.position.set(0, 0, 0);
+            this.sunLight.position.set(0, 0, 0);
+            this.earthMesh.position.set(ep.x, ep.y, ep.z);
+            this.earthGlow.position.copy(this.earthMesh.position);
+            this.moonMesh.position.set(ma.x, ma.y, ma.z);
+            this.moonOrbitLine.position.set(ep.x, ep.y, ep.z);
+            this.earthOrbitLine.position.set(0, 0, 0);
+        } else {
+            this.earthMesh.position.set(0, 0, 0);
+            this.earthGlow.position.set(0, 0, 0);
+            this.sunMesh.position.set(-ep.x, -ep.y, -ep.z);
+            this.sunGlow.position.copy(this.sunMesh.position);
+            this.sunLight.position.copy(this.sunMesh.position);
+            this.moonMesh.position.set(mr.x, mr.y, mr.z);
+            this.moonOrbitLine.position.set(0, 0, 0);
+            this.earthOrbitLine.position.set(0, 0, 0);
+        }
+
+        // Smooth camera focus
+        let tx = 0, ty = 0, tz = 0;
+        if (this.focusTarget === 'earth') {
+            tx = this.earthMesh.position.x;
+            ty = this.earthMesh.position.y;
+            tz = this.earthMesh.position.z;
+        } else if (this.focusTarget === 'moon') {
+            tx = this.moonMesh.position.x;
+            ty = this.moonMesh.position.y;
+            tz = this.moonMesh.position.z;
+        }
+        const lerp = 0.05;
+        this.cam.smoothTargetX += (tx - this.cam.smoothTargetX) * lerp;
+        this.cam.smoothTargetY += (ty - this.cam.smoothTargetY) * lerp;
+        this.cam.smoothTargetZ += (tz - this.cam.smoothTargetZ) * lerp;
+
+        // Trails
+        if (this.playing) {
+            const chkE = document.getElementById('chk-earth-trail');
+            const chkM = document.getElementById('chk-moon-trail');
+            if (chkE && chkE.checked) {
+                const p = this.refFrame === 'heliocentric' ? ep : { x: -ep.x, y: -ep.y, z: -ep.z };
+                this.earthTrail.push(p.x, p.y, p.z);
+                if (this.earthTrail.length > this.maxTrailPoints * 3) this.earthTrail.splice(0, 3);
+            }
+            if (chkM && chkM.checked) {
+                const p = this.refFrame === 'heliocentric' ? ma : mr;
+                this.moonTrail.push(p.x, p.y, p.z);
+                if (this.moonTrail.length > this.maxTrailPoints * 3) this.moonTrail.splice(0, 3);
+            }
+        }
+        this.updateTrailGeo(this.earthTrailLine, this.earthTrail);
+        this.updateTrailGeo(this.moonTrailLine, this.moonTrail);
+
+        // Labels
+        this.updateLabels();
+        this.updateHUD();
+        this.updateClocks();
+
+        // Check milestones
+        if (this.playing) checkMilestones();
+
+        // Inertia
+        if (!this.cam.isDown && !this.cam.isPinching) {
+            if (Math.abs(this.cam.velTheta) > 0.0001 || Math.abs(this.cam.velPhi) > 0.0001) {
+                this.cam.theta += this.cam.velTheta;
+                this.cam.phi += this.cam.velPhi;
+                this.cam.phi = Math.max(0.05, Math.min(Math.PI-0.05, this.cam.phi));
+                this.cam.velTheta *= this.cam.damping;
+                this.cam.velPhi *= this.cam.damping;
+            }
+        }
+        this.updateCamera();
+        this.renderer.render(this.scene, this.camera);
+    },
+
+    updateTrailGeo(line, trail) {
+        const pos = line.geometry.attributes.position.array;
+        const count = trail.length / 3;
+        for (let i = 0; i < count && i < this.maxTrailPoints; i++) {
+            pos[i*3] = trail[i*3];
+            pos[i*3+1] = trail[i*3+1];
+            pos[i*3+2] = trail[i*3+2];
+        }
+        line.geometry.attributes.position.needsUpdate = true;
+        line.geometry.setDrawRange(0, Math.min(count, this.maxTrailPoints));
+    },
+
+    updateLabels() {
+        const chk = document.getElementById('chk-labels');
+        const show = chk && chk.checked;
+        const bodies = [
+            { mesh: this.sunMesh, el: document.getElementById('label-sun') },
+            { mesh: this.earthMesh, el: document.getElementById('label-earth') },
+            { mesh: this.moonMesh, el: document.getElementById('label-moon') }
+        ];
+        for (const b of bodies) {
+            if (!show) { b.el.style.opacity = '0'; continue; }
+            const p = b.mesh.position.clone();
+            p.y += b.mesh.scale.x * 1.8;
+            p.project(this.camera);
+            if (p.z > 1) { b.el.style.opacity = '0'; continue; }
+            b.el.style.left = (p.x*0.5+0.5)*window.innerWidth + 'px';
+            b.el.style.top = (-p.y*0.5+0.5)*window.innerHeight + 'px';
+            b.el.style.transform = 'translate(-50%,-100%)';
+            b.el.style.opacity = '1';
+        }
+    },
+
+    updateHUD() {
+        const d = this.elapsedDays;
+        const eO = d / this.EARTH_PERIOD;
+        // Synodic months: whole part from conjunction count, fractional from current elongation phase
+        const synodicPhase = d > 0.5 ? this.getSynodicPhase(d) : 0;
+        const mO = conjunctionCount + synodicPhase;
+
+        document.getElementById('hud-days').textContent = Math.floor(d);
+        document.getElementById('hud-earth-orbits').textContent = eO.toFixed(3);
+        document.getElementById('hud-moon-orbits').textContent = mO.toFixed(3);
+        document.getElementById('dhud-days').textContent = d.toFixed(2);
+        document.getElementById('dhud-earth-orbits').textContent = eO.toFixed(3);
+        document.getElementById('dhud-moon-orbits').textContent = mO.toFixed(3);
+
+        if (eO > 0.01) {
+            const r = mO / eO;
+            document.getElementById('hud-ratio').textContent = r.toFixed(2);
+            const dr = document.getElementById('dhud-ratio');
+            dr.textContent = r.toFixed(3);
+            const diff = Math.abs(r - 12.369);
+            if (diff < 0.05) {
+                dr.style.color = '#f97316';
+                dr.style.textShadow = '0 0 10px rgba(249,115,22,0.5)';
+            } else {
+                dr.style.color = '';
+                dr.style.textShadow = '';
+            }
+        } else {
+            document.getElementById('hud-ratio').textContent = '--';
+            document.getElementById('dhud-ratio').textContent = '--';
+        }
+
+        if (eO >= 0.8) document.getElementById('hud-ratio-note').classList.add('visible');
+    },
+
+    // ── Dual Clock Update (instant reset — no drain animation) ──
+    updateClocks() {
+        const d = this.elapsedDays;
+        const eO = d / this.EARTH_PERIOD;
+        const synodicPhase = d > 0.5 ? this.getSynodicPhase(d) : 0;
+        const mO = conjunctionCount + synodicPhase;
+
+        const yearFrac = eO % 1;
+        const monthFrac = mO % 1;
+
+        // Detect wrap-around: if fraction jumped down, disable transition for instant reset
+        const yearWrapped = yearFrac < this.prevYearFrac - 0.5;
+        const monthWrapped = monthFrac < this.prevMonthFrac - 0.5;
+
+        if (yearWrapped) {
+            clockYearArc.style.transition = 'none';
+            clockYearArc.setAttribute('stroke-dashoffset', String(YEAR_CIRCUMFERENCE));
+            // Force reflow then re-enable transition
+            clockYearArc.getBoundingClientRect();
+            clockYearArc.style.transition = 'stroke-dashoffset 0.1s linear';
+        }
+        if (monthWrapped) {
+            clockMonthArc.style.transition = 'none';
+            clockMonthArc.setAttribute('stroke-dashoffset', String(MONTH_CIRCUMFERENCE));
+            clockMonthArc.getBoundingClientRect();
+            clockMonthArc.style.transition = 'stroke-dashoffset 0.1s linear';
+        }
+
+        const yearOffset = YEAR_CIRCUMFERENCE * (1 - yearFrac);
+        const monthOffset = MONTH_CIRCUMFERENCE * (1 - monthFrac);
+        clockYearArc.setAttribute('stroke-dashoffset', yearOffset.toFixed(2));
+        clockMonthArc.setAttribute('stroke-dashoffset', monthOffset.toFixed(2));
+
+        clockYearText.textContent = Math.floor(eO);
+        clockMonthText.textContent = Math.floor(mO);
+
+        this.prevYearFrac = yearFrac;
+        this.prevMonthFrac = monthFrac;
+    },
+
+    // ── Controls ──
+    togglePlay() {
+        this.playing = !this.playing;
+        const btn = document.getElementById('btn-play');
+        btn.textContent = this.playing ? '⏸' : '▶';
+
+        // Remove pulse and arrow when user presses play
+        if (this.playing) {
+            btn.classList.remove('pulsing');
+            document.getElementById('play-arrow-hint').classList.remove('visible');
+        }
+    },
+
+    reset() {
+        this.elapsedDays = 0;
+        this.earthTrail = [];
+        this.moonTrail = [];
+        this.prevYearFrac = 0;
+        this.prevMonthFrac = 0;
+        // Reset conjunction tracking
+        prevElongation = 0;
+        conjunctionCount = 0;
+        // Reset milestones
+        for (const key in milestones) milestones[key].triggered = false;
+        // Hide any active messages
+        document.querySelectorAll('.sim-message').forEach(el => el.classList.remove('visible'));
+        activeMessage = null;
+        document.getElementById('hud-ratio-note').classList.remove('visible');
+        // Reset clock arcs instantly
+        clockYearArc.style.transition = 'none';
+        clockMonthArc.style.transition = 'none';
+        clockYearArc.setAttribute('stroke-dashoffset', String(YEAR_CIRCUMFERENCE));
+        clockMonthArc.setAttribute('stroke-dashoffset', String(MONTH_CIRCUMFERENCE));
+        clockYearArc.getBoundingClientRect();
+        clockYearArc.style.transition = 'stroke-dashoffset 0.1s linear';
+        clockMonthArc.style.transition = 'stroke-dashoffset 0.1s linear';
+    },
+
+    setSpeed(spd) {
+        this.speed = spd;
+        const idx = SPEED_STEPS.indexOf(spd);
+        if (idx >= 0) document.getElementById('speed-slider').value = idx;
+        document.getElementById('speed-display').textContent = spd + 'x';
+        document.getElementById('speed-value-label').textContent = spd + 'x';
+        document.getElementById('speed-mini-label').textContent = spd + 'x';
+        document.querySelectorAll('.speed-preset-btn').forEach(b => {
+            b.classList.toggle('active', parseInt(b.dataset.speed) === spd);
+        });
+    },
+
+    setRefFrame(mode) {
+        this.refFrame = mode;
+        this.earthTrail = [];
+        this.moonTrail = [];
+        document.querySelectorAll('#ref-frame-toggle .menu-toggle-opt').forEach(b => {
+            b.classList.toggle('active', b.dataset.mode === mode);
+        });
+        this.earthTrailLine.material.color.set(mode === 'geocentric' ? 0xffaa00 : 0x3b82f6);
+    },
+
+    setScaleMode(mode) {
+        this.scaleMode = mode;
+        document.querySelectorAll('#scale-toggle .menu-toggle-opt').forEach(b => {
+            b.classList.toggle('active', b.dataset.scale === mode);
+        });
+        this.updateScale();
+    },
+
+    jumpToYear() {
+        this.elapsedDays = this.EARTH_PERIOD;
+        // Reset milestone tracking so the year message fires
+        for (const key in milestones) {
+            if (key !== 'year') milestones[key].triggered = true;
+        }
+        milestones.year.triggered = false;
+    },
+
+    // ── UI Init ──
+    initUI() {
+        const slider = document.getElementById('speed-slider');
+        slider.addEventListener('input', () => this.setSpeed(SPEED_STEPS[parseInt(slider.value)]));
+        document.querySelectorAll('.speed-preset-btn').forEach(b => {
+            b.addEventListener('click', () => this.setSpeed(parseInt(b.dataset.speed)));
+        });
+        document.querySelectorAll('#ref-frame-toggle .menu-toggle-opt').forEach(b => {
+            b.addEventListener('click', () => this.setRefFrame(b.dataset.mode));
+        });
+        document.querySelectorAll('#scale-toggle .menu-toggle-opt').forEach(b => {
+            b.addEventListener('click', () => this.setScaleMode(b.dataset.scale));
+        });
+        document.getElementById('chk-earth-trail').addEventListener('change', function() {
+            sim.earthTrailLine.visible = this.checked;
+            if (!this.checked) sim.earthTrail = [];
+        });
+        document.getElementById('chk-moon-trail').addEventListener('change', function() {
+            sim.moonTrailLine.visible = this.checked;
+            if (!this.checked) sim.moonTrail = [];
+        });
+        document.getElementById('chk-grid').addEventListener('change', function() {
+            sim.gridHelper.visible = this.checked;
+        });
+        document.getElementById('chk-orbits').addEventListener('change', function() {
+            sim.earthOrbitLine.visible = this.checked;
+            sim.moonOrbitLine.visible = this.checked;
+        });
+        this.initBottomSheetDrag();
+    },
+
+    initBottomSheetDrag() {
+        const sheet = document.getElementById('bottom-sheet');
+        const handle = document.getElementById('sheet-handle');
+        let startY = 0, isDragging = false;
+
+        handle.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            isDragging = true;
+            startY = e.touches[0].clientY;
+            sheet.style.transition = 'none';
+        }, { passive: false });
+
+        handle.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            e.stopPropagation();
+            e.preventDefault();
+        }, { passive: false });
+
+        handle.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            sheet.style.transition = '';
+            const delta = e.changedTouches[0].clientY - startY;
+            if (sheet.classList.contains('expanded')) {
+                if (delta > 50) sheet.classList.remove('expanded');
+            } else {
+                if (delta < -50) sheet.classList.add('expanded');
+            }
+        });
+    }
+};
+
+// ── UI Helpers ──
+function toggleMenu() {
+    const m = document.getElementById('side-menu');
+    const o = document.getElementById('menu-overlay');
+    const b = document.getElementById('menu-btn');
+    const isOpen = m.classList.contains('open');
+    m.classList.toggle('open', !isOpen);
+    o.classList.toggle('open', !isOpen);
+    b.classList.toggle('open', !isOpen);
+}
+
+function toggleBottomSheet() {
+    document.getElementById('bottom-sheet').classList.toggle('expanded');
+}
+
+function showExplanation() {
+    document.getElementById('explanation').classList.add('visible');
+    const m = document.getElementById('side-menu');
+    if (m.classList.contains('open')) toggleMenu();
+}
+
+function hideExplanation() {
+    document.getElementById('explanation').classList.remove('visible');
+}
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+// Prevent default mobile behaviors
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('gesturechange', (e) => e.preventDefault());
+
+// Init
+window.addEventListener('DOMContentLoaded', () => sim.init());
+</script>
+
+</body>
+</html>
